@@ -8,13 +8,14 @@
     "critique": "./src/cli.tsx"
   },
   "scripts": {
-    "cli": "bun --watch src/cli.tsx"
+    "cli": "bun --watch src/cli.tsx",
+    "example": "bun --watch src/example.tsx"
   },
   "devDependencies": {
-    "@types/bun": "latest"
+    "@types/bun": "1.2.23"
   },
   "peerDependencies": {
-    "typescript": "^5"
+    "typescript": "^5.9.3"
   },
   "dependencies": {
     "@opentui/core": "^0.1.25",
@@ -23,7 +24,7 @@
     "@shikijs/themes": "^3.13.0",
     "cac": "^6.7.14",
     "diff": "^8.0.2",
-    "react": "^19.1.1",
+    "react": "^19.2.0",
     "react-error-boundary": "^6.0.0",
     "shiki": "^3.13.0"
   }

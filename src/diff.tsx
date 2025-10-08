@@ -15,15 +15,48 @@ import {
 } from "shiki";
 
 // Color constants for diff display
-const REMOVED_BG_LIGHT = RGBA.fromInts(255, 0, 0, 32); // Light red with transparency for removed code lines
-const REMOVED_BG_DARK = RGBA.fromInts(120, 0, 0, 220); // Darker red for emphasis on word-level changes
-const ADDED_BG_LIGHT = RGBA.fromInts(0, 255, 0, 32); // Light green with transparency for added code lines
-const ADDED_BG_DARK = RGBA.fromInts(0, 120, 0, 220); // Darker green for emphasis on word-level changes
-const UNCHANGED_CODE_BG = RGBA.fromInts(15, 15, 15, 255); // Dark background for unchanged code lines
-const UNCHANGED_BG = RGBA.fromInts(128, 128, 128, 16); // Light gray for unchanged lines (legacy)
-const LINE_NUMBER_BG = RGBA.fromInts(5, 5, 5, 255); // Darker gray background for line numbers
-const REMOVED_LINE_NUMBER_BG = RGBA.fromInts(60, 0, 0, 255); // Much darker red for removed line numbers
-const ADDED_LINE_NUMBER_BG = RGBA.fromInts(0, 50, 0, 255); // Much darker green for added line numbers
+const REMOVED_BG_LIGHT = RGBA.fromInts(255, 0, 0, 32);
+const REMOVED_BG_DARK = RGBA.fromInts(120, 0, 0, 220);
+const ADDED_BG_LIGHT = RGBA.fromInts(0, 255, 0, 32);
+const ADDED_BG_DARK = RGBA.fromInts(0, 120, 0, 220);
+const UNCHANGED_CODE_BG = RGBA.fromInts(15, 15, 15, 255);
+const UNCHANGED_BG = RGBA.fromInts(128, 128, 128, 16);
+const LINE_NUMBER_BG = RGBA.fromInts(5, 5, 5, 255);
+const REMOVED_LINE_NUMBER_BG = RGBA.fromInts(60, 0, 0, 255);
+const ADDED_LINE_NUMBER_BG = RGBA.fromInts(0, 50, 0, 255);
+
+const highlighter = await createHighlighter({
+  themes: ["github-dark"],
+  langs: ["javascript", "typescript", "tsx", "jsx"],
+});
+
+function detectLanguage(filePath: string): BundledLanguage {
+  const ext = filePath.split(".").pop()?.toLowerCase();
+  switch (ext) {
+    case "ts":
+      return "typescript";
+    case "tsx":
+      return "tsx";
+    case "jsx":
+      return "jsx";
+    case "js":
+    default:
+      return "javascript";
+  }
+}
+
+function renderHighlightedTokens(tokens: ThemedToken[]) {
+  return tokens.map((token, tokenIdx) => {
+    const color = token.color;
+    const fg = color ? RGBA.fromHex(color) : undefined;
+
+    return (
+      <span key={tokenIdx} fg={fg}>
+        {token.content}
+      </span>
+    );
+  });
+}
 
 // Custom error boundary class
 class ErrorBoundary extends React.Component<
@@ -119,12 +152,13 @@ export const FileEditPreview = ({
   hunks,
   paddingLeft = 0,
   splitView = true,
+  filePath = "",
 }: {
   hunks: Hunk[];
   paddingLeft?: number;
   splitView?: boolean;
+  filePath?: string;
 }) => {
-  // Calculate max line numbers across all hunks
   const allLines = hunks.flatMap((h) => h.lines);
   let oldLineNum = hunks[0]?.oldStart || 1;
   let newLineNum = hunks[0]?.newStart || 1;
@@ -173,6 +207,7 @@ export const FileEditPreview = ({
               splitView={splitView}
               leftMaxWidth={leftMaxWidth}
               rightMaxWidth={rightMaxWidth}
+              filePath={filePath}
             />
           </box>,
         ];
@@ -196,19 +231,25 @@ const getWordDiff = (oldLine: string, newLine: string) => {
   return diffWordsWithSpace(oldLine, newLine);
 };
 
-// StructuredDiff component
 const StructuredDiff = ({
   patch,
   splitView = true,
   leftMaxWidth = 0,
   rightMaxWidth = 0,
+  filePath = "",
 }: {
   patch: Hunk;
   splitView?: boolean;
   leftMaxWidth?: number;
   rightMaxWidth?: number;
+  filePath?: string;
 }) => {
-  const formatDiff = (lines: string[], startingLineNumber: number, isSplitView: boolean) => {
+
+  const formatDiff = (
+    lines: string[],
+    startingLineNumber: number,
+    isSplitView: boolean,
+  ) => {
     const processedLines = lines.map((code) => {
       if (code.startsWith("+")) {
         return { code: code.slice(1), type: "add", originalCode: code };
@@ -221,6 +262,38 @@ const StructuredDiff = ({
         };
       }
       return { code: code.slice(1), type: "nochange", originalCode: code };
+    });
+
+    const lang = detectLanguage(filePath);
+
+    let beforeState: GrammarState | undefined;
+    const beforeTokens = processedLines.map((line) => {
+      if (line.type === "remove" || line.type === "nochange") {
+        const result = highlighter.codeToTokens(line.code, {
+          lang,
+          theme: "github-dark",
+          grammarState: beforeState,
+        });
+        const tokens = result.tokens[0] || null;
+        beforeState = highlighter.getLastGrammarState(result.tokens);
+        return tokens;
+      }
+      return null;
+    });
+
+    let afterState: GrammarState | undefined;
+    const afterTokens = processedLines.map((line) => {
+      if (line.type === "add" || line.type === "nochange") {
+        const result = highlighter.codeToTokens(line.code, {
+          lang,
+          theme: "github-dark",
+          grammarState: afterState,
+        });
+        const tokens = result.tokens[0] || null;
+        afterState = highlighter.getLastGrammarState(result.tokens);
+        return tokens;
+      }
+      return null;
     });
 
     // Check if hunk is fully additions or fully deletions
@@ -282,9 +355,18 @@ const StructuredDiff = ({
         const shouldSkipWordDiff = removedLength > 80 || addedLength > 80;
 
         if (shouldSkipWordDiff) {
-          // Skip word diff, treat as regular line
-          const removedContent = <text wrap={false}>{removedText}</text>;
-          result.push({ code: removedContent, type, lineNumber, pairedWith: pair.add });
+          const tokens = beforeTokens[i];
+          const removedContent = tokens ? (
+            <text wrap={false}>{renderHighlightedTokens(tokens)}</text>
+          ) : (
+            <text wrap={false}>{removedText}</text>
+          );
+          result.push({
+            code: removedContent,
+            type,
+            lineNumber,
+            pairedWith: pair.add,
+          });
           continue;
         }
 
@@ -339,9 +421,18 @@ const StructuredDiff = ({
         const shouldSkipWordDiff = removedLength > 80 || addedLength > 80;
 
         if (shouldSkipWordDiff) {
-          // Skip word diff, treat as regular line
-          const addedContent = <text wrap={false}>{addedText}</text>;
-          result.push({ code: addedContent, type, lineNumber, pairedWith: pair.remove });
+          const tokens = afterTokens[i];
+          const addedContent = tokens ? (
+            <text wrap={false}>{renderHighlightedTokens(tokens)}</text>
+          ) : (
+            <text wrap={false}>{addedText}</text>
+          );
+          result.push({
+            code: addedContent,
+            type,
+            lineNumber,
+            pairedWith: pair.remove,
+          });
           continue;
         }
 
@@ -379,8 +470,17 @@ const StructuredDiff = ({
 
         result.push({ code: addedContent, type, lineNumber, pairedWith: pair.remove });
       } else {
-        // Regular line without word-level diff
-        const content = <text wrap={false}>{code}</text>;
+        const tokens =
+          type === "remove"
+            ? beforeTokens[i]
+            : type === "add"
+              ? afterTokens[i]
+              : beforeTokens[i] || afterTokens[i];
+        const content = tokens ? (
+          <text wrap={false}>{renderHighlightedTokens(tokens)}</text>
+        ) : (
+          <text wrap={false}>{code}</text>
+        );
 
         result.push({ code: content, type, lineNumber });
       }

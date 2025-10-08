@@ -42,7 +42,7 @@ function App() {
         }}
         focused
       >
-        <FileEditPreview hunks={hunks} paddingLeft={0} />
+        <FileEditPreview hunks={hunks} paddingLeft={0} filePath={filePath} />
       </scrollbox>
     </box>
   );
