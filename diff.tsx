@@ -518,8 +518,10 @@ const StructuredDiff = ({
   );
 };
 
+export { ErrorBoundary };
+
 // Example file content before and after - Extended version for scrolling demo
-const beforeContent = `import React from 'react'
+export const beforeContent = `import React from 'react'
 import PropTypes from 'prop-types'
 import { cn } from '../utils/cn'
 import { useEffect, useState } from 'react'
@@ -757,7 +759,7 @@ IconButton.propTypes = {
   size: PropTypes.oneOf(["small", "medium", "large", "xlarge"])
 }`;
 
-const afterContent = `import React from 'react'
+export const afterContent = `import React from 'react'
 import PropTypes from 'prop-types'
 import { cn } from '../utils/cn'
 import { useEffect, useState, useCallback, useMemo } from 'react'
@@ -1415,48 +1417,3 @@ ToggleButton.propTypes = {
     off: PropTypes.string
   })
 }`;
-
-// Generate larger patch from before/after content
-const filePath = "/src/components/Button.tsx";
-const hunks = structuredPatch(
-  filePath,
-  filePath,
-  beforeContent,
-  afterContent,
-  undefined,
-  undefined,
-  { context: 3, ignoreWhitespace: true,  stripTrailingCr: true },
-).hunks;
-
-function App() {
-  return (
-    <box style={{ flexDirection: "column", height: "100%", padding: 1 }}>
-      <FileEditPreviewTitle filePath={filePath} hunks={hunks} />
-      <box paddingTop={3} />
-      <scrollbox
-        style={{
-          flexGrow: 1,
-          rootOptions: {
-            backgroundColor: "transparent",
-            border: false,
-          },
-
-          scrollbarOptions: {
-            showArrows: false,
-            trackOptions: {
-              foregroundColor: "#4a4a4a",
-              backgroundColor: "transparent",
-            },
-          },
-        }}
-        focused
-      >
-        <FileEditPreview hunks={hunks} paddingLeft={0} />
-      </scrollbox>
-    </box>
-  );
-}
-
-await render(
-  React.createElement(ErrorBoundary, null, React.createElement(App)),
-);

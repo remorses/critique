@@ -13,6 +13,7 @@
   "dependencies": {
     "@opentui/core": "^0.1.25",
     "@opentui/react": "^0.1.25",
+    "cac": "^6.7.14",
     "diff": "^8.0.2",
     "react": "^19.1.1",
     "react-error-boundary": "^6.0.0"
