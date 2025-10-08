@@ -1,10 +1,18 @@
-import { TextAttributes, RGBA,  } from "@opentui/core";
+import { TextAttributes, RGBA } from "@opentui/core";
 import { structuredPatch } from "diff";
 import { render, useOnResize, useTerminalDimensions } from "@opentui/react";
 
 import * as React from "react";
 
 import { type StructuredPatchHunk as Hunk, diffWordsWithSpace } from "diff";
+import {
+  createHighlighter,
+  type HighlighterGeneric,
+  type BundledLanguage,
+  type BundledTheme,
+  type GrammarState,
+  type ThemedToken,
+} from "shiki";
 
 // Color constants for diff display
 const REMOVED_BG_LIGHT = RGBA.fromInts(255, 0, 0, 32); // Light red with transparency for removed code lines
