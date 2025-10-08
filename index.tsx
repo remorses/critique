@@ -145,11 +145,11 @@ const StructuredDiff = ({ patch }: { patch: Hunk }) => {
   const formatDiff = (lines: string[], startingLineNumber: number) => {
     const processedLines = lines.map((code) => {
       if (code.startsWith("+")) {
-        return { code: " " + code.slice(1), type: "add", originalCode: code };
+        return { code: code.slice(1), type: "add", originalCode: code };
       }
       if (code.startsWith("-")) {
         return {
-          code: " " + code.slice(1),
+          code: code.slice(1),
           type: "remove",
           originalCode: code,
         };
@@ -203,7 +203,6 @@ const StructuredDiff = ({ patch }: { patch: Hunk }) => {
         // Create word-level diff display for removed line
         const removedContent = (
           <text bg={REMOVED_BG_LIGHT} wrap={false}>
-            <span fg="red">-</span>
             {wordDiff.map((part, idx) => {
               if (part.removed) {
                 return (
@@ -231,7 +230,6 @@ const StructuredDiff = ({ patch }: { patch: Hunk }) => {
         // Create word-level diff display for added line
         const addedContent = (
           <text bg={ADDED_BG_LIGHT} wrap={false}>
-            <span fg="green">+</span>
             {wordDiff.map((part, idx) => {
               if (part.added) {
                 return (
@@ -254,13 +252,10 @@ const StructuredDiff = ({ patch }: { patch: Hunk }) => {
               bg={type === "add" ? ADDED_BG_LIGHT : REMOVED_BG_LIGHT}
               wrap={false}
             >
-              <span fg={type === "add" ? "green" : "red"}>
-                {type === "add" ? "+" : "-"}
-              </span>
               {code}
             </text>
           ) : (
-            <text wrap={false}> {code}</text>
+            <text wrap={false}>{code}</text>
           );
 
         result.push({ code: content, type, lineNumber });
@@ -280,6 +275,7 @@ const StructuredDiff = ({ patch }: { patch: Hunk }) => {
       return {
         lineNumber: lineNumberText,
         code,
+        type,
         key: `line-${index}`,
       };
     });
@@ -288,12 +284,34 @@ const StructuredDiff = ({ patch }: { patch: Hunk }) => {
   const diff = formatDiff(patch.lines, patch.oldStart);
   return (
     <>
-      {diff.map(({ lineNumber, code, key }) => (
+      {diff.map(({ lineNumber, code, type, key }) => (
         <box key={key} style={{ flexDirection: "row" }}>
-          <text fg="brightBlack" wrap={false}>
-            {lineNumber}{" "}
+          <text
+            fg="brightBlack"
+            bg={
+              type === "add"
+                ? ADDED_BG_LIGHT
+                : type === "remove"
+                  ? REMOVED_BG_LIGHT
+                  : undefined
+            }
+            wrap={false}
+          >
+            {" "}{lineNumber}{" "}
           </text>
-          {code}
+          <box
+            style={{
+              flexGrow: 1,
+              backgroundColor:
+                type === "add"
+                  ? ADDED_BG_LIGHT
+                  : type === "remove"
+                    ? REMOVED_BG_LIGHT
+                    : undefined,
+            }}
+          >
+            {code}
+          </box>
         </box>
       ))}
     </>
@@ -1207,7 +1225,7 @@ const hunks = structuredPatch(
   afterContent,
   undefined,
   undefined,
-  { context: 3, ignoreWhitespace: false, stripTrailingCr: true },
+  { context: 3, ignoreWhitespace: true, stripTrailingCr: true },
 ).hunks;
 
 function App() {
