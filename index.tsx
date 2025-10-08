@@ -111,6 +111,42 @@ export const FileEditPreview = ({
   paddingLeft?: number;
   splitView?: boolean;
 }) => {
+  // Calculate max line numbers across all hunks
+  const allLines = hunks.flatMap((h) => h.lines);
+  let oldLineNum = hunks[0]?.oldStart || 1;
+  let newLineNum = hunks[0]?.newStart || 1;
+  
+  const maxOldLine = allLines.reduce((max, line) => {
+    if (line.startsWith("-")) {
+      return Math.max(max, oldLineNum++);
+    } else if (line.startsWith("+")) {
+      newLineNum++;
+      return max;
+    } else {
+      oldLineNum++;
+      newLineNum++;
+      return Math.max(max, oldLineNum - 1);
+    }
+  }, 0);
+  
+  oldLineNum = hunks[0]?.oldStart || 1;
+  newLineNum = hunks[0]?.newStart || 1;
+  const maxNewLine = allLines.reduce((max, line) => {
+    if (line.startsWith("-")) {
+      oldLineNum++;
+      return max;
+    } else if (line.startsWith("+")) {
+      return Math.max(max, newLineNum++);
+    } else {
+      oldLineNum++;
+      newLineNum++;
+      return Math.max(max, newLineNum - 1);
+    }
+  }, 0);
+  
+  const leftMaxWidth = maxOldLine.toString().length;
+  const rightMaxWidth = maxNewLine.toString().length;
+
   return (
     <box style={{ flexDirection: "column" }}>
       {hunks.flatMap((patch, i) => {
@@ -119,14 +155,19 @@ export const FileEditPreview = ({
             style={{ flexDirection: "column", paddingLeft }}
             key={patch.newStart}
           >
-            <StructuredDiff patch={patch} splitView={splitView} />
+            <StructuredDiff 
+              patch={patch} 
+              splitView={splitView}
+              leftMaxWidth={leftMaxWidth}
+              rightMaxWidth={rightMaxWidth}
+            />
           </box>,
         ];
         if (i < hunks.length - 1) {
           elements.push(
             <box style={{ paddingLeft }} key={`ellipsis-${i}`}>
               <text fg="brightBlack" wrap={false}>
-                ...
+                {" ".repeat(leftMaxWidth + 2)}…
               </text>
             </box>,
           );
@@ -146,9 +187,13 @@ const getWordDiff = (oldLine: string, newLine: string) => {
 const StructuredDiff = ({
   patch,
   splitView = true,
+  leftMaxWidth = 0,
+  rightMaxWidth = 0,
 }: {
   patch: Hunk;
   splitView?: boolean;
+  leftMaxWidth?: number;
+  rightMaxWidth?: number;
 }) => {
   const formatDiff = (lines: string[], startingLineNumber: number) => {
     const processedLines = lines.map((code) => {
@@ -274,14 +319,9 @@ const StructuredDiff = ({
       }
     }
 
-    const maxLineNumber = Math.max(...result.map((r) => r.lineNumber));
-    const maxWidth = maxLineNumber.toString().length;
-
     return result.map(({ type, code, lineNumber }, index) => {
-      const lineNumberText = lineNumber.toString().padStart(maxWidth);
-
       return {
-        lineNumber: lineNumberText,
+        lineNumber: lineNumber.toString(),
         code,
         type,
         key: `line-${index}`,
@@ -290,11 +330,17 @@ const StructuredDiff = ({
   };
 
   const diff = formatDiff(patch.lines, patch.oldStart);
+  
+  const maxWidth = Math.max(leftMaxWidth, rightMaxWidth);
 
   if (!splitView) {
+    const paddedDiff = diff.map((item) => ({
+      ...item,
+      lineNumber: item.lineNumber ? item.lineNumber.padStart(maxWidth) : " ".repeat(maxWidth),
+    }));
     return (
       <>
-        {diff.map(({ lineNumber, code, type, key }) => (
+        {paddedDiff.map(({ lineNumber, code, type, key }) => (
           <box key={key} style={{ flexDirection: "row" }}>
             <text
               fg="brightBlack"
@@ -333,9 +379,12 @@ const StructuredDiff = ({
   const splitLines = diff.map((line) => {
     if (line.type === "remove") {
       return {
-        left: line,
+        left: {
+          ...line,
+          lineNumber: line.lineNumber.padStart(leftMaxWidth),
+        },
         right: {
-          lineNumber: "",
+          lineNumber: " ".repeat(rightMaxWidth),
           code: <text wrap={false}></text>,
           type: "empty",
           key: `${line.key}-empty-right`,
@@ -344,17 +393,26 @@ const StructuredDiff = ({
     } else if (line.type === "add") {
       return {
         left: {
-          lineNumber: "",
+          lineNumber: " ".repeat(leftMaxWidth),
           code: <text wrap={false}></text>,
           type: "empty",
           key: `${line.key}-empty-left`,
         },
-        right: line,
+        right: {
+          ...line,
+          lineNumber: line.lineNumber.padStart(rightMaxWidth),
+        },
       };
     } else {
       return {
-        left: line,
-        right: line,
+        left: {
+          ...line,
+          lineNumber: line.lineNumber.padStart(leftMaxWidth),
+        },
+        right: {
+          ...line,
+          lineNumber: line.lineNumber.padStart(rightMaxWidth),
+        },
       };
     }
   });
