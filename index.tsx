@@ -212,7 +212,7 @@ const StructuredDiff = ({
           originalCode: code,
         };
       }
-      return { code, type: "nochange", originalCode: code };
+      return { code: code.slice(1), type: "nochange", originalCode: code };
     });
 
     // Check if hunk is fully additions or fully deletions
