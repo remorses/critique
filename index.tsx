@@ -7,10 +7,15 @@ import * as React from "react";
 import { type StructuredPatchHunk as Hunk, diffWordsWithSpace } from "diff";
 
 // Color constants for diff display
-const REMOVED_BG_LIGHT = RGBA.fromInts(255, 0, 0, 32); // Light red with transparency (32/255 = ~12.5% opacity)
-const REMOVED_BG_DARK = RGBA.fromInts(255, 0, 0, 96); // Darker red for emphasis (96/255 = ~37.5% opacity)
-const ADDED_BG_LIGHT = RGBA.fromInts(0, 255, 0, 32); // Light green with transparency
-const ADDED_BG_DARK = RGBA.fromInts(0, 255, 0, 96); // Darker green for emphasis
+const REMOVED_BG_LIGHT = RGBA.fromInts(255, 0, 0, 32); // Light red with transparency for removed code lines
+const REMOVED_BG_DARK = RGBA.fromInts(120, 0, 0, 220); // Darker red for emphasis on word-level changes
+const ADDED_BG_LIGHT = RGBA.fromInts(0, 255, 0, 32); // Light green with transparency for added code lines
+const ADDED_BG_DARK = RGBA.fromInts(0, 120, 0, 220); // Darker green for emphasis on word-level changes
+const UNCHANGED_CODE_BG = RGBA.fromInts(15, 15, 15, 255); // Dark background for unchanged code lines
+const UNCHANGED_BG = RGBA.fromInts(128, 128, 128, 16); // Light gray for unchanged lines (legacy)
+const LINE_NUMBER_BG = RGBA.fromInts(5, 5, 5, 255); // Darker gray background for line numbers
+const REMOVED_LINE_NUMBER_BG = RGBA.fromInts(40, 0, 0, 255); // Darker red for removed line numbers
+const ADDED_LINE_NUMBER_BG = RGBA.fromInts(0, 40, 0, 255); // Darker green for added line numbers
 
 // Custom error boundary class
 class ErrorBoundary extends React.Component<
@@ -115,7 +120,7 @@ export const FileEditPreview = ({
   const allLines = hunks.flatMap((h) => h.lines);
   let oldLineNum = hunks[0]?.oldStart || 1;
   let newLineNum = hunks[0]?.newStart || 1;
-  
+
   const maxOldLine = allLines.reduce((max, line) => {
     if (line.startsWith("-")) {
       return Math.max(max, oldLineNum++);
@@ -128,7 +133,7 @@ export const FileEditPreview = ({
       return Math.max(max, oldLineNum - 1);
     }
   }, 0);
-  
+
   oldLineNum = hunks[0]?.oldStart || 1;
   newLineNum = hunks[0]?.newStart || 1;
   const maxNewLine = allLines.reduce((max, line) => {
@@ -143,7 +148,7 @@ export const FileEditPreview = ({
       return Math.max(max, newLineNum - 1);
     }
   }, 0);
-  
+
   const leftMaxWidth = maxOldLine.toString().length;
   const rightMaxWidth = maxNewLine.toString().length;
 
@@ -155,8 +160,8 @@ export const FileEditPreview = ({
             style={{ flexDirection: "column", paddingLeft }}
             key={patch.newStart}
           >
-            <StructuredDiff 
-              patch={patch} 
+            <StructuredDiff
+              patch={patch}
               splitView={splitView}
               leftMaxWidth={leftMaxWidth}
               rightMaxWidth={rightMaxWidth}
@@ -195,7 +200,7 @@ const StructuredDiff = ({
   leftMaxWidth?: number;
   rightMaxWidth?: number;
 }) => {
-  const formatDiff = (lines: string[], startingLineNumber: number) => {
+  const formatDiff = (lines: string[], startingLineNumber: number, isSplitView: boolean) => {
     const processedLines = lines.map((code) => {
       if (code.startsWith("+")) {
         return { code: code.slice(1), type: "add", originalCode: code };
@@ -254,7 +259,23 @@ const StructuredDiff = ({
         const wordDiff = getWordDiff(removedText, addedText);
 
         // Create word-level diff display for removed line
-        const removedContent = (
+        const removedContent = isSplitView ? (
+          <text bg={REMOVED_BG_LIGHT} wrap={false}>
+            {wordDiff.map((part, idx) => {
+              if (part.removed) {
+                return (
+                  <span key={`removed-${i}-${idx}`} bg={REMOVED_BG_DARK}>
+                    {part.value}
+                  </span>
+                );
+              }
+              if (!part.added) {
+                return part.value;
+              }
+              return null;
+            })}
+          </text>
+        ) : (
           <text bg={REMOVED_BG_LIGHT} wrap={false}>
             {wordDiff.map((part, idx) => {
               if (part.removed) {
@@ -281,7 +302,23 @@ const StructuredDiff = ({
         const wordDiff = getWordDiff(removedText, addedText);
 
         // Create word-level diff display for added line
-        const addedContent = (
+        const addedContent = isSplitView ? (
+          <text bg={ADDED_BG_LIGHT} wrap={false}>
+            {wordDiff.map((part, idx) => {
+              if (part.added) {
+                return (
+                  <span key={`added-${i}-${idx}`} bg={ADDED_BG_DARK}>
+                    {part.value}
+                  </span>
+                );
+              }
+              if (!part.removed) {
+                return part.value;
+              }
+              return null;
+            })}
+          </text>
+        ) : (
           <text bg={ADDED_BG_LIGHT} wrap={false}>
             {wordDiff.map((part, idx) => {
               if (part.added) {
@@ -329,8 +366,8 @@ const StructuredDiff = ({
     });
   };
 
-  const diff = formatDiff(patch.lines, patch.oldStart);
-  
+  const diff = formatDiff(patch.lines, patch.oldStart, splitView);
+
   const maxWidth = Math.max(leftMaxWidth, rightMaxWidth);
 
   if (!splitView) {
@@ -346,10 +383,10 @@ const StructuredDiff = ({
               fg="brightBlack"
               bg={
                 type === "add"
-                  ? ADDED_BG_LIGHT
+                  ? ADDED_LINE_NUMBER_BG
                   : type === "remove"
-                    ? REMOVED_BG_LIGHT
-                    : undefined
+                    ? REMOVED_LINE_NUMBER_BG
+                    : LINE_NUMBER_BG
               }
               wrap={false}
             >
@@ -364,7 +401,7 @@ const StructuredDiff = ({
                     ? ADDED_BG_LIGHT
                     : type === "remove"
                       ? REMOVED_BG_LIGHT
-                      : undefined,
+                      : UNCHANGED_CODE_BG,
               }}
             >
               {code}
@@ -426,7 +463,9 @@ const StructuredDiff = ({
             <text
               fg="brightBlack"
               bg={
-                leftLine.type === "remove" ? REMOVED_BG_LIGHT : undefined
+                leftLine.type === "remove"
+                  ? REMOVED_LINE_NUMBER_BG
+                  : LINE_NUMBER_BG
               }
               wrap={false}
             >
@@ -437,7 +476,11 @@ const StructuredDiff = ({
               style={{
                 flexGrow: 1,
                 backgroundColor:
-                  leftLine.type === "remove" ? REMOVED_BG_LIGHT : undefined,
+                  leftLine.type === "remove"
+                    ? REMOVED_BG_LIGHT
+                    : leftLine.type === "nochange"
+                      ? UNCHANGED_CODE_BG
+                      : undefined,
               }}
             >
               {leftLine.code}
@@ -448,7 +491,11 @@ const StructuredDiff = ({
           <box style={{ flexDirection: "row", width: "50%" }}>
             <text
               fg="brightBlack"
-              bg={rightLine.type === "add" ? ADDED_BG_LIGHT : undefined}
+              bg={
+                rightLine.type === "add"
+                  ? ADDED_LINE_NUMBER_BG
+                  : LINE_NUMBER_BG
+              }
               wrap={false}
             >
               {" "}
@@ -458,7 +505,11 @@ const StructuredDiff = ({
               style={{
                 flexGrow: 1,
                 backgroundColor:
-                  rightLine.type === "add" ? ADDED_BG_LIGHT : undefined,
+                  rightLine.type === "add"
+                    ? ADDED_BG_LIGHT
+                    : rightLine.type === "nochange"
+                      ? UNCHANGED_CODE_BG
+                      : undefined,
               }}
             >
               {rightLine.code}
@@ -1377,7 +1428,7 @@ const hunks = structuredPatch(
   afterContent,
   undefined,
   undefined,
-  { context: 3, ignoreWhitespace: true, stripTrailingCr: true },
+  { context: 3, ignoreWhitespace: true,  stripTrailingCr: true },
 ).hunks;
 
 function App() {
