@@ -13,19 +13,21 @@ import {
 const cli = cac("critique");
 
 cli
-  .command("[ref]", "Show diff for a git reference (defaults to HEAD)")
+  .command("[ref]", "Show diff for a git reference (defaults to unstaged changes)")
   .option("--staged", "Show staged changes")
-  .option("--unstaged", "Show unstaged changes")
-  .action(async (ref = "HEAD", options) => {
+  .option("--commit <ref>", "Show changes from a specific commit")
+  .action(async (ref, options) => {
     let gitDiff: string;
 
     try {
       if (options.staged) {
         gitDiff = execSync("git diff --cached", { encoding: "utf-8" });
-      } else if (options.unstaged) {
-        gitDiff = execSync("git diff", { encoding: "utf-8" });
-      } else {
+      } else if (options.commit) {
+        gitDiff = execSync(`git show ${options.commit}`, { encoding: "utf-8" });
+      } else if (ref) {
         gitDiff = execSync(`git show ${ref}`, { encoding: "utf-8" });
+      } else {
+        gitDiff = execSync("git diff", { encoding: "utf-8" });
       }
     } catch (error) {
       console.error("Error getting git diff:", error);

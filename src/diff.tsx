@@ -245,6 +245,7 @@ const StructuredDiff = ({
       code: any;
       type: string;
       lineNumber: number;
+      pairedWith?: number;
     }> = [];
 
     for (let i = 0; i < processedLines.length; i++) {
@@ -275,7 +276,7 @@ const StructuredDiff = ({
         if (shouldSkipWordDiff) {
           // Skip word diff, treat as regular line
           const removedContent = <text wrap={false}>{removedText}</text>;
-          result.push({ code: removedContent, type, lineNumber });
+          result.push({ code: removedContent, type, lineNumber, pairedWith: pair.add });
           continue;
         }
 
@@ -311,7 +312,7 @@ const StructuredDiff = ({
           </text>
         );
 
-        result.push({ code: removedContent, type, lineNumber });
+        result.push({ code: removedContent, type, lineNumber, pairedWith: pair.add });
       } else if (pair && pair.add === i && pair.remove !== undefined) {
         // This is an added line with a corresponding removed line
         const removedLine = processedLines[pair.remove];
@@ -332,7 +333,7 @@ const StructuredDiff = ({
         if (shouldSkipWordDiff) {
           // Skip word diff, treat as regular line
           const addedContent = <text wrap={false}>{addedText}</text>;
-          result.push({ code: addedContent, type, lineNumber });
+          result.push({ code: addedContent, type, lineNumber, pairedWith: pair.remove });
           continue;
         }
 
@@ -368,7 +369,7 @@ const StructuredDiff = ({
           </text>
         );
 
-        result.push({ code: addedContent, type, lineNumber });
+        result.push({ code: addedContent, type, lineNumber, pairedWith: pair.remove });
       } else {
         // Regular line without word-level diff
         const content = <text wrap={false}>{code}</text>;
@@ -381,11 +382,12 @@ const StructuredDiff = ({
       }
     }
 
-    return result.map(({ type, code, lineNumber }, index) => {
+    return result.map(({ type, code, lineNumber, pairedWith }, index) => {
       return {
         lineNumber: lineNumber.toString(),
         code,
         type,
+        pairedWith,
         key: `line-${index}`,
       };
     });
@@ -440,9 +442,42 @@ const StructuredDiff = ({
   }
 
   // Split view: separate left (removals) and right (additions)
-  const splitLines = diff.map((line) => {
-    if (line.type === "remove") {
-      return {
+  // Build rows by pairing deletions with additions
+  const splitLines: Array<{
+    left: any;
+    right: any;
+  }> = [];
+  const processedIndices = new Set<number>();
+
+  for (let i = 0; i < diff.length; i++) {
+    if (processedIndices.has(i)) continue;
+
+    const line = diff[i];
+    if (!line) continue;
+
+    if (line.type === "remove" && line.pairedWith !== undefined) {
+      // This removal is paired with an addition
+      const pairedLine = diff[line.pairedWith];
+      if (pairedLine) {
+        splitLines.push({
+          left: {
+            ...line,
+            lineNumber: line.lineNumber.padStart(leftMaxWidth),
+          },
+          right: {
+            ...pairedLine,
+            lineNumber: pairedLine.lineNumber.padStart(rightMaxWidth),
+          },
+        });
+        processedIndices.add(i);
+        processedIndices.add(line.pairedWith);
+      }
+    } else if (line.type === "add" && line.pairedWith !== undefined) {
+      // This addition is paired with a removal (already processed above)
+      continue;
+    } else if (line.type === "remove") {
+      // Unpaired removal
+      splitLines.push({
         left: {
           ...line,
           lineNumber: line.lineNumber.padStart(leftMaxWidth),
@@ -453,9 +488,11 @@ const StructuredDiff = ({
           type: "empty",
           key: `${line.key}-empty-right`,
         },
-      };
+      });
+      processedIndices.add(i);
     } else if (line.type === "add") {
-      return {
+      // Unpaired addition
+      splitLines.push({
         left: {
           lineNumber: " ".repeat(leftMaxWidth),
           code: <text wrap={false}></text>,
@@ -466,9 +503,11 @@ const StructuredDiff = ({
           ...line,
           lineNumber: line.lineNumber.padStart(rightMaxWidth),
         },
-      };
+      });
+      processedIndices.add(i);
     } else {
-      return {
+      // Unchanged line
+      splitLines.push({
         left: {
           ...line,
           lineNumber: line.lineNumber.padStart(leftMaxWidth),
@@ -477,9 +516,10 @@ const StructuredDiff = ({
           ...line,
           lineNumber: line.lineNumber.padStart(rightMaxWidth),
         },
-      };
+      });
+      processedIndices.add(i);
     }
-  });
+  }
 
   return (
     <>
