@@ -9,6 +9,7 @@ import { type StructuredPatchHunk as Hunk, diffWordsWithSpace } from "diff";
 import {
   createHighlighter,
   type HighlighterGeneric,
+  createJavaScriptRegexEngine,
   type BundledLanguage,
   type BundledTheme,
   type GrammarState,
@@ -32,7 +33,9 @@ function openInEditor(filePath: string, lineNumber: number) {
 }
 
 const theme = "github-dark-default";
+const highlighterStart = performance.now();
 const highlighter = await createHighlighter({
+
   themes: [theme],
   langs: [
     "javascript",
@@ -56,6 +59,7 @@ const highlighter = await createHighlighter({
     "sql",
   ],
 });
+const highlighterDuration = performance.now() - highlighterStart;
 
 function detectLanguage(filePath: string): BundledLanguage {
   const ext = filePath.split(".").pop()?.toLowerCase();
@@ -227,6 +231,10 @@ export const FileEditPreview = ({
   splitView?: boolean;
   filePath?: string;
 }) => {
+  React.useEffect(() => {
+    console.log(`Highlighter initialized in ${highlighterDuration.toFixed(2)}ms`);
+  }, []);
+
   const allLines = hunks.flatMap((h) => h.lines);
   let oldLineNum = hunks[0]?.oldStart || 1;
   let newLineNum = hunks[0]?.newStart || 1;
