@@ -19,12 +19,13 @@ const REMOVED_BG_LIGHT = RGBA.fromInts(255, 0, 0, 32);
 const REMOVED_BG_DARK = RGBA.fromInts(120, 0, 0, 220);
 const ADDED_BG_DARK = RGBA.fromInts(0, 120, 0, 220);
 const UNCHANGED_CODE_BG = RGBA.fromInts(15, 15, 15, 255);
-const ADDED_BG_LIGHT = UNCHANGED_CODE_BG
+const ADDED_BG_LIGHT = UNCHANGED_CODE_BG;
 const UNCHANGED_BG = RGBA.fromInts(128, 128, 128, 16);
 const LINE_NUMBER_BG = RGBA.fromInts(5, 5, 5, 255);
 const REMOVED_LINE_NUMBER_BG = RGBA.fromInts(60, 0, 0, 255);
 const ADDED_LINE_NUMBER_BG = RGBA.fromInts(0, 50, 0, 255);
-
+const LINE_NUMBER_FG_BRIGHT = RGBA.fromInts(255, 255, 255, 255);
+const LINE_NUMBER_FG_DIM = "brightBlack";
 
 const theme = "github-dark-high-contrast";
 const highlighter = await createHighlighter({
@@ -332,7 +333,7 @@ const StructuredDiff = ({
             removes.push(j);
             j++;
           }
-          
+
           // Collect all consecutive adds that follow
           const adds: number[] = [];
           while (
@@ -342,13 +343,13 @@ const StructuredDiff = ({
             adds.push(j);
             j++;
           }
-          
+
           // Pair them up
           const minLength = Math.min(removes.length, adds.length);
           for (let k = 0; k < minLength; k++) {
             linePairs.push({ remove: removes[k], add: adds[k] });
           }
-          
+
           i = j;
         } else {
           i++;
@@ -560,7 +561,11 @@ const StructuredDiff = ({
           <box key={key} style={{ flexDirection: "row" }}>
             <box style={{ flexShrink: 0 }}>
               <text
-                fg="brightBlack"
+                fg={
+                  type === "add" || type === "remove"
+                    ? LINE_NUMBER_FG_BRIGHT
+                    : LINE_NUMBER_FG_DIM
+                }
                 bg={
                   type === "add"
                     ? ADDED_LINE_NUMBER_BG
@@ -680,15 +685,18 @@ const StructuredDiff = ({
         <box key={leftLine.key} style={{ flexDirection: "row" }}>
           {/* Left side (removals) */}
           <box style={{ flexDirection: "row", width: "50%" }}>
-            <box style={{ flexShrink: 0 }}>
+            <box style={{ flexShrink: 0, minWidth: leftMaxWidth + 2 }}>
               <text
-                fg="brightBlack"
+                fg={
+                  leftLine.type === "remove"
+                    ? LINE_NUMBER_FG_BRIGHT
+                    : LINE_NUMBER_FG_DIM
+                }
                 bg={
                   leftLine.type === "remove"
                     ? REMOVED_LINE_NUMBER_BG
                     : LINE_NUMBER_BG
                 }
-                style={{ width: leftMaxWidth + 2 }}
               >
                 {" "}
                 {leftLine.lineNumber}{" "}
@@ -698,6 +706,7 @@ const StructuredDiff = ({
               style={{
                 flexGrow: 1,
                 paddingLeft: 1,
+                minWidth: 0,
                 backgroundColor:
                   leftLine.type === "remove"
                     ? REMOVED_BG_LIGHT
@@ -712,15 +721,18 @@ const StructuredDiff = ({
 
           {/* Right side (additions) */}
           <box style={{ flexDirection: "row", width: "50%" }}>
-            <box style={{ flexShrink: 0 }}>
+            <box style={{ flexShrink: 0, minWidth: leftMaxWidth + 2 }}>
               <text
-                fg="brightBlack"
+                fg={
+                  rightLine.type === "add"
+                    ? LINE_NUMBER_FG_BRIGHT
+                    : LINE_NUMBER_FG_DIM
+                }
                 bg={
                   rightLine.type === "add"
                     ? ADDED_LINE_NUMBER_BG
                     : LINE_NUMBER_BG
                 }
-                style={{ width: rightMaxWidth + 2 }}
               >
                 {" "}
                 {rightLine.lineNumber}{" "}
@@ -729,6 +741,7 @@ const StructuredDiff = ({
             <box
               style={{
                 flexGrow: 1,
+                minWidth: 0,
                 paddingLeft: 1,
                 backgroundColor:
                   rightLine.type === "add"
