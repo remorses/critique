@@ -8,9 +8,10 @@ import {
   useTerminalDimensions,
 } from "@opentui/react";
 import * as React from "react";
-import { exec } from "child_process";
+import { exec, execSync } from "child_process";
 import { promisify } from "util";
 import { MacOSScrollAccel } from "@opentui/core";
+import { readFileSync } from "fs";
 
 const execAsync = promisify(exec);
 
@@ -29,6 +30,95 @@ class ScrollAcceleration {
     this.macosAccel.reset();
     // this.multiplier = 1;
   }
+}
+
+interface AppProps {
+  parsedFiles: Array<{
+    oldFileName?: string;
+    newFileName?: string;
+    hunks: any[];
+  }>;
+}
+
+function App({ parsedFiles }: AppProps) {
+  const { width: initialWidth } = useTerminalDimensions();
+  const [width, setWidth] = React.useState(initialWidth);
+  const [scrollAcceleration] = React.useState(() => new ScrollAcceleration());
+
+  useOnResize(
+    React.useCallback((newWidth: number) => {
+      setWidth(newWidth);
+    }, []),
+  );
+  const useSplitView = width >= 100;
+
+  const renderer = useRenderer();
+
+  useKeyboard((key) => {
+    if (key.name === "z" && key.ctrl) {
+      renderer.console.toggle();
+    }
+    if (key.option) {
+      console.log(key);
+      if (key.eventType === "release") {
+        scrollAcceleration.multiplier = 1;
+      } else {
+        scrollAcceleration.multiplier = 10;
+      }
+    }
+  });
+
+  const { FileEditPreviewTitle, FileEditPreview } = require("./diff.tsx");
+
+  return (
+    <box
+      key={String(useSplitView)}
+      style={{ flexDirection: "column", height: "100%", padding: 1 }}
+    >
+      <scrollbox
+        scrollAcceleration={scrollAcceleration}
+        style={{
+          flexGrow: 1,
+          rootOptions: {
+            backgroundColor: "transparent",
+            border: false,
+          },
+          scrollbarOptions: {
+            showArrows: false,
+            trackOptions: {
+              foregroundColor: "#4a4a4a",
+              backgroundColor: "transparent",
+            },
+          },
+        }}
+        focused
+      >
+        <box style={{ flexDirection: "column" }}>
+          {parsedFiles.map((file, idx) => (
+            <box
+              key={idx}
+              style={{
+                flexDirection: "column",
+                marginBottom: idx < parsedFiles.length - 1 ? 2 : 0,
+              }}
+            >
+              <FileEditPreviewTitle
+                filePath={file.newFileName || file.oldFileName || "unknown"}
+                hunks={file.hunks}
+              />
+              <box paddingTop={1} />
+              <FileEditPreview
+                hunks={file.hunks}
+                paddingLeft={0}
+                splitView={useSplitView}
+                filePath={file.newFileName || file.oldFileName || ""}
+              />
+            </box>
+          ))}
+        </box>
+      </scrollbox>
+    </box>
+  );
 }
 
 cli
@@ -66,98 +156,65 @@ cli
         process.exit(0);
       }
 
-      const { ErrorBoundary, FileEditPreviewTitle, FileEditPreview } =
-        diffModule;
-
-      function App() {
-        const { width: initialWidth } = useTerminalDimensions();
-        const [width, setWidth] = React.useState(initialWidth);
-        const [scrollAcceleration] = React.useState(
-          () => new ScrollAcceleration(),
-        );
-
-        useOnResize(
-          React.useCallback((newWidth: number) => {
-            setWidth(newWidth);
-          }, []),
-        );
-        const useSplitView = width >= 100;
-
-        const renderer = useRenderer();
-
-        useKeyboard((key) => {
-          if (key.name === "z" && key.ctrl) {
-            renderer.console.toggle();
-          }
-          // TODO does not work
-          if (key.option) {
-            console.log(key);
-            if (key.eventType === "release") {
-              scrollAcceleration.multiplier = 1;
-            } else {
-              scrollAcceleration.multiplier = 10;
-            }
-          }
-        });
-
-        return (
-          <box
-            key={String(useSplitView)}
-            style={{ flexDirection: "column", height: "100%", padding: 1 }}
-          >
-            <scrollbox
-              scrollAcceleration={scrollAcceleration}
-              style={{
-                flexGrow: 1,
-                rootOptions: {
-                  backgroundColor: "transparent",
-                  border: false,
-                },
-                scrollbarOptions: {
-                  showArrows: false,
-                  trackOptions: {
-                    foregroundColor: "#4a4a4a",
-                    backgroundColor: "transparent",
-                  },
-                },
-              }}
-              focused
-            >
-              <box style={{ flexDirection: "column" }}>
-                {parsedFiles.map((file, idx) => (
-                  <box
-                    key={idx}
-                    style={{
-                      flexDirection: "column",
-                      marginBottom: idx < parsedFiles.length - 1 ? 2 : 0,
-                    }}
-                  >
-                    <FileEditPreviewTitle
-                      filePath={
-                        file.newFileName || file.oldFileName || "unknown"
-                      }
-                      hunks={file.hunks}
-                    />
-                    <box paddingTop={1} />
-                    <FileEditPreview
-                      hunks={file.hunks}
-                      paddingLeft={0}
-                      splitView={useSplitView}
-                      filePath={file.newFileName || file.oldFileName || ""}
-                    />
-                  </box>
-                ))}
-              </box>
-            </scrollbox>
-          </box>
-        );
-      }
+      const { ErrorBoundary } = diffModule;
 
       await render(
-        React.createElement(ErrorBoundary, null, React.createElement(App)),
+        React.createElement(
+          ErrorBoundary,
+          null,
+          React.createElement(App, { parsedFiles }),
+        ),
       );
     } catch (error) {
       console.error("Error getting git diff:", error);
+      process.exit(1);
+    }
+  });
+
+cli
+  .command("difftool <local> <remote>", "Git difftool integration")
+  .action(async (local: string, remote: string) => {
+    if (!process.stdout.isTTY) {
+      execSync(`git diff --no-ext-diff "${local}" "${remote}"`, {
+        stdio: "inherit",
+      });
+      process.exit(0);
+    }
+
+    try {
+      const [localContent, remoteContent, diffModule, { structuredPatch }] =
+        await Promise.all([
+          readFileSync(local, "utf-8"),
+          readFileSync(remote, "utf-8"),
+          import("./diff.tsx"),
+          import("diff"),
+        ]);
+
+      const patch = structuredPatch(
+        local,
+        remote,
+        localContent,
+        remoteContent,
+        "",
+        "",
+      );
+
+      if (patch.hunks.length === 0) {
+        console.log("No changes to display");
+        process.exit(0);
+      }
+
+      const { ErrorBoundary } = diffModule;
+
+      await render(
+        React.createElement(
+          ErrorBoundary,
+          null,
+          React.createElement(App, { parsedFiles: [patch] }),
+        ),
+      );
+    } catch (error) {
+      console.error("Error displaying diff:", error);
       process.exit(1);
     }
   });
