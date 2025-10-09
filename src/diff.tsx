@@ -14,20 +14,18 @@ import {
   type ThemedToken,
 } from "shiki";
 
-// Color constants for diff display
-const REMOVED_BG_LIGHT = RGBA.fromInts(255, 0, 0, 32);
-const REMOVED_BG_DARK = RGBA.fromInts(120, 0, 0, 220);
-const ADDED_BG_DARK = RGBA.fromInts(0, 120, 0, 220);
+
 const UNCHANGED_CODE_BG = RGBA.fromInts(15, 15, 15, 255);
 const ADDED_BG_LIGHT = UNCHANGED_CODE_BG;
-const UNCHANGED_BG = RGBA.fromInts(128, 128, 128, 16);
+const REMOVED_BG_LIGHT = UNCHANGED_CODE_BG //  RGBA.fromInts(255, 0, 0, 32);
+
 const LINE_NUMBER_BG = RGBA.fromInts(5, 5, 5, 255);
 const REMOVED_LINE_NUMBER_BG = RGBA.fromInts(60, 0, 0, 255);
 const ADDED_LINE_NUMBER_BG = RGBA.fromInts(0, 50, 0, 255);
 const LINE_NUMBER_FG_BRIGHT = RGBA.fromInts(255, 255, 255, 255);
 const LINE_NUMBER_FG_DIM = "brightBlack";
 
-const theme = "github-dark-high-contrast";
+const theme = "github-dark-default";
 const highlighter = await createHighlighter({
   themes: [theme],
   langs: ["javascript", "typescript", "tsx", "jsx"],
