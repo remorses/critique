@@ -128,7 +128,7 @@ export const FileEditPreviewTitle = ({
   );
 
   return (
-    <text wrap={false}>
+    <text>
       Updated <strong>{filePath}</strong>
       {numAdditions > 0 || numRemovals > 0 ? " with " : ""}
       {numAdditions > 0 ? (
@@ -214,7 +214,7 @@ export const FileEditPreview = ({
         if (i < hunks.length - 1) {
           elements.push(
             <box style={{ paddingLeft }} key={`ellipsis-${i}`}>
-              <text fg="brightBlack" wrap={false}>
+              <text fg="brightBlack">
                 {" ".repeat(leftMaxWidth + 2)}…
               </text>
             </box>,
@@ -369,9 +369,9 @@ const StructuredDiff = ({
         if (shouldSkipWordDiff) {
           const tokens = beforeTokens[i];
           const removedContent = tokens ? (
-            <text wrap={false}>{renderHighlightedTokens(tokens)}</text>
+            <text>{renderHighlightedTokens(tokens)}</text>
           ) : (
-            <text wrap={false}>{removedText}</text>
+            <text>{removedText}</text>
           );
           result.push({
             code: removedContent,
@@ -384,9 +384,9 @@ const StructuredDiff = ({
 
         const tokens = beforeTokens[i];
         const removedContent = tokens && tokens.length > 0 ? (
-          <text wrap={false}>{renderHighlightedTokens(tokens)}</text>
+          <text>{renderHighlightedTokens(tokens)}</text>
         ) : (
-          <text wrap={false}>{removedText}</text>
+          <text>{removedText}</text>
         );
 
         result.push({ code: removedContent, type, lineNumber, pairedWith: pair.add });
@@ -410,9 +410,9 @@ const StructuredDiff = ({
         if (shouldSkipWordDiff) {
           const tokens = afterTokens[i];
           const addedContent = tokens ? (
-            <text wrap={false}>{renderHighlightedTokens(tokens)}</text>
+            <text>{renderHighlightedTokens(tokens)}</text>
           ) : (
-            <text wrap={false}>{addedText}</text>
+            <text>{addedText}</text>
           );
           result.push({
             code: addedContent,
@@ -425,9 +425,9 @@ const StructuredDiff = ({
 
         const tokens = afterTokens[i];
         const addedContent = tokens && tokens.length > 0 ? (
-          <text wrap={false}>{renderHighlightedTokens(tokens)}</text>
+          <text>{renderHighlightedTokens(tokens)}</text>
         ) : (
-          <text wrap={false}>{addedText}</text>
+          <text>{addedText}</text>
         );
 
         result.push({ code: addedContent, type, lineNumber, pairedWith: pair.remove });
@@ -444,9 +444,9 @@ const StructuredDiff = ({
         }
 
         const content = tokens && tokens.length > 0 ? (
-          <text wrap={false}>{renderHighlightedTokens(tokens)}</text>
+          <text>{renderHighlightedTokens(tokens)}</text>
         ) : (
-          <text wrap={false}>{code}</text>
+          <text>{code}</text>
         );
 
         result.push({ code: content, type, lineNumber });
@@ -481,21 +481,22 @@ const StructuredDiff = ({
       <>
         {paddedDiff.map(({ lineNumber, code, type, key }) => (
           <box key={key} style={{ flexDirection: "row" }}>
-            <text
-              fg="brightBlack"
-              bg={
-                type === "add"
-                  ? ADDED_LINE_NUMBER_BG
-                  : type === "remove"
-                    ? REMOVED_LINE_NUMBER_BG
-                    : LINE_NUMBER_BG
-              }
-              wrap={false}
-              style={{ width: maxWidth + 2 }}
-            >
-              {" "}
-              {lineNumber}{" "}
-            </text>
+            <box style={{ flexShrink: 0 }}>
+              <text
+                fg="brightBlack"
+                bg={
+                  type === "add"
+                    ? ADDED_LINE_NUMBER_BG
+                    : type === "remove"
+                      ? REMOVED_LINE_NUMBER_BG
+                      : LINE_NUMBER_BG
+                }
+                style={{ width: maxWidth + 2 }}
+              >
+                {" "}
+                {lineNumber}{" "}
+              </text>
+            </box>
             <box
               style={{
                 flexGrow: 1,
@@ -559,7 +560,7 @@ const StructuredDiff = ({
         },
         right: {
           lineNumber: " ".repeat(rightMaxWidth),
-          code: <text wrap={false}></text>,
+          code: <text></text>,
           type: "empty",
           key: `${line.key}-empty-right`,
         },
@@ -570,7 +571,7 @@ const StructuredDiff = ({
       splitLines.push({
         left: {
           lineNumber: " ".repeat(leftMaxWidth),
-          code: <text wrap={false}></text>,
+          code: <text></text>,
           type: "empty",
           key: `${line.key}-empty-left`,
         },
@@ -602,19 +603,20 @@ const StructuredDiff = ({
         <box key={leftLine.key} style={{ flexDirection: "row" }}>
           {/* Left side (removals) */}
           <box style={{ flexDirection: "row", width: "50%" }}>
-            <text
-              fg="brightBlack"
-              bg={
-                leftLine.type === "remove"
-                  ? REMOVED_LINE_NUMBER_BG
-                  : LINE_NUMBER_BG
-              }
-              wrap={false}
-              style={{ width: leftMaxWidth + 2 }}
-            >
-              {" "}
-              {leftLine.lineNumber}{" "}
-            </text>
+            <box style={{ flexShrink: 0 }}>
+              <text
+                fg="brightBlack"
+                bg={
+                  leftLine.type === "remove"
+                    ? REMOVED_LINE_NUMBER_BG
+                    : LINE_NUMBER_BG
+                }
+                style={{ width: leftMaxWidth + 2 }}
+              >
+                {" "}
+                {leftLine.lineNumber}{" "}
+              </text>
+            </box>
             <box
               style={{
                 flexGrow: 1,
@@ -633,19 +635,20 @@ const StructuredDiff = ({
 
           {/* Right side (additions) */}
           <box style={{ flexDirection: "row", width: "50%" }}>
-            <text
-              fg="brightBlack"
-              bg={
-                rightLine.type === "add"
-                  ? ADDED_LINE_NUMBER_BG
-                  : LINE_NUMBER_BG
-              }
-              wrap={false}
-              style={{ width: rightMaxWidth + 2 }}
-            >
-              {" "}
-              {rightLine.lineNumber}{" "}
-            </text>
+            <box style={{ flexShrink: 0 }}>
+              <text
+                fg="brightBlack"
+                bg={
+                  rightLine.type === "add"
+                    ? ADDED_LINE_NUMBER_BG
+                    : LINE_NUMBER_BG
+                }
+                style={{ width: rightMaxWidth + 2 }}
+              >
+                {" "}
+                {rightLine.lineNumber}{" "}
+              </text>
+            </box>
             <box
               style={{
                 flexGrow: 1,
