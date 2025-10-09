@@ -1,5 +1,11 @@
 import { structuredPatch } from "diff";
-import { render } from "@opentui/react";
+import {
+  render,
+  useKeyboard,
+  useOnResize,
+  useRenderer,
+  useTerminalDimensions,
+} from "@opentui/react";
 import * as React from "react";
 import {
   ErrorBoundary,
@@ -7,8 +13,22 @@ import {
   FileEditPreview,
 } from "./diff.tsx";
 
-
 function App() {
+  const renderer = useRenderer();
+  const { width: initialWidth } = useTerminalDimensions();
+  const [width, setWidth] = React.useState(initialWidth);
+
+  useOnResize(
+    React.useCallback((newWidth: number) => {
+      setWidth(newWidth);
+    }, []),
+  );
+  const useSplitView = width >= 100;
+  useKeyboard((key) => {
+    if (key.name === "z" && key.ctrl) {
+      renderer.console.toggle();
+    }
+  });
   return (
     <box style={{ flexDirection: "column", height: "100%", padding: 1 }}>
       <FileEditPreviewTitle filePath={filePath} hunks={hunks} />
@@ -35,7 +55,6 @@ function App() {
     </box>
   );
 }
-
 
 // Example file content before and after - Extended version for scrolling demo
 export const beforeContent = `import React from 'react'
@@ -945,8 +964,6 @@ const hunks = structuredPatch(
   undefined,
   { context: 3, ignoreWhitespace: true, stripTrailingCr: true },
 ).hunks;
-
-
 
 await render(
   React.createElement(ErrorBoundary, null, React.createElement(App)),

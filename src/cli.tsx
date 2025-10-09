@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 import { cac } from "cac";
 import { parsePatch } from "diff";
-import { render, useOnResize, useTerminalDimensions } from "@opentui/react";
+import { render, useKeyboard, useOnResize, useRenderer, useTerminalDimensions } from "@opentui/react";
 import * as React from "react";
 import { execSync } from "child_process";
 import {
@@ -60,8 +60,20 @@ cli
       );
       const useSplitView = width >= 100;
 
+      const renderer = useRenderer();
+
+      useKeyboard((key) => {
+
+        if (key.name === "z" && key.ctrl) {
+          renderer.console.toggle()
+        }
+      });
+
       return (
-        <box key={String(useSplitView)} style={{ flexDirection: "column", height: "100%", padding: 1 }}>
+        <box
+          key={String(useSplitView)}
+          style={{ flexDirection: "column", height: "100%", padding: 1 }}
+        >
           <scrollbox
             style={{
               flexGrow: 1,
@@ -97,6 +109,7 @@ cli
                     hunks={file.hunks}
                     paddingLeft={0}
                     splitView={useSplitView}
+                    filePath={file.newFileName || file.oldFileName || ""}
                   />
                 </box>
               ))}

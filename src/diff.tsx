@@ -27,11 +27,8 @@ const LINE_NUMBER_FG_DIM = "brightBlack";
 
 function openInEditor(filePath: string, lineNumber: number) {
   const editor = process.env.REACT_EDITOR || "zed";
-  try {
-    execSync(`${editor} "${filePath}:${lineNumber}"`, { stdio: "ignore" });
-  } catch (error) {
-    console.error(`Failed to open file in ${editor}:`, error);
-  }
+
+  execSync(`${editor} "${filePath}:${lineNumber}"`, { stdio: "ignore" });
 }
 
 const theme = "github-dark-default";
@@ -76,6 +73,7 @@ function detectLanguage(filePath: string): BundledLanguage {
     case "json":
       return "json";
     case "md":
+    case "mdx":
     case "markdown":
       return "markdown";
     case "html":
@@ -630,12 +628,13 @@ const StructuredDiff = ({
             <box
               style={{ flexShrink: 0 }}
               onMouse={(event: MouseEvent) => {
-                if (event.type === "down" && newLineNumber && newLineNumber !== "0") {
+                if (event.type === "down") {
                   openInEditor(filePath, parseInt(newLineNumber));
                 }
               }}
             >
               <text
+                selectable={false}
                 fg={
                   type === "add" || type === "remove"
                     ? LINE_NUMBER_FG_BRIGHT
@@ -763,12 +762,17 @@ const StructuredDiff = ({
             <box
               style={{ flexShrink: 0, minWidth: leftMaxWidth + 2 }}
               onMouse={(event: MouseEvent) => {
-                if (event.type === "down" && leftLine.oldLineNumber && leftLine.oldLineNumber !== "0") {
+                if (
+                  event.type === "down" &&
+                  leftLine.oldLineNumber &&
+                  leftLine.oldLineNumber !== "0"
+                ) {
                   openInEditor(filePath, parseInt(leftLine.oldLineNumber));
                 }
               }}
             >
               <text
+                selectable={false}
                 fg={
                   leftLine.type === "remove"
                     ? LINE_NUMBER_FG_BRIGHT
@@ -806,12 +810,13 @@ const StructuredDiff = ({
             <box
               style={{ flexShrink: 0, minWidth: leftMaxWidth + 2 }}
               onMouse={(event: MouseEvent) => {
-                if (event.type === "down" && rightLine.newLineNumber && rightLine.newLineNumber !== "0") {
+                if (event.type === "down") {
                   openInEditor(filePath, parseInt(rightLine.newLineNumber));
                 }
               }}
             >
               <text
+                selectable={false}
                 fg={
                   rightLine.type === "add"
                     ? LINE_NUMBER_FG_BRIGHT
