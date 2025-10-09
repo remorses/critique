@@ -1,7 +1,6 @@
-import { TextAttributes, RGBA, type MouseEvent } from "@opentui/core";
+import { TextAttributes, RGBA } from "@opentui/core";
 import { structuredPatch } from "diff";
 import { render, useOnResize, useTerminalDimensions } from "@opentui/react";
-import { execSync } from "child_process";
 
 import * as React from "react";
 
@@ -24,15 +23,6 @@ const REMOVED_LINE_NUMBER_BG = RGBA.fromInts(60, 0, 0, 255);
 const ADDED_LINE_NUMBER_BG = RGBA.fromInts(0, 50, 0, 255);
 const LINE_NUMBER_FG_BRIGHT = RGBA.fromInts(255, 255, 255, 255);
 const LINE_NUMBER_FG_DIM = "brightBlack";
-
-function openInEditor(filePath: string, lineNumber: number) {
-  const editor = process.env.REACT_EDITOR || "zed";
-  try {
-    execSync(`${editor} "${filePath}:${lineNumber}"`, { stdio: "ignore" });
-  } catch (error) {
-    console.error(`Failed to open file in ${editor}:`, error);
-  }
-}
 
 const theme = "github-dark-default";
 const highlighter = await createHighlighter({
@@ -625,16 +615,9 @@ const StructuredDiff = ({
     }));
     return (
       <>
-        {paddedDiff.map(({ lineNumber, code, type, key, newLineNumber }) => (
+        {paddedDiff.map(({ lineNumber, code, type, key }) => (
           <box key={key} style={{ flexDirection: "row" }}>
-            <box
-              style={{ flexShrink: 0 }}
-              onMouse={(event: MouseEvent) => {
-                if (event.type === "down" && newLineNumber && newLineNumber !== "0") {
-                  openInEditor(filePath, parseInt(newLineNumber));
-                }
-              }}
-            >
+            <box style={{ flexShrink: 0 }}>
               <text
                 fg={
                   type === "add" || type === "remove"
@@ -760,14 +743,7 @@ const StructuredDiff = ({
         <box key={leftLine.key} style={{ flexDirection: "row" }}>
           {/* Left side (removals) */}
           <box style={{ flexDirection: "row", width: "50%" }}>
-            <box
-              style={{ flexShrink: 0, minWidth: leftMaxWidth + 2 }}
-              onMouse={(event: MouseEvent) => {
-                if (event.type === "down" && leftLine.oldLineNumber && leftLine.oldLineNumber !== "0") {
-                  openInEditor(filePath, parseInt(leftLine.oldLineNumber));
-                }
-              }}
-            >
+            <box style={{ flexShrink: 0, minWidth: leftMaxWidth + 2 }}>
               <text
                 fg={
                   leftLine.type === "remove"
@@ -803,14 +779,7 @@ const StructuredDiff = ({
 
           {/* Right side (additions) */}
           <box style={{ flexDirection: "row", width: "50%" }}>
-            <box
-              style={{ flexShrink: 0, minWidth: leftMaxWidth + 2 }}
-              onMouse={(event: MouseEvent) => {
-                if (event.type === "down" && rightLine.newLineNumber && rightLine.newLineNumber !== "0") {
-                  openInEditor(filePath, parseInt(rightLine.newLineNumber));
-                }
-              }}
-            >
+            <box style={{ flexShrink: 0, minWidth: leftMaxWidth + 2 }}>
               <text
                 fg={
                   rightLine.type === "add"
