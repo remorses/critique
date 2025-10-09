@@ -18,8 +18,8 @@
     "typescript": "^5.9.3"
   },
   "dependencies": {
-    "@opentui/core": "^0.1.25",
-    "@opentui/react": "^0.1.25",
+    "@opentui/core": "^0.1.26",
+    "@opentui/react": "^0.1.26",
     "@shikijs/langs": "^3.13.0",
     "@shikijs/themes": "^3.13.0",
     "cac": "^6.7.14",
