@@ -27,7 +27,27 @@ const LINE_NUMBER_FG_DIM = "brightBlack";
 const theme = "github-dark-default";
 const highlighter = await createHighlighter({
   themes: [theme],
-  langs: ["javascript", "typescript", "tsx", "jsx"],
+  langs: [
+    "javascript",
+    "typescript",
+    "tsx",
+    "jsx",
+    "json",
+    "markdown",
+    "html",
+    "css",
+    "python",
+    "rust",
+    "go",
+    "java",
+    "c",
+    "cpp",
+    "yaml",
+    "toml",
+    "bash",
+    "sh",
+    "sql",
+  ],
 });
 
 function detectLanguage(filePath: string): BundledLanguage {
@@ -40,6 +60,47 @@ function detectLanguage(filePath: string): BundledLanguage {
     case "jsx":
       return "jsx";
     case "js":
+    case "mjs":
+    case "cjs":
+      return "javascript";
+    case "json":
+      return "json";
+    case "md":
+    case "markdown":
+      return "markdown";
+    case "html":
+    case "htm":
+      return "html";
+    case "css":
+      return "css";
+    case "py":
+      return "python";
+    case "rs":
+      return "rust";
+    case "go":
+      return "go";
+    case "java":
+      return "java";
+    case "c":
+    case "h":
+      return "c";
+    case "cpp":
+    case "cc":
+    case "cxx":
+    case "hpp":
+    case "hxx":
+      return "cpp";
+    case "yaml":
+    case "yml":
+      return "yaml";
+    case "toml":
+      return "toml";
+    case "sh":
+      return "sh";
+    case "bash":
+      return "bash";
+    case "sql":
+      return "sql";
     default:
       return "javascript";
   }
