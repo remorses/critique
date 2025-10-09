@@ -14,10 +14,9 @@ import {
   type ThemedToken,
 } from "shiki";
 
-
 const UNCHANGED_CODE_BG = RGBA.fromInts(15, 15, 15, 255);
-const ADDED_BG_LIGHT = UNCHANGED_CODE_BG;
-const REMOVED_BG_LIGHT = UNCHANGED_CODE_BG //  RGBA.fromInts(255, 0, 0, 32);
+const ADDED_BG_LIGHT = RGBA.fromInts(100, 250, 120, 12);
+const REMOVED_BG_LIGHT = RGBA.fromInts(255, 0, 0, 32);
 
 const LINE_NUMBER_BG = RGBA.fromInts(5, 5, 5, 255);
 const REMOVED_LINE_NUMBER_BG = RGBA.fromInts(60, 0, 0, 255);
