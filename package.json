@@ -6,7 +6,7 @@
   "private": false,
   "bin": "./src/cli.tsx",
   "scripts": {
-    "cli": "bun --watch src/cli.tsx",
+    "cli": "bun src/cli.tsx",
     "prepublishonly": "tsc",
     "example": "bun --watch src/example.tsx"
   },
