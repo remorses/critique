@@ -23,6 +23,7 @@ Try to never use useEffect if possible. usually you can move logic directly in e
 ## Rules
 
 - keep types as close as possible to rayacst
+- if you need Node.js apis import the namesapce and not the named exports: `import fs from 'fs'` and not `import { writeFileSync } from 'fs'`
 - DO NOT use as any. instead try to understand how to fix the types in other ways
 - to implement compound components like `List.Item` first define the type of List, using a interface, then use : to implement it and add compound components later using . and omitting the props types given they are already typed by the interface, here is an example
 - DO NOT use console.log. only use logger.log instead

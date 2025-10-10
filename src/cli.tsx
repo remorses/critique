@@ -11,7 +11,10 @@ import * as React from "react";
 import { exec, execSync } from "child_process";
 import { promisify } from "util";
 import { MacOSScrollAccel } from "@opentui/core";
-import { readFileSync } from "fs";
+import fs from "fs";
+import { tmpdir } from "os";
+import { join } from "path";
+import * as p from "@clack/prompts";
 
 const execAsync = promisify(exec);
 
@@ -184,8 +187,8 @@ cli
     try {
       const [localContent, remoteContent, diffModule, { structuredPatch }] =
         await Promise.all([
-          readFileSync(local, "utf-8"),
-          readFileSync(remote, "utf-8"),
+          fs.readFileSync(local, "utf-8"),
+          fs.readFileSync(remote, "utf-8"),
           import("./diff.tsx"),
           import("diff"),
         ]);
@@ -215,6 +218,87 @@ cli
       );
     } catch (error) {
       console.error("Error displaying diff:", error);
+      process.exit(1);
+    }
+  });
+
+cli
+  .command("pick <branch>", "Pick files from another branch to apply to HEAD")
+  .action(async (branch: string) => {
+    try {
+      const { stdout: currentBranch } = await execAsync(
+        "git branch --show-current",
+      );
+      const current = currentBranch.trim();
+
+      if (current === branch) {
+        p.log.error("Cannot pick from the same branch");
+        process.exit(1);
+      }
+
+      const { stdout: branchExists } = await execAsync(
+        `git rev-parse --verify ${branch}`,
+        { encoding: "utf-8" },
+      ).catch(() => ({ stdout: "" }));
+
+      if (!branchExists.trim()) {
+        p.log.error(`Branch "${branch}" does not exist`);
+        process.exit(1);
+      }
+
+      const { stdout: diffOutput } = await execAsync(
+        `git diff --name-only HEAD ${branch}`,
+        { encoding: "utf-8" },
+      );
+
+      const files = diffOutput
+        .trim()
+        .split("\n")
+        .filter((f) => f);
+
+      if (files.length === 0) {
+        p.log.info("No differences found between branches");
+        process.exit(0);
+      }
+
+      const selectedFiles = await p.multiselect({
+        message: `Select files to pick from "${branch}":`,
+
+        options: files.map((file) => ({
+          value: file,
+          label: file,
+        })),
+        required: false,
+      });
+
+      if (p.isCancel(selectedFiles)) {
+        p.cancel("Operation cancelled.");
+        process.exit(0);
+      }
+
+      if (!selectedFiles || selectedFiles.length === 0) {
+        p.log.info("No files selected");
+        process.exit(0);
+      }
+
+      const { stdout: patchData } = await execAsync(
+        `git diff HEAD ${branch} --no-prefix -- ${selectedFiles.join(" ")}`,
+        { encoding: "utf-8" },
+      );
+
+      const patchFile = join(tmpdir(), `critique-pick-${Date.now()}.patch`);
+      fs.writeFileSync(patchFile, patchData);
+
+      try {
+        execSync(`git apply "${patchFile}"`, { stdio: "inherit" });
+        p.log.success(`Applied changes from ${selectedFiles.length} file(s)`);
+      } finally {
+        fs.unlinkSync(patchFile);
+      }
+    } catch (error) {
+      p.log.error(
+        `Error: ${error instanceof Error ? error.message : String(error)}`,
+      );
       process.exit(1);
     }
   });
