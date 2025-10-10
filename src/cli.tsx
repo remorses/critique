@@ -382,18 +382,12 @@ cli
               onChange={handleChange}
               selectedValues={Array.from(selectedFiles)}
               placeholder="Search files..."
-            >
-              <Dropdown.Section>
-                {files.map((file) => (
-                  <Dropdown.Item
-                    key={file}
-                    value={file}
-                    title={file}
-                    keywords={file.split("/")}
-                  />
-                ))}
-              </Dropdown.Section>
-            </Dropdown>
+              options={files.map((file) => ({
+                value: file,
+                title: "/" + file,
+                keywords: file.split("/"),
+              }))}
+            />
             {message && (
               <box
                 style={{
