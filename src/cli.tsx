@@ -284,7 +284,7 @@ cli
       }
 
       const { stdout: patchData } = await execAsync(
-        `git diff HEAD ${branch} --no-prefix -- ${selectedFiles.join(" ")}`,
+        `git diff HEAD ${branch} -- ${selectedFiles.join(" ")}`,
         { encoding: "utf-8" },
       );
 
@@ -293,28 +293,29 @@ cli
 
       try {
         execSync(`git apply --3way "${patchFile}"`, { stdio: "pipe" });
-        fs.unlinkSync(patchFile);
-
-        const { stdout: conflictFiles } = await execAsync(
-          "git diff --name-only --diff-filter=U",
-          { encoding: "utf-8" },
-        );
-
-        const conflicts = conflictFiles
-          .trim()
-          .split("\n")
-          .filter((f) => f);
-
-        if (conflicts.length > 0) {
-          p.log.warn(`Applied with conflicts in ${conflicts.length} file(s):`);
-          conflicts.forEach((file) => p.log.message(`  - ${file}`));
-        } else {
-          p.log.success(`Applied changes from ${selectedFiles.length} file(s)`);
-        }
-      } catch (applyError) {
-        fs.unlinkSync(patchFile);
-        throw applyError;
+      } catch {
+        execSync(`git apply "${patchFile}"`, { stdio: "inherit" });
       }
+
+      fs.unlinkSync(patchFile);
+
+      const { stdout: conflictFiles } = await execAsync(
+        "git diff --name-only --diff-filter=U",
+        { encoding: "utf-8" },
+      );
+
+      const conflicts = conflictFiles
+        .trim()
+        .split("\n")
+        .filter((f) => f);
+
+      if (conflicts.length > 0) {
+        p.log.warn(`Applied with conflicts in ${conflicts.length} file(s):`);
+        conflicts.forEach((file) => p.log.message(`  - ${file}`));
+      } else {
+        p.log.success(`Applied changes from ${selectedFiles.length} file(s)`);
+      }
+      process.exit(0);
     } catch (error) {
       p.log.error(
         `Error: ${error instanceof Error ? error.message : String(error)}`,
