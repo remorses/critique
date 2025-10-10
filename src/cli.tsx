@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 import { cac } from "cac";
 import {
+  // more comments
   render,
   useKeyboard,
   useOnResize,
@@ -305,5 +306,5 @@ cli
 
 cli.help();
 cli.version("1.0.0");
-
+// comment
 cli.parse();

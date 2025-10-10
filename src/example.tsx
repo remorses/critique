@@ -11,7 +11,7 @@ import {
   ErrorBoundary,
   FileEditPreviewTitle,
   FileEditPreview,
-} from "./diff.tsx";
+} from "./diff.tsx"; // comments
 
 function App() {
   const renderer = useRenderer();
