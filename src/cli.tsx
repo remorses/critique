@@ -308,12 +308,19 @@ cli
               `git checkout HEAD -- "${value}"`,
               { stdio: "pipe" },
             );
+            
             if (error) {
-              usePickStore.setState({
-                message: `Failed to restore ${value}: ${error}`,
-                messageType: "error",
-              });
-              return;
+              if (error.includes("did not match any file(s) known to git")) {
+                if (fs.existsSync(value)) {
+                  fs.unlinkSync(value);
+                }
+              } else {
+                usePickStore.setState({
+                  message: `Failed to restore ${value}: ${error}`,
+                  messageType: "error",
+                });
+                return;
+              }
             }
 
             usePickStore.setState((state) => ({
