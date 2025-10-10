@@ -263,7 +263,6 @@ cli
 
       const selectedFiles = await p.multiselect({
         message: `Select files to pick from "${branch}":`,
-
         options: files.map((file) => ({
           value: file,
           label: file,
@@ -290,10 +289,25 @@ cli
       fs.writeFileSync(patchFile, patchData);
 
       try {
-        execSync(`git apply "${patchFile}"`, { stdio: "inherit" });
-        p.log.success(`Applied changes from ${selectedFiles.length} file(s)`);
-      } finally {
+        execSync(`git apply --3way "${patchFile}"`, { stdio: "pipe" });
         fs.unlinkSync(patchFile);
+
+        const { stdout: conflictFiles } = await execAsync(
+          "git diff --name-only --diff-filter=U",
+          { encoding: "utf-8" },
+        );
+
+        const conflicts = conflictFiles.trim().split("\n").filter((f) => f);
+
+        if (conflicts.length > 0) {
+          p.log.warn(`Applied with conflicts in ${conflicts.length} file(s):`);
+          conflicts.forEach((file) => p.log.message(`  - ${file}`));
+        } else {
+          p.log.success(`Applied changes from ${selectedFiles.length} file(s)`);
+        }
+      } catch (applyError) {
+        fs.unlinkSync(patchFile);
+        throw applyError;
       }
     } catch (error) {
       p.log.error(
