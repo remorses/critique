@@ -313,8 +313,14 @@ cli
               ? fs.readFileSync(value, "utf-8")
               : undefined;
 
+            const { stdout: mergeBase } = await execAsync(
+              `git merge-base HEAD ${branch}`,
+              { encoding: "utf-8" },
+            );
+            const base = mergeBase.trim();
+
             const { stdout: patchData } = await execAsync(
-              `git diff HEAD ${branch} -- ${value}`,
+              `git diff ${base} ${branch} -- ${value}`,
               { encoding: "utf-8" },
             );
 
