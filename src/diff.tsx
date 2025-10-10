@@ -1,19 +1,15 @@
-import { TextAttributes, RGBA, type MouseEvent } from "@opentui/core";
-import { structuredPatch } from "diff";
-import { render, useOnResize, useTerminalDimensions } from "@opentui/react";
+import { RGBA, type MouseEvent } from "@opentui/core";
 import { execSync } from "child_process";
+import { diffWords } from "diff";
 
 import * as React from "react";
 
-import { type StructuredPatchHunk as Hunk, diffWordsWithSpace } from "diff";
+import { type StructuredPatchHunk as Hunk } from "diff";
 import {
-  createHighlighter,
-  type HighlighterGeneric,
-  createJavaScriptRegexEngine,
-  type BundledLanguage,
-  type BundledTheme,
-  type GrammarState,
-  type ThemedToken,
+    createHighlighter,
+    type BundledLanguage,
+    type GrammarState,
+    type ThemedToken
 } from "shiki";
 
 const UNCHANGED_CODE_BG = RGBA.fromInts(15, 15, 15, 255);
@@ -35,7 +31,6 @@ function openInEditor(filePath: string, lineNumber: number) {
 const theme = "github-dark-default";
 const highlighterStart = performance.now();
 const highlighter = await createHighlighter({
-
   themes: [theme],
   langs: [
     "javascript",
@@ -232,7 +227,9 @@ export const FileEditPreview = ({
   filePath?: string;
 }) => {
   React.useEffect(() => {
-    console.log(`Highlighter initialized in ${highlighterDuration.toFixed(2)}ms`);
+    console.log(
+      `Highlighter initialized in ${highlighterDuration.toFixed(2)}ms`,
+    );
   }, []);
 
   const allLines = hunks.flatMap((h) => h.lines);
@@ -300,10 +297,42 @@ export const FileEditPreview = ({
   );
 };
 
-// Helper function to get word-level diff
-const getWordDiff = (oldLine: string, newLine: string) => {
-  return diffWordsWithSpace(oldLine, newLine);
-};
+function calculateSimilarity(str1: string, str2: string): number {
+  const longer = str1.length > str2.length ? str1 : str2;
+  const shorter = str1.length > str2.length ? str2 : str1;
+
+  if (longer.length === 0) return 1.0;
+
+  const editDistance = levenshteinDistance(longer, shorter);
+  return (longer.length - editDistance) / longer.length;
+}
+
+function levenshteinDistance(str1: string, str2: string): number {
+  const len1 = str1.length;
+  const len2 = str2.length;
+  const matrix: number[][] = [];
+
+  for (let i = 0; i <= len1; i++) {
+    matrix[i] = [i];
+  }
+
+  for (let j = 0; j <= len2; j++) {
+    matrix[0]![j] = j;
+  }
+
+  for (let i = 1; i <= len1; i++) {
+    for (let j = 1; j <= len2; j++) {
+      const cost = str1[i - 1] === str2[j - 1] ? 0 : 1;
+      matrix[i]![j] = Math.min(
+        matrix[i - 1]![j]! + 1,
+        matrix[i]![j - 1]! + 1,
+        matrix[i - 1]![j - 1]! + cost,
+      );
+    }
+  }
+
+  return matrix[len1]![len2]!;
+}
 
 const StructuredDiff = ({
   patch,
@@ -450,18 +479,9 @@ const StructuredDiff = ({
         if (!removedText || !addedLine) continue;
 
         const addedText = addedLine.code;
-        const wordDiff = getWordDiff(removedText, addedText);
 
-        // Check if the highlighted portions would be too long (like GitHub does)
-        const removedLength = wordDiff
-          .filter((p) => p.removed)
-          .reduce((sum, p) => sum + p.value.length, 0);
-        const addedLength = wordDiff
-          .filter((p) => p.added)
-          .reduce((sum, p) => sum + p.value.length, 0);
-
-        // If changed portions are too long, skip word diff
-        const shouldSkipWordDiff = removedLength > 80 || addedLength > 80;
+        const similarity = calculateSimilarity(removedText, addedText);
+        const shouldSkipWordDiff = similarity < 0.5;
 
         if (shouldSkipWordDiff) {
           const tokens = beforeTokens[i];
@@ -481,13 +501,25 @@ const StructuredDiff = ({
           continue;
         }
 
-        const tokens = beforeTokens[i];
-        const removedContent =
-          tokens && tokens.length > 0 ? (
-            <text>{renderHighlightedTokens(tokens)}</text>
-          ) : (
-            <text>{removedText}</text>
-          );
+        const wordDiff = diffWords(removedText, addedText);
+
+        const removedContent = (
+          <text>
+            {wordDiff.map((part, idx) => {
+              if (part.removed) {
+                return (
+                  <span key={idx} bg={RGBA.fromInts(255, 50, 50, 100)}>
+                    {part.value}
+                  </span>
+                );
+              }
+              if (!part.added) {
+                return <span key={idx}>{part.value}</span>;
+              }
+              return null;
+            })}
+          </text>
+        );
 
         result.push({
           code: removedContent,
@@ -505,18 +537,9 @@ const StructuredDiff = ({
 
         const removedText = removedLine.code;
         const addedText = addedLine.code;
-        const wordDiff = getWordDiff(removedText, addedText);
 
-        // Check if the highlighted portions would be too long (like GitHub does)
-        const removedLength = wordDiff
-          .filter((p) => p.removed)
-          .reduce((sum, p) => sum + p.value.length, 0);
-        const addedLength = wordDiff
-          .filter((p) => p.added)
-          .reduce((sum, p) => sum + p.value.length, 0);
-
-        // If changed portions are too long, skip word diff
-        const shouldSkipWordDiff = removedLength > 80 || addedLength > 80;
+        const similarity = calculateSimilarity(removedText, addedText);
+        const shouldSkipWordDiff = similarity < 0.5;
 
         if (shouldSkipWordDiff) {
           const tokens = afterTokens[i];
@@ -536,13 +559,25 @@ const StructuredDiff = ({
           continue;
         }
 
-        const tokens = afterTokens[i];
-        const addedContent =
-          tokens && tokens.length > 0 ? (
-            <text>{renderHighlightedTokens(tokens)}</text>
-          ) : (
-            <text>{addedText}</text>
-          );
+        const wordDiff = diffWords(removedText, addedText);
+
+        const addedContent = (
+          <text>
+            {wordDiff.map((part, idx) => {
+              if (part.added) {
+                return (
+                  <span key={idx} bg={RGBA.fromInts(0, 200, 0, 100)}>
+                    {part.value}
+                  </span>
+                );
+              }
+              if (!part.removed) {
+                return <span key={idx}>{part.value}</span>;
+              }
+              return null;
+            })}
+          </text>
+        );
 
         result.push({
           code: addedContent,
