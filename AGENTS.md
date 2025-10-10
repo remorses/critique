@@ -56,3 +56,9 @@ use gitchamber to read the .md files using curl
 ## researching opentui patterns
 
 you can read more examples of opentui react code using gitchamber by listing and reading files from the correct endpoint: https://gitchamber.com/repos/sst/opentui/main/files?glob=packages/react/examples/**
+
+## changelog
+
+after any meaningful change update CHANGELOG.md with the version number and the list of changes made. in concise bullet points
+
+before updating the changelog bump the package.json version field first. NEVER do major bumps. NEVER publish yourself
