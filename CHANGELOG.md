@@ -1,3 +1,12 @@
+# 0.0.6
+
+- Simplify Dropdown component with options prop instead of descendants pattern
+- Add pagination support with configurable items per page (default 10)
+- Implement multi-word search with space-separated terms (intersection)
+- Detect and display conflict messages when patches create merge conflicts
+- Handle new files created by patches (delete on deselect instead of checkout)
+- Add file path prefix "/" in dropdown display
+
 # 0.0.5
 
 - Fix patch application to use merge-base for correct ahead-only commits
