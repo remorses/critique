@@ -366,11 +366,18 @@ cli
 
             fs.unlinkSync(patchFile);
 
+            const { stdout: conflictCheck } = await execAsync(
+              `git diff --name-only --diff-filter=U -- "${value}"`,
+              { encoding: "utf-8" },
+            );
+
+            const hasConflict = conflictCheck.trim().length > 0;
+
             usePickStore.setState((state) => ({
               selectedFiles: new Set([...state.selectedFiles, value]),
               appliedFiles: new Map([...state.appliedFiles, [value, true]]),
-              message: "",
-              messageType: "",
+              message: hasConflict ? `Applied ${value} with conflicts` : `Applied ${value}`,
+              messageType: hasConflict ? "error" : "",
             }));
           }
         };
