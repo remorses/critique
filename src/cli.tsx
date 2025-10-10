@@ -183,7 +183,7 @@ cli
           oldFileName?: string;
           newFileName?: string;
           hunks: any[];
-        }>>([]);
+        }> | null>(null);
 
         React.useEffect(() => {
           const fetchDiff = async () => {
@@ -257,6 +257,14 @@ cli
             }
           };
         }, []);
+
+        if (parsedFiles === null) {
+          return (
+            <box style={{ padding: 1 }}>
+              <text>Loading...</text>
+            </box>
+          );
+        }
 
         if (parsedFiles.length === 0) {
           return (

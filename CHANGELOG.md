@@ -1,3 +1,8 @@
+# 0.0.8
+
+- Default command:
+  - Show "Loading..." instead of "No changes to display" on initial load
+
 # 0.0.7
 
 - Default command:
