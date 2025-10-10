@@ -218,7 +218,7 @@ const Dropdown: DropdownType = (props) => {
                 <text attributes={TextAttributes.BOLD}>{tooltip}</text>
                 <text fg={Theme.textMuted}>esc</text>
               </box>
-              <box style={{ paddingTop: 1, paddingBottom: 1 }}>
+              <box style={{ paddingTop: 1, paddingBottom: 2 }}>
                 <input
                   ref={inputRef}
                   onInput={(value) => handleSearchTextChange(value)}

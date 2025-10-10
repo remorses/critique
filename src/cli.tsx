@@ -249,7 +249,7 @@ cli
       }
 
       const { stdout: diffOutput } = await execAsync(
-        `git diff --name-only HEAD ${branch}`,
+        `git diff --name-only HEAD...${branch}`,
         { encoding: "utf-8" },
       );
 
