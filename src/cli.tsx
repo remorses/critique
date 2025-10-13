@@ -207,6 +207,11 @@ cli
                   return false;
                 }
 
+                const isNewFile = !file.oldFileName || file.oldFileName === "/dev/null";
+                if (isNewFile) {
+                  return true;
+                }
+
                 const totalLines = file.hunks.reduce((sum, hunk) => sum + hunk.lines.length, 0);
                 return totalLines <= 6000;
               });

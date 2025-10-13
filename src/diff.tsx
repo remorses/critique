@@ -194,9 +194,12 @@ export const FileEditPreviewTitle = ({
     0,
   );
 
+  const isNewFile = numAdditions > 0 && numRemovals === 0;
+  const isDeleted = numRemovals > 0 && numAdditions === 0;
+
   return (
     <text>
-      Updated <strong>{filePath}</strong>
+      {isNewFile ? "Created" : isDeleted ? "Deleted" : "Updated"} <strong>{filePath}</strong>
       {numAdditions > 0 || numRemovals > 0 ? " with " : ""}
       {numAdditions > 0 ? (
         <>

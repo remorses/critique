@@ -1,3 +1,8 @@
+# 0.0.9
+
+- Default command:
+  - Increase max lines for diff display
+
 # 0.0.8
 
 - Default command:
