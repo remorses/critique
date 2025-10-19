@@ -48,19 +48,24 @@ const monotoneGreen = createMonotoneTheme({
   name: "monotone-green-dark",
   hue: 120,
   isDark: true,
+  saturation: 0.50,
+  lightnessAdjust: 0.15,
 });
 
 const monotoneGray = createMonotoneTheme({
   name: "monotone-gray-dark",
   hue: 0,
   isDark: true,
-  saturation: 0.05,
+  saturation: 0.0,
+  lightnessAdjust: -1,
 });
 
 const monotoneRed = createMonotoneTheme({
   name: "monotone-red-dark",
   hue: 0,
   isDark: true,
+  saturation: 0.50,
+  lightnessAdjust: 0.10,
 });
 
 const themes = [monotoneGreen, monotoneGray, monotoneRed];
@@ -80,7 +85,7 @@ for (let i = 0; i < lines.length; i++) {
   const line = lines[i]!;
   const themeIndex = themePattern[i % themePattern.length]!;
   const theme = themes[themeIndex]!;
-  
+
   const result = highlighter.codeToTokens(line, {
     lang: "js",
     theme: theme.name!,
@@ -100,15 +105,26 @@ function HighlightedCode() {
   return (
     <box style={{ flexDirection: "column", padding: 2 }}>
       {highlightedLines.map((line, lineIdx) => {
-        const isGreenTheme = lineThemes[lineIdx] === 0;
-        
+        const themeIndex = lineThemes[lineIdx];
+        const isGreenTheme = themeIndex === 0;
+        const isRedTheme = themeIndex === 2;
+
         return (
           <text key={lineIdx} wrap={false}>
             {line.map((token, tokenIdx) => {
               const hexColor = token.color?.slice(0, 7);
               const fg = hexColor ? RGBA.fromHex(hexColor) : undefined;
-              const shouldHighlight = isGreenTheme && token.content.trim() && Math.random() > 0.7;
-              const bg = shouldHighlight ? RGBA.fromHex("#1a3a1a") : undefined;
+
+              const shouldHighlight = token.content.trim() && Math.random() > 0.7;
+              let bg: RGBA | undefined;
+
+              if (shouldHighlight) {
+                if (isGreenTheme) {
+                  bg = RGBA.fromHex("#1a2a1a");
+                } else if (isRedTheme) {
+                  bg = RGBA.fromHex("#2a1a1a");
+                }
+              }
 
               return (
                 <span key={tokenIdx} fg={fg} bg={bg}>

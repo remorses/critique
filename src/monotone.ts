@@ -59,18 +59,21 @@ function createMonotoneTheme(options: {
   hue: number;
   isDark?: boolean;
   saturation?: number;
+  lightnessAdjust?: number;
 }): VSCodeTheme {
-  const { name, hue, isDark = true, saturation = 0.20 } = options;
+  const { name, hue, isDark = true, saturation = 0.20, lightnessAdjust = 0 } = options;
+
+  const s = (factor: number) => saturation === 0 ? 0 : saturation * factor;
 
   const bg = isDark
-    ? hslToHex(hue, saturation * 0.75, 0.08)
-    : hslToHex(hue, saturation * 0.50, 0.95);
+    ? hslToHex(hue, s(0.75), 0.08 + lightnessAdjust)
+    : hslToHex(hue, s(0.50), 0.95 + lightnessAdjust);
   const fg = isDark
-    ? hslToHex(hue, saturation * 0.50, 0.85)
-    : hslToHex(hue, saturation * 0.75, 0.15);
+    ? hslToHex(hue, s(0.50), 0.85 + lightnessAdjust)
+    : hslToHex(hue, s(0.75), 0.15 + lightnessAdjust);
 
-  const shade = (lightness: number, sat: number = saturation) =>
-    hslToHex(hue, sat, lightness);
+  const shade = (lightness: number, satFactor: number = 1.0) =>
+    hslToHex(hue, s(satFactor), lightness);
 
   return {
     name,
@@ -78,79 +81,79 @@ function createMonotoneTheme(options: {
     colors: {
       "editor.background": bg,
       "editor.foreground": fg,
-      "editorLineNumber.foreground": isDark ? shade(0.30, saturation * 0.75) : shade(0.60, saturation * 0.75),
-      "editorLineNumber.activeForeground": isDark ? shade(0.50, saturation * 1.25) : shade(0.40, saturation * 1.25),
+      "editorLineNumber.foreground": isDark ? shade(0.30, 0.75) : shade(0.60, 0.75),
+      "editorLineNumber.activeForeground": isDark ? shade(0.50, 1.25) : shade(0.40, 1.25),
       "editorCursor.foreground": fg,
-      "editor.selectionBackground": isDark ? shade(0.18, 0.25) : shade(0.85, 0.20),
-      "editor.lineHighlightBackground": isDark ? shade(0.12, 0.20) : shade(0.92, 0.15),
-      "editorIndentGuide.background": isDark ? shade(0.15, 0.15) : shade(0.85, 0.15),
-      "editorIndentGuide.activeBackground": isDark ? shade(0.30, 0.25) : shade(0.70, 0.25),
-      "editorWhitespace.foreground": isDark ? shade(0.20, 0.15) : shade(0.80, 0.15),
-      "sideBar.background": isDark ? shade(0.06, 0.15) : shade(0.97, 0.10),
-      "sideBar.foreground": isDark ? shade(0.60, 0.20) : shade(0.35, 0.20),
-      "sideBar.border": isDark ? shade(0.12, 0.20) : shade(0.90, 0.15),
-      "activityBar.background": isDark ? shade(0.06, 0.15) : shade(0.97, 0.10),
-      "activityBar.foreground": isDark ? shade(0.70, 0.25) : shade(0.30, 0.25),
-      "activityBar.border": isDark ? shade(0.12, 0.20) : shade(0.90, 0.15),
-      "statusBar.background": isDark ? shade(0.06, 0.15) : shade(0.97, 0.10),
-      "statusBar.foreground": isDark ? shade(0.60, 0.20) : shade(0.35, 0.20),
-      "statusBar.border": isDark ? shade(0.12, 0.20) : shade(0.90, 0.15),
-      "titleBar.activeBackground": isDark ? shade(0.06, 0.15) : shade(0.97, 0.10),
-      "titleBar.activeForeground": isDark ? shade(0.60, 0.20) : shade(0.35, 0.20),
-      "titleBar.border": isDark ? shade(0.12, 0.20) : shade(0.90, 0.15),
+      "editor.selectionBackground": isDark ? shade(0.18, 1.25) : shade(0.85, 1.0),
+      "editor.lineHighlightBackground": isDark ? shade(0.12, 1.0) : shade(0.92, 0.75),
+      "editorIndentGuide.background": isDark ? shade(0.15, 0.75) : shade(0.85, 0.75),
+      "editorIndentGuide.activeBackground": isDark ? shade(0.30, 1.25) : shade(0.70, 1.25),
+      "editorWhitespace.foreground": isDark ? shade(0.20, 0.75) : shade(0.80, 0.75),
+      "sideBar.background": isDark ? shade(0.06, 0.75) : shade(0.97, 0.50),
+      "sideBar.foreground": isDark ? shade(0.60, 1.0) : shade(0.35, 1.0),
+      "sideBar.border": isDark ? shade(0.12, 1.0) : shade(0.90, 0.75),
+      "activityBar.background": isDark ? shade(0.06, 0.75) : shade(0.97, 0.50),
+      "activityBar.foreground": isDark ? shade(0.70, 1.25) : shade(0.30, 1.25),
+      "activityBar.border": isDark ? shade(0.12, 1.0) : shade(0.90, 0.75),
+      "statusBar.background": isDark ? shade(0.06, 0.75) : shade(0.97, 0.50),
+      "statusBar.foreground": isDark ? shade(0.60, 1.0) : shade(0.35, 1.0),
+      "statusBar.border": isDark ? shade(0.12, 1.0) : shade(0.90, 0.75),
+      "titleBar.activeBackground": isDark ? shade(0.06, 0.75) : shade(0.97, 0.50),
+      "titleBar.activeForeground": isDark ? shade(0.60, 1.0) : shade(0.35, 1.0),
+      "titleBar.border": isDark ? shade(0.12, 1.0) : shade(0.90, 0.75),
       "tab.activeBackground": bg,
       "tab.activeForeground": fg,
-      "tab.inactiveBackground": isDark ? shade(0.10, 0.15) : shade(0.93, 0.10),
-      "tab.inactiveForeground": isDark ? shade(0.45, 0.20) : shade(0.50, 0.20),
-      "tab.border": isDark ? shade(0.12, 0.20) : shade(0.90, 0.15),
-      "panel.border": isDark ? shade(0.12, 0.20) : shade(0.90, 0.15),
-      "input.background": isDark ? shade(0.10, 0.15) : shade(0.98, 0.10),
+      "tab.inactiveBackground": isDark ? shade(0.10, 0.75) : shade(0.93, 0.50),
+      "tab.inactiveForeground": isDark ? shade(0.45, 1.0) : shade(0.50, 1.0),
+      "tab.border": isDark ? shade(0.12, 1.0) : shade(0.90, 0.75),
+      "panel.border": isDark ? shade(0.12, 1.0) : shade(0.90, 0.75),
+      "input.background": isDark ? shade(0.10, 0.75) : shade(0.98, 0.50),
       "input.foreground": fg,
-      "input.border": isDark ? shade(0.20, 0.20) : shade(0.85, 0.20),
-      "dropdown.background": isDark ? shade(0.10, 0.15) : shade(0.98, 0.10),
+      "input.border": isDark ? shade(0.20, 1.0) : shade(0.85, 1.0),
+      "dropdown.background": isDark ? shade(0.10, 0.75) : shade(0.98, 0.50),
       "dropdown.foreground": fg,
-      "list.activeSelectionBackground": isDark ? shade(0.18, 0.25) : shade(0.85, 0.25),
+      "list.activeSelectionBackground": isDark ? shade(0.18, 1.25) : shade(0.85, 1.25),
       "list.activeSelectionForeground": fg,
-      "list.hoverBackground": isDark ? shade(0.14, 0.20) : shade(0.90, 0.15),
-      "list.focusBackground": isDark ? shade(0.18, 0.25) : shade(0.85, 0.25),
+      "list.hoverBackground": isDark ? shade(0.14, 1.0) : shade(0.90, 0.75),
+      "list.focusBackground": isDark ? shade(0.18, 1.25) : shade(0.85, 1.25),
     },
     tokenColors: [
       {
         scope: ["comment", "punctuation.definition.comment"],
         settings: {
-          foreground: isDark ? shade(0.45, 0.20) : shade(0.50, 0.25),
+          foreground: isDark ? shade(0.45, 1.0) : shade(0.50, 1.25),
           fontStyle: "italic",
         },
       },
       {
         scope: ["keyword", "storage.type", "storage.modifier"],
         settings: {
-          foreground: isDark ? shade(0.60, 0.35) : shade(0.35, 0.40),
+          foreground: isDark ? shade(0.60, 1.75) : shade(0.35, 2.0),
           fontStyle: "bold",
         },
       },
       {
         scope: ["string", "punctuation.definition.string"],
         settings: {
-          foreground: isDark ? shade(0.65, 0.30) : shade(0.40, 0.35),
+          foreground: isDark ? shade(0.65, 1.5) : shade(0.40, 1.75),
         },
       },
       {
         scope: ["constant.numeric", "constant.language", "constant.character"],
         settings: {
-          foreground: isDark ? shade(0.70, 0.30) : shade(0.35, 0.35),
+          foreground: isDark ? shade(0.70, 1.5) : shade(0.35, 1.75),
         },
       },
       {
         scope: ["variable", "entity.name.variable"],
         settings: {
-          foreground: isDark ? shade(0.75, 0.20) : shade(0.25, 0.20),
+          foreground: isDark ? shade(0.75, 1.0) : shade(0.25, 1.0),
         },
       },
       {
         scope: ["entity.name.function", "support.function"],
         settings: {
-          foreground: isDark ? shade(0.80, 0.25) : shade(0.20, 0.30),
+          foreground: isDark ? shade(0.80, 1.25) : shade(0.20, 1.5),
         },
       },
       {
@@ -161,31 +164,31 @@ function createMonotoneTheme(options: {
           "support.class",
         ],
         settings: {
-          foreground: isDark ? shade(0.75, 0.30) : shade(0.25, 0.35),
+          foreground: isDark ? shade(0.75, 1.5) : shade(0.25, 1.75),
         },
       },
       {
         scope: "punctuation",
         settings: {
-          foreground: isDark ? shade(0.55, 0.20) : shade(0.45, 0.20),
+          foreground: isDark ? shade(0.55, 1.0) : shade(0.45, 1.0),
         },
       },
       {
         scope: "operator",
         settings: {
-          foreground: isDark ? shade(0.65, 0.25) : shade(0.35, 0.30),
+          foreground: isDark ? shade(0.65, 1.25) : shade(0.35, 1.5),
         },
       },
       {
         scope: "entity.name.tag",
         settings: {
-          foreground: isDark ? shade(0.70, 0.35) : shade(0.30, 0.40),
+          foreground: isDark ? shade(0.70, 1.75) : shade(0.30, 2.0),
         },
       },
       {
         scope: "entity.other.attribute-name",
         settings: {
-          foreground: isDark ? shade(0.75, 0.25) : shade(0.25, 0.30),
+          foreground: isDark ? shade(0.75, 1.25) : shade(0.25, 1.5),
         },
       },
     ],
