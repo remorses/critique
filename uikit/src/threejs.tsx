@@ -3,7 +3,7 @@ import { Container, Fullscreen, Text } from "@react-three/uikit"
 import { OrbitControls } from "@react-three/drei"
 import { inconsolata } from "@pmndrs/msdfonts"
 import { structuredPatch, type Hunk } from "diff"
-import { useState, useEffect } from "react"
+import { useScreenBreakpoint } from "./hooks"
 
 // Import example content from the parent folder
 const beforeContent = `import React from 'react'
@@ -237,39 +237,6 @@ const patch = structuredPatch(filePath, filePath, beforeContent, afterContent, u
 const hunks = patch.hunks
 
 const em = 16
-
-type Breakpoint = "xs" | "sm" | "md" | "lg" | "xl" | "2xl"
-
-function useScreenBreakpoint(): Breakpoint {
-  const getBreakpoint = (width: number): Breakpoint => {
-    if (width >= 1536) return "2xl"
-    if (width >= 1280) return "xl"
-    if (width >= 1024) return "lg"
-    if (width >= 768) return "md"
-    if (width >= 640) return "sm"
-    return "xs"
-  }
-
-  const [breakpoint, setBreakpoint] = useState<Breakpoint>(() => getBreakpoint(window.innerWidth))
-
-  useEffect(() => {
-    const handleResize = () => {
-      const newBreakpoint = getBreakpoint(window.innerWidth)
-      setBreakpoint((current) => {
-        // Only update if breakpoint actually changed
-        if (current !== newBreakpoint) {
-          return newBreakpoint
-        }
-        return current
-      })
-    }
-
-    window.addEventListener("resize", handleResize)
-    return () => window.removeEventListener("resize", handleResize)
-  }, [])
-
-  return breakpoint
-}
 
 export default function App() {
   return (
