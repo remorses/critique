@@ -1,8 +1,8 @@
-import { Canvas } from '@react-three/fiber'
-import { Container, Fullscreen, Text } from '@react-three/uikit'
-import { OrbitControls } from '@react-three/drei'
-import { inconsolata } from '@pmndrs/msdfonts'
-import { structuredPatch, type Hunk } from 'diff'
+import { Canvas } from "@react-three/fiber"
+import { Container, Fullscreen, Text } from "@react-three/uikit"
+import { OrbitControls } from "@react-three/drei"
+import { inconsolata } from "@pmndrs/msdfonts"
+import { structuredPatch, type Hunk } from "diff"
 
 // Import example content from the parent folder
 const beforeContent = `import React from 'react'
@@ -91,7 +91,7 @@ function Button({
   )
 }
 
-export default Button`;
+export default Button`
 
 const afterContent = `import React from 'react'
 import PropTypes from 'prop-types'
@@ -228,31 +228,19 @@ function Button({
   )
 }
 
-export default Button`;
+export default Button`
 
-const filePath = '/src/components/Button.tsx'
+const filePath = "/src/components/Button.tsx"
 
-const patch = structuredPatch(
-  filePath,
-  filePath,
-  beforeContent,
-  afterContent,
-  undefined,
-  undefined,
-  { context: 3, ignoreWhitespace: true },
-)
+const patch = structuredPatch(filePath, filePath, beforeContent, afterContent, undefined, undefined, { context: 3, ignoreWhitespace: true })
 const hunks = patch.hunks
 
 const em = 16
 
 export default function App() {
   return (
-    <Canvas
-      camera={{ position: [0, 0, 10], fov: 50 }}
-      style={{ height: '100vh', touchAction: 'none' }}
-      gl={{ localClippingEnabled: true }}
-    >
-      <color attach="background" args={['#0a0a0a']} />
+    <Canvas camera={{ position: [0, 0, 10], fov: 50 }} style={{ height: "100vh", touchAction: "none" }} gl={{ localClippingEnabled: true }}>
+      <color attach="background" args={["#0a0a0a"]} />
       <OrbitControls enableRotate={false} enableZoom={false} enablePan={false} />
       <ambientLight intensity={1} />
       <pointLight position={[10, 10, 10]} />
@@ -279,13 +267,13 @@ export default function App() {
 function DiffHunk({ hunk }: { hunk: Hunk }) {
   // Process lines and build split view
   const processedLines = hunk.lines.map((code) => {
-    if (code.startsWith('+')) {
-      return { code: code.slice(1), type: 'add' }
+    if (code.startsWith("+")) {
+      return { code: code.slice(1), type: "add" }
     }
-    if (code.startsWith('-')) {
-      return { code: code.slice(1), type: 'remove' }
+    if (code.startsWith("-")) {
+      return { code: code.slice(1), type: "remove" }
     }
-    return { code: code.slice(1), type: 'nochange' }
+    return { code: code.slice(1), type: "nochange" }
   })
 
   // Build split lines structure
@@ -302,17 +290,17 @@ function DiffHunk({ hunk }: { hunk: Hunk }) {
     const line = processedLines[i]
     if (!line) break
 
-    if (line.type === 'remove') {
+    if (line.type === "remove") {
       // Collect consecutive removes
       const removes: Array<{ code: string; lineNum: number }> = []
-      while (i < processedLines.length && processedLines[i]?.type === 'remove') {
+      while (i < processedLines.length && processedLines[i]?.type === "remove") {
         removes.push({ code: processedLines[i]!.code, lineNum: oldLineNum++ })
         i++
       }
 
       // Collect consecutive adds that follow
       const adds: Array<{ code: string; lineNum: number }> = []
-      while (i < processedLines.length && processedLines[i]?.type === 'add') {
+      while (i < processedLines.length && processedLines[i]?.type === "add") {
         adds.push({ code: processedLines[i]!.code, lineNum: newLineNum++ })
         i++
       }
@@ -322,32 +310,30 @@ function DiffHunk({ hunk }: { hunk: Hunk }) {
       for (let j = 0; j < maxLength; j++) {
         splitLines.push({
           left: removes[j]
-            ? { code: removes[j].code, lineNumber: removes[j].lineNum, type: 'remove' }
-            : { code: '', lineNumber: null, type: 'empty' },
-          right: adds[j]
-            ? { code: adds[j].code, lineNumber: adds[j].lineNum, type: 'add' }
-            : { code: '', lineNumber: null, type: 'empty' },
+            ? { code: removes[j].code, lineNumber: removes[j].lineNum, type: "remove" }
+            : { code: "", lineNumber: null, type: "empty" },
+          right: adds[j] ? { code: adds[j].code, lineNumber: adds[j].lineNum, type: "add" } : { code: "", lineNumber: null, type: "empty" },
         })
       }
-    } else if (line.type === 'add') {
+    } else if (line.type === "add") {
       // Unpaired add
       splitLines.push({
-        left: { code: '', lineNumber: null, type: 'empty' },
-        right: { code: line.code, lineNumber: newLineNum++, type: 'add' },
+        left: { code: "", lineNumber: null, type: "empty" },
+        right: { code: line.code, lineNumber: newLineNum++, type: "add" },
       })
       i++
     } else {
       // Unchanged line
       splitLines.push({
-        left: { code: line.code, lineNumber: oldLineNum++, type: 'nochange' },
-        right: { code: line.code, lineNumber: newLineNum++, type: 'nochange' },
+        left: { code: line.code, lineNumber: oldLineNum++, type: "nochange" },
+        right: { code: line.code, lineNumber: newLineNum++, type: "nochange" },
       })
       i++
     }
   }
 
   return (
-    <Container fontFamily={'inconsolata'} flexDirection="column" gap={0} flexShrink={0} width="100%">
+    <Container fontFamily={"inconsolata"} flexDirection="column" gap={0} flexShrink={0} width="100%">
       {splitLines.map((splitLine, idx) => {
         return (
           <Container key={idx} flexDirection="row" flexShrink={0} width="100%" alignItems="flex-start">
@@ -356,36 +342,24 @@ function DiffHunk({ hunk }: { hunk: Hunk }) {
               <Container
                 width={em * 3}
                 flexShrink={0}
-                backgroundColor={splitLine.left.type === 'remove' ? '#3a0a0a' : '#1a1a1a'}
+                backgroundColor={splitLine.left.type === "remove" ? "#3a0a0a" : "#1a1a1a"}
                 paddingX={4}
                 paddingY={2}
               >
-                <Text
-                  fontSize={em}
-                  color={splitLine.left.type === 'remove' ? '#ff6666' : '#666666'}
-
-                  flexShrink={0}
-                >
-                  {splitLine.left.lineNumber !== null ? splitLine.left.lineNumber.toString().padStart(4, ' ') : '    '}
+                <Text fontSize={em} color={splitLine.left.type === "remove" ? "#ff6666" : "#666666"} flexShrink={0}>
+                  {splitLine.left.lineNumber !== null ? splitLine.left.lineNumber.toString().padStart(4, " ") : "    "}
                 </Text>
               </Container>
               <Container
                 flexGrow={1}
                 flexShrink={1}
-                backgroundColor={splitLine.left.type === 'remove' ? '#2a0000' : '#0f0f0f'}
+                backgroundColor={splitLine.left.type === "remove" ? "#2a0000" : "#0f0f0f"}
                 paddingX={4}
                 paddingY={2}
                 overflow="hidden"
               >
-                <Text
-                  fontSize={em}
-                  color="#e5e5e5"
-
-                  whiteSpace="pre"
-                  wordBreak="break-word"
-                  flexShrink={1}
-                >
-                  {splitLine.left.code || ' '}
+                <Text fontSize={em} color="#e5e5e5" whiteSpace="pre" wordBreak="break-word" flexShrink={1}>
+                  {splitLine.left.code || " "}
                 </Text>
               </Container>
             </Container>
@@ -395,36 +369,24 @@ function DiffHunk({ hunk }: { hunk: Hunk }) {
               <Container
                 width={em * 3}
                 flexShrink={0}
-                backgroundColor={splitLine.right.type === 'add' ? '#0a3a0a' : '#1a1a1a'}
+                backgroundColor={splitLine.right.type === "add" ? "#0a3a0a" : "#1a1a1a"}
                 paddingX={4}
                 paddingY={2}
               >
-                <Text
-                  fontSize={em}
-                  color={splitLine.right.type === 'add' ? '#66ff66' : '#666666'}
-
-                  flexShrink={0}
-                >
-                  {splitLine.right.lineNumber !== null ? splitLine.right.lineNumber.toString().padStart(4, ' ') : '    '}
+                <Text fontSize={em} color={splitLine.right.type === "add" ? "#66ff66" : "#666666"} flexShrink={0}>
+                  {splitLine.right.lineNumber !== null ? splitLine.right.lineNumber.toString().padStart(4, " ") : "    "}
                 </Text>
               </Container>
               <Container
                 flexGrow={1}
                 flexShrink={1}
-                backgroundColor={splitLine.right.type === 'add' ? '#002a00' : '#0f0f0f'}
+                backgroundColor={splitLine.right.type === "add" ? "#002a00" : "#0f0f0f"}
                 paddingX={4}
                 paddingY={2}
                 overflow="hidden"
               >
-                <Text
-                  fontSize={em}
-                  color="#e5e5e5"
-
-                  whiteSpace="pre"
-                  wordBreak="break-word"
-                  flexShrink={1}
-                >
-                  {splitLine.right.code || ' '}
+                <Text fontSize={em} color="#e5e5e5" whiteSpace="pre" wordBreak="break-word" flexShrink={1}>
+                  {splitLine.right.code || " "}
                 </Text>
               </Container>
             </Container>
