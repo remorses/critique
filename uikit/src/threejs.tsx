@@ -263,7 +263,7 @@ export default function App() {
         </Container>
 
         <Container flexGrow={1} flexShrink={1} overflow="scroll" backgroundColor="#0a0a0a" scrollbarColor="#444444">
-          <Container flexDirection="column" gap={4} flexShrink={0}>
+          <Container flexDirection="column" gap={4} flexShrink={0} width="100%">
             {hunks.map((hunk, i) => (
               <DiffHunk key={i} hunk={hunk} />
             ))}
@@ -345,10 +345,10 @@ function DiffHunk({ hunk }: { hunk: Hunk }) {
   }
 
   return (
-    <Container flexDirection="column" gap={0} flexShrink={0}>
+    <Container flexDirection="column" gap={0} flexShrink={0} width="100%">
       {splitLines.map((splitLine, idx) => {
         return (
-          <Container key={idx} flexDirection="row" flexShrink={0}>
+          <Container key={idx} flexDirection="row" flexShrink={0} width="100%">
             {/* Left side (old/removed) */}
             <Container flexDirection="row" width="50%" flexShrink={0}>
               <Container
