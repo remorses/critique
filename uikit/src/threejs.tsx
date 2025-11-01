@@ -243,6 +243,8 @@ const patch = structuredPatch(
 )
 const hunks = patch.hunks
 
+const em = 16
+
 export default function App() {
   return (
     <Canvas
@@ -345,23 +347,23 @@ function DiffHunk({ hunk }: { hunk: Hunk }) {
   }
 
   return (
-    <Container flexDirection="column" gap={0} flexShrink={0} width="100%">
+    <Container fontFamily={'inconsolata'} flexDirection="column" gap={0} flexShrink={0} width="100%">
       {splitLines.map((splitLine, idx) => {
         return (
-          <Container key={idx} flexDirection="row" flexShrink={0} width="100%">
+          <Container key={idx} flexDirection="row" flexShrink={0} width="100%" alignItems="flex-start">
             {/* Left side (old/removed) */}
-            <Container flexDirection="row" width="50%" flexShrink={0}>
+            <Container flexDirection="row" width="50%" flexShrink={0} alignItems="stretch">
               <Container
-                width={50}
+                width={em * 3}
                 flexShrink={0}
                 backgroundColor={splitLine.left.type === 'remove' ? '#3a0a0a' : '#1a1a1a'}
                 paddingX={4}
                 paddingY={2}
               >
                 <Text
-                  fontSize={14}
+                  fontSize={em}
                   color={splitLine.left.type === 'remove' ? '#ff6666' : '#666666'}
-                  fontFamily="inconsolata"
+
                   flexShrink={0}
                 >
                   {splitLine.left.lineNumber !== null ? splitLine.left.lineNumber.toString().padStart(4, ' ') : '    '}
@@ -369,30 +371,38 @@ function DiffHunk({ hunk }: { hunk: Hunk }) {
               </Container>
               <Container
                 flexGrow={1}
-                flexShrink={0}
+                flexShrink={1}
                 backgroundColor={splitLine.left.type === 'remove' ? '#2a0000' : '#0f0f0f'}
                 paddingX={4}
                 paddingY={2}
+                overflow="hidden"
               >
-                <Text fontSize={14} color="#e5e5e5" fontFamily="inconsolata" whiteSpace="pre" flexShrink={0}>
+                <Text
+                  fontSize={em}
+                  color="#e5e5e5"
+
+                  whiteSpace="pre"
+                  wordBreak="break-word"
+                  flexShrink={1}
+                >
                   {splitLine.left.code || ' '}
                 </Text>
               </Container>
             </Container>
 
             {/* Right side (new/added) */}
-            <Container flexDirection="row" width="50%" flexShrink={0}>
+            <Container flexDirection="row" width="50%" flexShrink={0} alignItems="stretch">
               <Container
-                width={50}
+                width={em * 3}
                 flexShrink={0}
                 backgroundColor={splitLine.right.type === 'add' ? '#0a3a0a' : '#1a1a1a'}
                 paddingX={4}
                 paddingY={2}
               >
                 <Text
-                  fontSize={14}
+                  fontSize={em}
                   color={splitLine.right.type === 'add' ? '#66ff66' : '#666666'}
-                  fontFamily="inconsolata"
+
                   flexShrink={0}
                 >
                   {splitLine.right.lineNumber !== null ? splitLine.right.lineNumber.toString().padStart(4, ' ') : '    '}
@@ -400,12 +410,20 @@ function DiffHunk({ hunk }: { hunk: Hunk }) {
               </Container>
               <Container
                 flexGrow={1}
-                flexShrink={0}
+                flexShrink={1}
                 backgroundColor={splitLine.right.type === 'add' ? '#002a00' : '#0f0f0f'}
                 paddingX={4}
                 paddingY={2}
+                overflow="hidden"
               >
-                <Text fontSize={14} color="#e5e5e5" fontFamily="inconsolata" whiteSpace="pre" flexShrink={0}>
+                <Text
+                  fontSize={em}
+                  color="#e5e5e5"
+
+                  whiteSpace="pre"
+                  wordBreak="break-word"
+                  flexShrink={1}
+                >
                   {splitLine.right.code || ' '}
                 </Text>
               </Container>
