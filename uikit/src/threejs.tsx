@@ -2,6 +2,7 @@ import { Canvas } from '@react-three/fiber'
 import { Container, Fullscreen, Text } from '@react-three/uikit'
 import { OrbitControls } from '@react-three/drei'
 import { inconsolata } from '@pmndrs/msdfonts'
+import { structuredPatch, type Hunk } from 'diff'
 
 // Import example content from the parent folder
 const beforeContent = `import React from 'react'
@@ -92,7 +93,7 @@ function Button({
 
 export default Button`;
 
-const _afterContent = `import React from 'react'
+const afterContent = `import React from 'react'
 import PropTypes from 'prop-types'
 import { cn } from '../utils/cn'
 import { useEffect, useState, useCallback, useMemo } from 'react'
@@ -231,9 +232,18 @@ export default Button`;
 
 const filePath = '/src/components/Button.tsx'
 
-export default function App() {
-  const beforeLines = beforeContent.split('\n')
+const patch = structuredPatch(
+  filePath,
+  filePath,
+  beforeContent,
+  afterContent,
+  undefined,
+  undefined,
+  { context: 3, ignoreWhitespace: true },
+)
+const hunks = patch.hunks
 
+export default function App() {
   return (
     <Canvas
       camera={{ position: [0, 0, 10], fov: 50 }}
@@ -248,27 +258,161 @@ export default function App() {
       <Fullscreen flexDirection="column" padding={10} gap={2} backgroundColor="#0f0f0f" fontFamilies={{ inconsolata }}>
         <Container padding={8} backgroundColor="#1a1a1a" flexShrink={0}>
           <Text fontSize={20} color="#ffffff">
-            {filePath} - {beforeLines.length} lines
+            {filePath}
           </Text>
         </Container>
 
         <Container flexGrow={1} flexShrink={1} overflow="scroll" backgroundColor="#0a0a0a" scrollbarColor="#444444">
-          <Container flexDirection="column" gap={1} flexShrink={0}>
-            {beforeLines.map((line, idx) => {
-              return (
-                <Container key={idx} flexDirection="row" gap={8} paddingX={4} paddingY={2} flexShrink={0}>
-                  <Text fontSize={16} color="#666666" fontFamily="inconsolata" flexShrink={0}>
-                    {(idx + 1).toString().padStart(3, ' ')}
-                  </Text>
-                  <Text fontSize={16} color="#e5e5e5" fontFamily="inconsolata" whiteSpace="pre" flexShrink={0}>
-                    {line || ' '}
-                  </Text>
-                </Container>
-              )
-            })}
+          <Container flexDirection="column" gap={4} flexShrink={0}>
+            {hunks.map((hunk, i) => (
+              <DiffHunk key={i} hunk={hunk} />
+            ))}
           </Container>
         </Container>
       </Fullscreen>
     </Canvas>
+  )
+}
+
+function DiffHunk({ hunk }: { hunk: Hunk }) {
+  // Process lines and build split view
+  const processedLines = hunk.lines.map((code) => {
+    if (code.startsWith('+')) {
+      return { code: code.slice(1), type: 'add' }
+    }
+    if (code.startsWith('-')) {
+      return { code: code.slice(1), type: 'remove' }
+    }
+    return { code: code.slice(1), type: 'nochange' }
+  })
+
+  // Build split lines structure
+  const splitLines: Array<{
+    left: { code: string; lineNumber: number | null; type: string }
+    right: { code: string; lineNumber: number | null; type: string }
+  }> = []
+
+  let oldLineNum = hunk.oldStart
+  let newLineNum = hunk.newStart
+  let i = 0
+
+  while (i < processedLines.length) {
+    const line = processedLines[i]
+    if (!line) break
+
+    if (line.type === 'remove') {
+      // Collect consecutive removes
+      const removes: Array<{ code: string; lineNum: number }> = []
+      while (i < processedLines.length && processedLines[i]?.type === 'remove') {
+        removes.push({ code: processedLines[i]!.code, lineNum: oldLineNum++ })
+        i++
+      }
+
+      // Collect consecutive adds that follow
+      const adds: Array<{ code: string; lineNum: number }> = []
+      while (i < processedLines.length && processedLines[i]?.type === 'add') {
+        adds.push({ code: processedLines[i]!.code, lineNum: newLineNum++ })
+        i++
+      }
+
+      // Pair them up
+      const maxLength = Math.max(removes.length, adds.length)
+      for (let j = 0; j < maxLength; j++) {
+        splitLines.push({
+          left: removes[j]
+            ? { code: removes[j].code, lineNumber: removes[j].lineNum, type: 'remove' }
+            : { code: '', lineNumber: null, type: 'empty' },
+          right: adds[j]
+            ? { code: adds[j].code, lineNumber: adds[j].lineNum, type: 'add' }
+            : { code: '', lineNumber: null, type: 'empty' },
+        })
+      }
+    } else if (line.type === 'add') {
+      // Unpaired add
+      splitLines.push({
+        left: { code: '', lineNumber: null, type: 'empty' },
+        right: { code: line.code, lineNumber: newLineNum++, type: 'add' },
+      })
+      i++
+    } else {
+      // Unchanged line
+      splitLines.push({
+        left: { code: line.code, lineNumber: oldLineNum++, type: 'nochange' },
+        right: { code: line.code, lineNumber: newLineNum++, type: 'nochange' },
+      })
+      i++
+    }
+  }
+
+  return (
+    <Container flexDirection="column" gap={0} flexShrink={0}>
+      {splitLines.map((splitLine, idx) => {
+        return (
+          <Container key={idx} flexDirection="row" flexShrink={0}>
+            {/* Left side (old/removed) */}
+            <Container flexDirection="row" width="50%" flexShrink={0}>
+              <Container
+                width={50}
+                flexShrink={0}
+                backgroundColor={splitLine.left.type === 'remove' ? '#3a0a0a' : '#1a1a1a'}
+                paddingX={4}
+                paddingY={2}
+              >
+                <Text
+                  fontSize={14}
+                  color={splitLine.left.type === 'remove' ? '#ff6666' : '#666666'}
+                  fontFamily="inconsolata"
+                  flexShrink={0}
+                >
+                  {splitLine.left.lineNumber !== null ? splitLine.left.lineNumber.toString().padStart(4, ' ') : '    '}
+                </Text>
+              </Container>
+              <Container
+                flexGrow={1}
+                flexShrink={0}
+                backgroundColor={splitLine.left.type === 'remove' ? '#2a0000' : '#0f0f0f'}
+                paddingX={4}
+                paddingY={2}
+              >
+                <Text fontSize={14} color="#e5e5e5" fontFamily="inconsolata" whiteSpace="pre" flexShrink={0}>
+                  {splitLine.left.code || ' '}
+                </Text>
+              </Container>
+            </Container>
+
+            {/* Right side (new/added) */}
+            <Container flexDirection="row" width="50%" flexShrink={0}>
+              <Container
+                width={50}
+                flexShrink={0}
+                backgroundColor={splitLine.right.type === 'add' ? '#0a3a0a' : '#1a1a1a'}
+                paddingX={4}
+                paddingY={2}
+              >
+                <Text
+                  fontSize={14}
+                  color={splitLine.right.type === 'add' ? '#66ff66' : '#666666'}
+                  fontFamily="inconsolata"
+                  flexShrink={0}
+                >
+                  {splitLine.right.lineNumber !== null ? splitLine.right.lineNumber.toString().padStart(4, ' ') : '    '}
+                </Text>
+              </Container>
+              <Container
+                flexGrow={1}
+                flexShrink={0}
+                backgroundColor={splitLine.right.type === 'add' ? '#002a00' : '#0f0f0f'}
+                paddingX={4}
+                paddingY={2}
+              >
+                <Text fontSize={14} color="#e5e5e5" fontFamily="inconsolata" whiteSpace="pre" flexShrink={0}>
+                  {splitLine.right.code || ' '}
+                </Text>
+              </Container>
+            </Container>
+          </Container>
+        )
+      })}
+    </Container>
   )
 }
