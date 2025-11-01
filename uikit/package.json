@@ -16,6 +16,7 @@
     "diff": "^7.0.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "shiki": "^3.14.0",
     "three": "^0.171.0"
   },
   "devDependencies": {

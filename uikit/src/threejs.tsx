@@ -4,6 +4,103 @@ import { OrbitControls } from "@react-three/drei"
 import { inconsolata } from "@pmndrs/msdfonts"
 import { structuredPatch, type Hunk } from "diff"
 import { useScreenBreakpoint } from "./hooks"
+import { createHighlighter, type BundledLanguage, type GrammarState, type ThemedToken } from "shiki"
+
+// Initialize syntax highlighter
+const theme = "github-dark-default"
+const highlighter = await createHighlighter({
+  themes: [theme],
+  langs: [
+    "javascript",
+    "typescript",
+    "tsx",
+    "jsx",
+    "json",
+    "markdown",
+    "html",
+    "css",
+    "python",
+    "rust",
+    "go",
+    "java",
+    "c",
+    "cpp",
+    "yaml",
+    "toml",
+    "bash",
+    "sh",
+    "sql",
+  ],
+})
+
+function detectLanguage(filePath: string): BundledLanguage {
+  const ext = filePath.split(".").pop()?.toLowerCase()
+  switch (ext) {
+    case "ts":
+      return "typescript"
+    case "tsx":
+      return "tsx"
+    case "jsx":
+      return "jsx"
+    case "js":
+    case "mjs":
+    case "cjs":
+      return "javascript"
+    case "json":
+      return "json"
+    case "md":
+    case "mdx":
+    case "markdown":
+      return "markdown"
+    case "html":
+    case "htm":
+      return "html"
+    case "css":
+      return "css"
+    case "py":
+      return "python"
+    case "rs":
+      return "rust"
+    case "go":
+      return "go"
+    case "java":
+      return "java"
+    case "c":
+    case "h":
+      return "c"
+    case "cpp":
+    case "cc":
+    case "cxx":
+    case "hpp":
+    case "hxx":
+      return "cpp"
+    case "yaml":
+    case "yml":
+      return "yaml"
+    case "toml":
+      return "toml"
+    case "sh":
+      return "sh"
+    case "bash":
+      return "bash"
+    case "sql":
+      return "sql"
+    default:
+      return "javascript"
+  }
+}
+
+function renderHighlightedTokens(tokens: ThemedToken[], fontSize: number) {
+  return tokens.map((token, tokenIdx) => {
+    const color = token.color || "#e5e5e5"
+    return (
+
+      <Text key={tokenIdx}  fontSize={fontSize} color={color} flexShrink={0} whiteSpace="pre" >
+        {token.content}
+      </Text>
+    )
+  })
+}
 
 // Import example content from the parent folder
 const beforeContent = `import React from 'react'
@@ -253,7 +350,7 @@ export default function App() {
           </Text>
         </Container>
 
-        <Container flexGrow={1} flexShrink={1} overflow="scroll" backgroundColor="#0a0a0a" scrollbarColor="#444444">
+        <Container flexGrow={1} flexShrink={0} overflow="scroll" backgroundColor="#0a0a0a" scrollbarColor="#444444">
           <Container flexDirection="column" gap={4} flexShrink={0} width="100%">
             {hunks.map((hunk, i) => (
               <DiffHunk key={i} hunk={hunk} />
@@ -280,11 +377,52 @@ function DiffHunk({ hunk }: { hunk: Hunk }) {
     return { code: code.slice(1), type: "nochange" }
   })
 
+  // Tokenize code with syntax highlighting
+  const lang = detectLanguage(filePath)
+
+  // Tokenize "before" state (removed/unchanged lines)
+  let beforeState: GrammarState | undefined
+  const beforeTokens: (ThemedToken[] | null)[] = []
+
+  for (const line of processedLines) {
+    if (line.type === "remove" || line.type === "nochange") {
+      const result = highlighter.codeToTokens(line.code, {
+        lang,
+        theme,
+        grammarState: beforeState,
+      })
+      const tokens = result.tokens[0] || null
+      beforeTokens.push(tokens)
+      beforeState = highlighter.getLastGrammarState(result.tokens)
+    } else {
+      beforeTokens.push(null)
+    }
+  }
+
+  // Tokenize "after" state (added/unchanged lines)
+  let afterState: GrammarState | undefined
+  const afterTokens: (ThemedToken[] | null)[] = []
+
+  for (const line of processedLines) {
+    if (line.type === "add" || line.type === "nochange") {
+      const result = highlighter.codeToTokens(line.code, {
+        lang,
+        theme,
+        grammarState: afterState,
+      })
+      const tokens = result.tokens[0] || null
+      afterTokens.push(tokens)
+      afterState = highlighter.getLastGrammarState(result.tokens)
+    } else {
+      afterTokens.push(null)
+    }
+  }
+
   if (useSplitView) {
     // Build split lines structure (for larger screens)
     const splitLines: Array<{
-      left: { code: string; lineNumber: number | null; type: string }
-      right: { code: string; lineNumber: number | null; type: string }
+      left: { code: string; lineNumber: number | null; type: string; originalIdx: number | null }
+      right: { code: string; lineNumber: number | null; type: string; originalIdx: number | null }
     }> = []
 
     let oldLineNum = hunk.oldStart
@@ -297,16 +435,16 @@ function DiffHunk({ hunk }: { hunk: Hunk }) {
 
       if (line.type === "remove") {
         // Collect consecutive removes
-        const removes: Array<{ code: string; lineNum: number }> = []
+        const removes: Array<{ code: string; lineNum: number; idx: number }> = []
         while (i < processedLines.length && processedLines[i]?.type === "remove") {
-          removes.push({ code: processedLines[i]!.code, lineNum: oldLineNum++ })
+          removes.push({ code: processedLines[i]!.code, lineNum: oldLineNum++, idx: i })
           i++
         }
 
         // Collect consecutive adds that follow
-        const adds: Array<{ code: string; lineNum: number }> = []
+        const adds: Array<{ code: string; lineNum: number; idx: number }> = []
         while (i < processedLines.length && processedLines[i]?.type === "add") {
-          adds.push({ code: processedLines[i]!.code, lineNum: newLineNum++ })
+          adds.push({ code: processedLines[i]!.code, lineNum: newLineNum++, idx: i })
           i++
         }
 
@@ -315,23 +453,25 @@ function DiffHunk({ hunk }: { hunk: Hunk }) {
         for (let j = 0; j < maxLength; j++) {
           splitLines.push({
             left: removes[j]
-              ? { code: removes[j].code, lineNumber: removes[j].lineNum, type: "remove" }
-              : { code: "", lineNumber: null, type: "empty" },
-            right: adds[j] ? { code: adds[j].code, lineNumber: adds[j].lineNum, type: "add" } : { code: "", lineNumber: null, type: "empty" },
+              ? { code: removes[j].code, lineNumber: removes[j].lineNum, type: "remove", originalIdx: removes[j].idx }
+              : { code: "", lineNumber: null, type: "empty", originalIdx: null },
+            right: adds[j]
+              ? { code: adds[j].code, lineNumber: adds[j].lineNum, type: "add", originalIdx: adds[j].idx }
+              : { code: "", lineNumber: null, type: "empty", originalIdx: null },
           })
         }
       } else if (line.type === "add") {
         // Unpaired add
         splitLines.push({
-          left: { code: "", lineNumber: null, type: "empty" },
-          right: { code: line.code, lineNumber: newLineNum++, type: "add" },
+          left: { code: "", lineNumber: null, type: "empty", originalIdx: null },
+          right: { code: line.code, lineNumber: newLineNum++, type: "add", originalIdx: i },
         })
         i++
       } else {
         // Unchanged line
         splitLines.push({
-          left: { code: line.code, lineNumber: oldLineNum++, type: "nochange" },
-          right: { code: line.code, lineNumber: newLineNum++, type: "nochange" },
+          left: { code: line.code, lineNumber: oldLineNum++, type: "nochange", originalIdx: i },
+          right: { code: line.code, lineNumber: newLineNum++, type: "nochange", originalIdx: i },
         })
         i++
       }
@@ -341,6 +481,12 @@ function DiffHunk({ hunk }: { hunk: Hunk }) {
     return (
       <Container fontFamily={"inconsolata"} flexDirection="column" gap={0} flexShrink={0} width="100%">
         {splitLines.map((splitLine, idx) => {
+          // Get tokens for left line using original index
+          const leftTokens = splitLine.left.originalIdx !== null ? beforeTokens[splitLine.left.originalIdx] : null
+
+          // Get tokens for right line using original index
+          const rightTokens = splitLine.right.originalIdx !== null ? afterTokens[splitLine.right.originalIdx] : null
+
           return (
             <Container key={idx} flexDirection="row" flexShrink={0} width="100%" alignItems="flex-start">
               {/* Left side (old/removed) */}
@@ -358,15 +504,20 @@ function DiffHunk({ hunk }: { hunk: Hunk }) {
                 </Container>
                 <Container
                   flexGrow={1}
-                  flexShrink={1}
+                  flexShrink={0}
                   backgroundColor={splitLine.left.type === "remove" ? "#2a0000" : "#0f0f0f"}
                   paddingX={4}
                   paddingY={2}
                   overflow="hidden"
+                  flexDirection="row"
                 >
-                  <Text fontSize={em} color="#e5e5e5" whiteSpace="pre" wordBreak="break-word" flexShrink={1}>
-                    {splitLine.left.code || " "}
-                  </Text>
+                  {leftTokens && leftTokens.length > 0 ? (
+                    renderHighlightedTokens(leftTokens, em)
+                  ) : (
+                    <Text fontSize={em} color="#e5e5e5" whiteSpace="pre">
+                      {splitLine.left.code || " "}
+                    </Text>
+                  )}
                 </Container>
               </Container>
 
@@ -385,15 +536,20 @@ function DiffHunk({ hunk }: { hunk: Hunk }) {
                 </Container>
                 <Container
                   flexGrow={1}
-                  flexShrink={1}
+                  flexShrink={0}
                   backgroundColor={splitLine.right.type === "add" ? "#002a00" : "#0f0f0f"}
                   paddingX={4}
                   paddingY={2}
                   overflow="hidden"
+                  flexDirection="row"
                 >
-                  <Text fontSize={em} color="#e5e5e5" whiteSpace="pre" wordBreak="break-word" flexShrink={1}>
-                    {splitLine.right.code || " "}
-                  </Text>
+                  {rightTokens && rightTokens.length > 0 ? (
+                    renderHighlightedTokens(rightTokens, em)
+                  ) : (
+                    <Text fontSize={em} color="#e5e5e5" whiteSpace="pre">
+                      {splitLine.right.code || " "}
+                    </Text>
+                  )}
                 </Container>
               </Container>
             </Container>
@@ -440,6 +596,25 @@ function DiffHunk({ hunk }: { hunk: Hunk }) {
   return (
     <Container fontFamily={"inconsolata"} flexDirection="column" gap={0} flexShrink={0} width="100%">
       {unifiedLines.map((line, idx) => {
+        // Get the original line index to access tokens
+        let originalIdx = 0
+        let count = 0
+        for (let i = 0; i < processedLines.length; i++) {
+          if (count === idx) {
+            originalIdx = i
+            break
+          }
+          count++
+        }
+
+        // Determine which tokens to use based on line type
+        const tokens =
+          line.type === "remove"
+            ? beforeTokens[originalIdx]
+            : line.type === "add" || line.type === "nochange"
+              ? afterTokens[originalIdx]
+              : null
+
         return (
           <Container key={idx} flexDirection="row" flexShrink={0} width="100%" alignItems="stretch">
             <Container
@@ -449,25 +624,26 @@ function DiffHunk({ hunk }: { hunk: Hunk }) {
               paddingX={4}
               paddingY={2}
             >
-              <Text
-                fontSize={em}
-                color={line.type === "add" ? "#66ff66" : line.type === "remove" ? "#ff6666" : "#666666"}
-                flexShrink={0}
-              >
+              <Text fontSize={em} color={line.type === "add" ? "#66ff66" : line.type === "remove" ? "#ff6666" : "#666666"} flexShrink={0}>
                 {line.lineNumber.toString().padStart(4, " ")}
               </Text>
             </Container>
             <Container
               flexGrow={1}
-              flexShrink={1}
+              flexShrink={0}
               backgroundColor={line.type === "add" ? "#002a00" : line.type === "remove" ? "#2a0000" : "#0f0f0f"}
               paddingX={4}
               paddingY={2}
               overflow="hidden"
+              flexDirection="row"
             >
-              <Text fontSize={em} color="#e5e5e5" whiteSpace="pre" wordBreak="break-word" flexShrink={1}>
-                {line.code || " "}
-              </Text>
+              {tokens && tokens.length > 0 ? (
+                renderHighlightedTokens(tokens, em)
+              ) : (
+                <Text fontSize={em} color="#e5e5e5" whiteSpace="pre">
+                  {line.code || " "}
+                </Text>
+              )}
             </Container>
           </Container>
         )
