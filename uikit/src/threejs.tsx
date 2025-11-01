@@ -3,6 +3,7 @@ import { Container, Fullscreen, Text } from "@react-three/uikit"
 import { OrbitControls } from "@react-three/drei"
 import { inconsolata } from "@pmndrs/msdfonts"
 import { structuredPatch, type Hunk } from "diff"
+import { useState, useEffect } from "react"
 
 // Import example content from the parent folder
 const beforeContent = `import React from 'react'
@@ -237,6 +238,39 @@ const hunks = patch.hunks
 
 const em = 16
 
+type Breakpoint = "xs" | "sm" | "md" | "lg" | "xl" | "2xl"
+
+function useScreenBreakpoint(): Breakpoint {
+  const getBreakpoint = (width: number): Breakpoint => {
+    if (width >= 1536) return "2xl"
+    if (width >= 1280) return "xl"
+    if (width >= 1024) return "lg"
+    if (width >= 768) return "md"
+    if (width >= 640) return "sm"
+    return "xs"
+  }
+
+  const [breakpoint, setBreakpoint] = useState<Breakpoint>(() => getBreakpoint(window.innerWidth))
+
+  useEffect(() => {
+    const handleResize = () => {
+      const newBreakpoint = getBreakpoint(window.innerWidth)
+      setBreakpoint((current) => {
+        // Only update if breakpoint actually changed
+        if (current !== newBreakpoint) {
+          return newBreakpoint
+        }
+        return current
+      })
+    }
+
+    window.addEventListener("resize", handleResize)
+    return () => window.removeEventListener("resize", handleResize)
+  }, [])
+
+  return breakpoint
+}
+
 export default function App() {
   return (
     <Canvas camera={{ position: [0, 0, 10], fov: 50 }} style={{ height: "100vh", touchAction: "none" }} gl={{ localClippingEnabled: true }}>
@@ -265,7 +299,10 @@ export default function App() {
 }
 
 function DiffHunk({ hunk }: { hunk: Hunk }) {
-  // Process lines and build split view
+  const breakpoint = useScreenBreakpoint()
+  const useSplitView = breakpoint === "md" || breakpoint === "lg" || breakpoint === "xl" || breakpoint === "2xl"
+
+  // Process lines
   const processedLines = hunk.lines.map((code) => {
     if (code.startsWith("+")) {
       return { code: code.slice(1), type: "add" }
@@ -276,140 +313,66 @@ function DiffHunk({ hunk }: { hunk: Hunk }) {
     return { code: code.slice(1), type: "nochange" }
   })
 
-  // Build unified lines structure (for smaller screens)
-  const unifiedLines: Array<{
-    code: string
-    lineNumber: number
-    type: string
-  }> = []
+  if (useSplitView) {
+    // Build split lines structure (for larger screens)
+    const splitLines: Array<{
+      left: { code: string; lineNumber: number | null; type: string }
+      right: { code: string; lineNumber: number | null; type: string }
+    }> = []
 
-  let oldLineNum = hunk.oldStart
-  let newLineNum = hunk.newStart
+    let oldLineNum = hunk.oldStart
+    let newLineNum = hunk.newStart
+    let i = 0
 
-  for (const line of processedLines) {
-    if (line.type === "remove") {
-      unifiedLines.push({
-        code: line.code,
-        lineNumber: oldLineNum++,
-        type: "remove",
-      })
-    } else if (line.type === "add") {
-      unifiedLines.push({
-        code: line.code,
-        lineNumber: newLineNum++,
-        type: "add",
-      })
-    } else {
-      unifiedLines.push({
-        code: line.code,
-        lineNumber: newLineNum++,
-        type: "nochange",
-      })
-      oldLineNum++
-    }
-  }
+    while (i < processedLines.length) {
+      const line = processedLines[i]
+      if (!line) break
 
-  // Build split lines structure (for larger screens)
-  const splitLines: Array<{
-    left: { code: string; lineNumber: number | null; type: string }
-    right: { code: string; lineNumber: number | null; type: string }
-  }> = []
+      if (line.type === "remove") {
+        // Collect consecutive removes
+        const removes: Array<{ code: string; lineNum: number }> = []
+        while (i < processedLines.length && processedLines[i]?.type === "remove") {
+          removes.push({ code: processedLines[i]!.code, lineNum: oldLineNum++ })
+          i++
+        }
 
-  oldLineNum = hunk.oldStart
-  newLineNum = hunk.newStart
-  let i = 0
+        // Collect consecutive adds that follow
+        const adds: Array<{ code: string; lineNum: number }> = []
+        while (i < processedLines.length && processedLines[i]?.type === "add") {
+          adds.push({ code: processedLines[i]!.code, lineNum: newLineNum++ })
+          i++
+        }
 
-  while (i < processedLines.length) {
-    const line = processedLines[i]
-    if (!line) break
-
-    if (line.type === "remove") {
-      // Collect consecutive removes
-      const removes: Array<{ code: string; lineNum: number }> = []
-      while (i < processedLines.length && processedLines[i]?.type === "remove") {
-        removes.push({ code: processedLines[i]!.code, lineNum: oldLineNum++ })
-        i++
-      }
-
-      // Collect consecutive adds that follow
-      const adds: Array<{ code: string; lineNum: number }> = []
-      while (i < processedLines.length && processedLines[i]?.type === "add") {
-        adds.push({ code: processedLines[i]!.code, lineNum: newLineNum++ })
-        i++
-      }
-
-      // Pair them up
-      const maxLength = Math.max(removes.length, adds.length)
-      for (let j = 0; j < maxLength; j++) {
+        // Pair them up
+        const maxLength = Math.max(removes.length, adds.length)
+        for (let j = 0; j < maxLength; j++) {
+          splitLines.push({
+            left: removes[j]
+              ? { code: removes[j].code, lineNumber: removes[j].lineNum, type: "remove" }
+              : { code: "", lineNumber: null, type: "empty" },
+            right: adds[j] ? { code: adds[j].code, lineNumber: adds[j].lineNum, type: "add" } : { code: "", lineNumber: null, type: "empty" },
+          })
+        }
+      } else if (line.type === "add") {
+        // Unpaired add
         splitLines.push({
-          left: removes[j]
-            ? { code: removes[j].code, lineNumber: removes[j].lineNum, type: "remove" }
-            : { code: "", lineNumber: null, type: "empty" },
-          right: adds[j] ? { code: adds[j].code, lineNumber: adds[j].lineNum, type: "add" } : { code: "", lineNumber: null, type: "empty" },
+          left: { code: "", lineNumber: null, type: "empty" },
+          right: { code: line.code, lineNumber: newLineNum++, type: "add" },
         })
+        i++
+      } else {
+        // Unchanged line
+        splitLines.push({
+          left: { code: line.code, lineNumber: oldLineNum++, type: "nochange" },
+          right: { code: line.code, lineNumber: newLineNum++, type: "nochange" },
+        })
+        i++
       }
-    } else if (line.type === "add") {
-      // Unpaired add
-      splitLines.push({
-        left: { code: "", lineNumber: null, type: "empty" },
-        right: { code: line.code, lineNumber: newLineNum++, type: "add" },
-      })
-      i++
-    } else {
-      // Unchanged line
-      splitLines.push({
-        left: { code: line.code, lineNumber: oldLineNum++, type: "nochange" },
-        right: { code: line.code, lineNumber: newLineNum++, type: "nochange" },
-      })
-      i++
     }
-  }
 
-  return (
-    <Container fontFamily={"inconsolata"} flexDirection="column" gap={0} flexShrink={0} width="100%">
-      {/* Unified view (default, hidden on md and up) */}
-      <Container flexDirection="column" gap={0} width="100%" md={{ display: "none" }}>
-        {unifiedLines.map((line, idx) => {
-          return (
-            <Container key={idx} flexDirection="row" flexShrink={0} width="100%" alignItems="stretch">
-              <Container
-                width={em * 3}
-                flexShrink={0}
-                backgroundColor={
-                  line.type === "add" ? "#0a3a0a" : line.type === "remove" ? "#3a0a0a" : "#1a1a1a"
-                }
-                paddingX={4}
-                paddingY={2}
-              >
-                <Text
-                  fontSize={em}
-                  color={line.type === "add" ? "#66ff66" : line.type === "remove" ? "#ff6666" : "#666666"}
-                  flexShrink={0}
-                >
-                  {line.lineNumber.toString().padStart(4, " ")}
-                </Text>
-              </Container>
-              <Container
-                flexGrow={1}
-                flexShrink={1}
-                backgroundColor={
-                  line.type === "add" ? "#002a00" : line.type === "remove" ? "#2a0000" : "#0f0f0f"
-                }
-                paddingX={4}
-                paddingY={2}
-                overflow="hidden"
-              >
-                <Text fontSize={em} color="#e5e5e5" whiteSpace="pre" wordBreak="break-word" flexShrink={1}>
-                  {line.code || " "}
-                </Text>
-              </Container>
-            </Container>
-          )
-        })}
-      </Container>
-
-      {/* Split view (hidden by default, shown on md and up) */}
-      <Container flexDirection="column" gap={0} width="100%" display="none" md={{ display: "flex" }}>
+    // Split view for larger screens
+    return (
+      <Container fontFamily={"inconsolata"} flexDirection="column" gap={0} flexShrink={0} width="100%">
         {splitLines.map((splitLine, idx) => {
           return (
             <Container key={idx} flexDirection="row" flexShrink={0} width="100%" alignItems="flex-start">
@@ -470,6 +433,78 @@ function DiffHunk({ hunk }: { hunk: Hunk }) {
           )
         })}
       </Container>
+    )
+  }
+
+  // Build unified lines structure (for smaller screens)
+  const unifiedLines: Array<{
+    code: string
+    lineNumber: number
+    type: string
+  }> = []
+
+  let oldLineNum = hunk.oldStart
+  let newLineNum = hunk.newStart
+
+  for (const line of processedLines) {
+    if (line.type === "remove") {
+      unifiedLines.push({
+        code: line.code,
+        lineNumber: oldLineNum++,
+        type: "remove",
+      })
+    } else if (line.type === "add") {
+      unifiedLines.push({
+        code: line.code,
+        lineNumber: newLineNum++,
+        type: "add",
+      })
+    } else {
+      unifiedLines.push({
+        code: line.code,
+        lineNumber: newLineNum++,
+        type: "nochange",
+      })
+      oldLineNum++
+    }
+  }
+
+  // Unified view for smaller screens
+  return (
+    <Container fontFamily={"inconsolata"} flexDirection="column" gap={0} flexShrink={0} width="100%">
+      {unifiedLines.map((line, idx) => {
+        return (
+          <Container key={idx} flexDirection="row" flexShrink={0} width="100%" alignItems="stretch">
+            <Container
+              width={em * 3}
+              flexShrink={0}
+              backgroundColor={line.type === "add" ? "#0a3a0a" : line.type === "remove" ? "#3a0a0a" : "#1a1a1a"}
+              paddingX={4}
+              paddingY={2}
+            >
+              <Text
+                fontSize={em}
+                color={line.type === "add" ? "#66ff66" : line.type === "remove" ? "#ff6666" : "#666666"}
+                flexShrink={0}
+              >
+                {line.lineNumber.toString().padStart(4, " ")}
+              </Text>
+            </Container>
+            <Container
+              flexGrow={1}
+              flexShrink={1}
+              backgroundColor={line.type === "add" ? "#002a00" : line.type === "remove" ? "#2a0000" : "#0f0f0f"}
+              paddingX={4}
+              paddingY={2}
+              overflow="hidden"
+            >
+              <Text fontSize={em} color="#e5e5e5" whiteSpace="pre" wordBreak="break-word" flexShrink={1}>
+                {line.code || " "}
+              </Text>
+            </Container>
+          </Container>
+        )
+      })}
     </Container>
   )
 }
