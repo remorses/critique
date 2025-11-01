@@ -276,14 +276,47 @@ function DiffHunk({ hunk }: { hunk: Hunk }) {
     return { code: code.slice(1), type: "nochange" }
   })
 
-  // Build split lines structure
+  // Build unified lines structure (for smaller screens)
+  const unifiedLines: Array<{
+    code: string
+    lineNumber: number
+    type: string
+  }> = []
+
+  let oldLineNum = hunk.oldStart
+  let newLineNum = hunk.newStart
+
+  for (const line of processedLines) {
+    if (line.type === "remove") {
+      unifiedLines.push({
+        code: line.code,
+        lineNumber: oldLineNum++,
+        type: "remove",
+      })
+    } else if (line.type === "add") {
+      unifiedLines.push({
+        code: line.code,
+        lineNumber: newLineNum++,
+        type: "add",
+      })
+    } else {
+      unifiedLines.push({
+        code: line.code,
+        lineNumber: newLineNum++,
+        type: "nochange",
+      })
+      oldLineNum++
+    }
+  }
+
+  // Build split lines structure (for larger screens)
   const splitLines: Array<{
     left: { code: string; lineNumber: number | null; type: string }
     right: { code: string; lineNumber: number | null; type: string }
   }> = []
 
-  let oldLineNum = hunk.oldStart
-  let newLineNum = hunk.newStart
+  oldLineNum = hunk.oldStart
+  newLineNum = hunk.newStart
   let i = 0
 
   while (i < processedLines.length) {
@@ -334,65 +367,109 @@ function DiffHunk({ hunk }: { hunk: Hunk }) {
 
   return (
     <Container fontFamily={"inconsolata"} flexDirection="column" gap={0} flexShrink={0} width="100%">
-      {splitLines.map((splitLine, idx) => {
-        return (
-          <Container key={idx} flexDirection="row" flexShrink={0} width="100%" alignItems="flex-start">
-            {/* Left side (old/removed) */}
-            <Container flexDirection="row" width="50%" flexShrink={0} alignItems="stretch">
+      {/* Unified view (default, hidden on md and up) */}
+      <Container flexDirection="column" gap={0} width="100%" md={{ display: "none" }}>
+        {unifiedLines.map((line, idx) => {
+          return (
+            <Container key={idx} flexDirection="row" flexShrink={0} width="100%" alignItems="stretch">
               <Container
                 width={em * 3}
                 flexShrink={0}
-                backgroundColor={splitLine.left.type === "remove" ? "#3a0a0a" : "#1a1a1a"}
+                backgroundColor={
+                  line.type === "add" ? "#0a3a0a" : line.type === "remove" ? "#3a0a0a" : "#1a1a1a"
+                }
                 paddingX={4}
                 paddingY={2}
               >
-                <Text fontSize={em} color={splitLine.left.type === "remove" ? "#ff6666" : "#666666"} flexShrink={0}>
-                  {splitLine.left.lineNumber !== null ? splitLine.left.lineNumber.toString().padStart(4, " ") : "    "}
+                <Text
+                  fontSize={em}
+                  color={line.type === "add" ? "#66ff66" : line.type === "remove" ? "#ff6666" : "#666666"}
+                  flexShrink={0}
+                >
+                  {line.lineNumber.toString().padStart(4, " ")}
                 </Text>
               </Container>
               <Container
                 flexGrow={1}
                 flexShrink={1}
-                backgroundColor={splitLine.left.type === "remove" ? "#2a0000" : "#0f0f0f"}
+                backgroundColor={
+                  line.type === "add" ? "#002a00" : line.type === "remove" ? "#2a0000" : "#0f0f0f"
+                }
                 paddingX={4}
                 paddingY={2}
                 overflow="hidden"
               >
                 <Text fontSize={em} color="#e5e5e5" whiteSpace="pre" wordBreak="break-word" flexShrink={1}>
-                  {splitLine.left.code || " "}
+                  {line.code || " "}
                 </Text>
               </Container>
             </Container>
+          )
+        })}
+      </Container>
 
-            {/* Right side (new/added) */}
-            <Container flexDirection="row" width="50%" flexShrink={0} alignItems="stretch">
-              <Container
-                width={em * 3}
-                flexShrink={0}
-                backgroundColor={splitLine.right.type === "add" ? "#0a3a0a" : "#1a1a1a"}
-                paddingX={4}
-                paddingY={2}
-              >
-                <Text fontSize={em} color={splitLine.right.type === "add" ? "#66ff66" : "#666666"} flexShrink={0}>
-                  {splitLine.right.lineNumber !== null ? splitLine.right.lineNumber.toString().padStart(4, " ") : "    "}
-                </Text>
+      {/* Split view (hidden by default, shown on md and up) */}
+      <Container flexDirection="column" gap={0} width="100%" display="none" md={{ display: "flex" }}>
+        {splitLines.map((splitLine, idx) => {
+          return (
+            <Container key={idx} flexDirection="row" flexShrink={0} width="100%" alignItems="flex-start">
+              {/* Left side (old/removed) */}
+              <Container flexDirection="row" width="50%" flexShrink={0} alignItems="stretch">
+                <Container
+                  width={em * 3}
+                  flexShrink={0}
+                  backgroundColor={splitLine.left.type === "remove" ? "#3a0a0a" : "#1a1a1a"}
+                  paddingX={4}
+                  paddingY={2}
+                >
+                  <Text fontSize={em} color={splitLine.left.type === "remove" ? "#ff6666" : "#666666"} flexShrink={0}>
+                    {splitLine.left.lineNumber !== null ? splitLine.left.lineNumber.toString().padStart(4, " ") : "    "}
+                  </Text>
+                </Container>
+                <Container
+                  flexGrow={1}
+                  flexShrink={1}
+                  backgroundColor={splitLine.left.type === "remove" ? "#2a0000" : "#0f0f0f"}
+                  paddingX={4}
+                  paddingY={2}
+                  overflow="hidden"
+                >
+                  <Text fontSize={em} color="#e5e5e5" whiteSpace="pre" wordBreak="break-word" flexShrink={1}>
+                    {splitLine.left.code || " "}
+                  </Text>
+                </Container>
               </Container>
-              <Container
-                flexGrow={1}
-                flexShrink={1}
-                backgroundColor={splitLine.right.type === "add" ? "#002a00" : "#0f0f0f"}
-                paddingX={4}
-                paddingY={2}
-                overflow="hidden"
-              >
-                <Text fontSize={em} color="#e5e5e5" whiteSpace="pre" wordBreak="break-word" flexShrink={1}>
-                  {splitLine.right.code || " "}
-                </Text>
+
+              {/* Right side (new/added) */}
+              <Container flexDirection="row" width="50%" flexShrink={0} alignItems="stretch">
+                <Container
+                  width={em * 3}
+                  flexShrink={0}
+                  backgroundColor={splitLine.right.type === "add" ? "#0a3a0a" : "#1a1a1a"}
+                  paddingX={4}
+                  paddingY={2}
+                >
+                  <Text fontSize={em} color={splitLine.right.type === "add" ? "#66ff66" : "#666666"} flexShrink={0}>
+                    {splitLine.right.lineNumber !== null ? splitLine.right.lineNumber.toString().padStart(4, " ") : "    "}
+                  </Text>
+                </Container>
+                <Container
+                  flexGrow={1}
+                  flexShrink={1}
+                  backgroundColor={splitLine.right.type === "add" ? "#002a00" : "#0f0f0f"}
+                  paddingX={4}
+                  paddingY={2}
+                  overflow="hidden"
+                >
+                  <Text fontSize={em} color="#e5e5e5" whiteSpace="pre" wordBreak="break-word" flexShrink={1}>
+                    {splitLine.right.code || " "}
+                  </Text>
+                </Container>
               </Container>
             </Container>
-          </Container>
-        )
-      })}
+          )
+        })}
+      </Container>
     </Container>
   )
 }
