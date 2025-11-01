@@ -9,9 +9,10 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@pmndrs/msdfonts": "^1.0.56",
+    "@react-three/drei": "^9.117.3",
     "@react-three/fiber": "^8.17.10",
     "@react-three/uikit": "^1.0.56",
-    "@react-three/drei": "^9.117.3",
     "diff": "^7.0.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",

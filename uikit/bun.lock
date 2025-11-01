@@ -4,6 +4,7 @@
     "": {
       "name": "critique-uikit",
       "dependencies": {
+        "@pmndrs/msdfonts": "^1.0.56",
         "@react-three/drei": "^9.117.3",
         "@react-three/fiber": "^8.17.10",
         "@react-three/uikit": "^1.0.56",

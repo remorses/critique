@@ -1,6 +1,7 @@
 import { Canvas } from '@react-three/fiber'
 import { Container, Fullscreen, Text } from '@react-three/uikit'
 import { OrbitControls } from '@react-three/drei'
+import { inconsolata } from '@pmndrs/msdfonts'
 
 // Import example content from the parent folder
 const beforeContent = `import React from 'react'
@@ -244,7 +245,7 @@ export default function App() {
       <ambientLight intensity={1} />
       <pointLight position={[10, 10, 10]} />
 
-      <Fullscreen flexDirection="column" padding={10} gap={2} backgroundColor="#0f0f0f">
+      <Fullscreen flexDirection="column" padding={10} gap={2} backgroundColor="#0f0f0f" fontFamilies={{ inconsolata }}>
         <Container padding={8} backgroundColor="#1a1a1a" flexShrink={0}>
           <Text fontSize={20} color="#ffffff">
             {filePath} - {beforeLines.length} lines
@@ -253,16 +254,18 @@ export default function App() {
 
         <Container flexGrow={1} flexShrink={1} overflow="scroll" backgroundColor="#0a0a0a" scrollbarColor="#444444">
           <Container flexDirection="column" gap={1} flexShrink={0}>
-            {beforeLines.map((line, idx) => (
-              <Container key={idx} flexDirection="row" gap={8} paddingX={4} paddingY={2} flexShrink={0}>
-                <Text fontSize={16} color="#666666" fontFamily="monospace" flexShrink={0}>
-                  {(idx + 1).toString().padStart(3, ' ')}
-                </Text>
-                <Text fontSize={16} color="#e5e5e5" fontFamily="monospace" whiteSpace="pre" flexShrink={0}>
-                  {line || ' '}
-                </Text>
-              </Container>
-            ))}
+            {beforeLines.map((line, idx) => {
+              return (
+                <Container key={idx} flexDirection="row" gap={8} paddingX={4} paddingY={2} flexShrink={0}>
+                  <Text fontSize={16} color="#666666" fontFamily="inconsolata" flexShrink={0}>
+                    {(idx + 1).toString().padStart(3, ' ')}
+                  </Text>
+                  <Text fontSize={16} color="#e5e5e5" fontFamily="inconsolata" whiteSpace="pre" flexShrink={0}>
+                    {line || ' '}
+                  </Text>
+                </Container>
+              )
+            })}
           </Container>
         </Container>
       </Fullscreen>
