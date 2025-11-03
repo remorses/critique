@@ -9,4 +9,7 @@ export default defineConfig({
   resolve: {
     dedupe: ['@react-three/fiber', 'three'],
   },
+  build: {
+    target: 'esnext',
+  },
 })
