@@ -2,7 +2,7 @@
   "name": "critique",
   "module": "src/diff.tsx",
   "type": "module",
-  "version": "0.0.10",
+  "version": "0.0.11",
   "private": false,
   "bin": "./src/cli.tsx",
   "scripts": {
@@ -15,16 +15,16 @@
     "typescript": "^5.9.3"
   },
   "dependencies": {
-    "@opentui/core": "^0.1.30",
-    "@opentui/react": "^0.1.30",
+    "@opentui/core": "^0.1.44",
+    "@opentui/react": "^0.1.44",
     "@parcel/watcher": "^2.5.1",
-    "@shikijs/langs": "^3.14.0",
-    "@shikijs/themes": "^3.14.0",
+    "@shikijs/langs": "^3.15.0",
+    "@shikijs/themes": "^3.15.0",
     "cac": "^6.7.14",
     "diff": "^8.0.2",
     "react": "^19.2.0",
     "react-error-boundary": "^6.0.0",
-    "shiki": "^3.14.0",
+    "shiki": "^3.15.0",
     "zustand": "^5.0.8"
   }
 }

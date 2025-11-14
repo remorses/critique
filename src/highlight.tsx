@@ -1,5 +1,5 @@
-import { RGBA } from "@opentui/core";
-import { render } from "@opentui/react";
+import { createCliRenderer, RGBA } from "@opentui/core";
+import { createRoot } from "@opentui/react";
 import * as React from "react";
 import { createHighlighter, type GrammarState, type ThemedToken } from "shiki";
 import { createMonochromeTheme } from "./monochrome";
@@ -110,7 +110,7 @@ function HighlightedCode() {
         const isRedTheme = themeIndex === 2;
 
         return (
-          <text key={lineIdx} wrap={false}>
+          <text key={lineIdx} wrapMode="none">
             {line.map((token, tokenIdx) => {
               const hexColor = token.color?.slice(0, 7);
               const fg = hexColor ? RGBA.fromHex(hexColor) : undefined;
@@ -139,4 +139,5 @@ function HighlightedCode() {
   );
 }
 
-await render(<HighlightedCode />);
+const renderer = await createCliRenderer();
+createRoot(renderer).render(<HighlightedCode />);

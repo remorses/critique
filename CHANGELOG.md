@@ -1,3 +1,13 @@
+# 0.0.11
+
+- Dependencies:
+  - Update @opentui/core and @opentui/react from 0.1.30 to 0.1.44
+  - Update shiki and related packages from 3.14.0 to 3.15.0
+- All commands:
+  - Migrate from deprecated `render()` to `createRoot()` API
+  - Use `wrapMode="none"` instead of deprecated `wrap={false}` prop
+  - Add scroll acceleration support to scrollbox components
+
 # 0.0.10
 
 - Default command:

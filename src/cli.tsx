@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 import { cac } from "cac";
 import {
-  render,
+  createRoot,
   useKeyboard,
   useOnResize,
   useRenderer,
@@ -10,7 +10,7 @@ import {
 import * as React from "react";
 import { exec, execSync } from "child_process";
 import { promisify } from "util";
-import { MacOSScrollAccel } from "@opentui/core";
+import { createCliRenderer, MacOSScrollAccel } from "@opentui/core";
 import fs from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
@@ -278,7 +278,8 @@ cli
 
       const { ErrorBoundary } = diffModule;
 
-      await render(
+      const renderer = await createCliRenderer();
+      createRoot(renderer).render(
         React.createElement(
           ErrorBoundary,
           null,
@@ -326,7 +327,8 @@ cli
 
       const { ErrorBoundary } = diffModule;
 
-      await render(
+      const renderer = await createCliRenderer();
+      createRoot(renderer).render(
         React.createElement(
           ErrorBoundary,
           null,
@@ -531,7 +533,8 @@ cli
         );
       }
 
-      await render(<PickApp files={files} branch={branch} />);
+      const renderer = await createCliRenderer();
+      createRoot(renderer).render(<PickApp files={files} branch={branch} />);
     } catch (error) {
       console.error(
         `Error: ${error instanceof Error ? error.message : String(error)}`,

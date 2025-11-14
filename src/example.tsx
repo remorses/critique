@@ -1,11 +1,12 @@
 import { structuredPatch } from "diff";
 import {
-  render,
+  createRoot,
   useKeyboard,
   useOnResize,
   useRenderer,
   useTerminalDimensions,
 } from "@opentui/react";
+import { createCliRenderer, MacOSScrollAccel } from "@opentui/core";
 import * as React from "react";
 import {
   ErrorBoundary,
@@ -17,6 +18,7 @@ function App() {
   const renderer = useRenderer();
   const { width: initialWidth } = useTerminalDimensions();
   const [width, setWidth] = React.useState(initialWidth);
+  const [scrollAcceleration] = React.useState(() => new MacOSScrollAccel());
 
   useOnResize(
     React.useCallback((newWidth: number) => {
@@ -34,6 +36,7 @@ function App() {
       <FileEditPreviewTitle filePath={filePath} hunks={hunks} />
       <box paddingTop={3} />
       <scrollbox
+        scrollAcceleration={scrollAcceleration}
         style={{
           flexGrow: 1,
           rootOptions: {
@@ -965,6 +968,7 @@ const hunks = structuredPatch(
   { context: 3, ignoreWhitespace: true, stripTrailingCr: true },
 ).hunks;
 
-await render(
+const renderer = await createCliRenderer();
+createRoot(renderer).render(
   React.createElement(ErrorBoundary, null, React.createElement(App)),
 );

@@ -1,5 +1,5 @@
-import { RGBA } from "@opentui/core";
-import { render } from "@opentui/react";
+import { createCliRenderer, RGBA } from "@opentui/core";
+import { createRoot } from "@opentui/react";
 import * as React from "react";
 
 function TransparencyDemo() {
@@ -29,4 +29,5 @@ function TransparencyDemo() {
   );
 }
 
-await render(<TransparencyDemo />);
+const renderer = await createCliRenderer();
+createRoot(renderer).render(<TransparencyDemo />);
