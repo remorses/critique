@@ -200,18 +200,13 @@ function App({ parsedFiles }: AppProps) {
       {/* Navigation header */}
       <box style={{ paddingBottom: 1, paddingLeft: 1, paddingRight: 1, flexShrink: 0, flexDirection: "row", alignItems: "center" }}>
         <text fg="#ffffff">←</text>
-        <text fg="#666666"> prev file</text>
         <box flexGrow={1} />
         <text onMouseDown={() => setShowDropdown(true)}>
           {fileName.trim()} 
         </text>
         <text fg="#00ff00"> +{additions}</text>
-        <text fg="#ff0000">-{deletions} </text>
-        <text fg="#666666">
-          ({validIndex + 1}/{parsedFiles.length})
-        </text>
+        <text fg="#ff0000">-{deletions}</text>
         <box flexGrow={1} />
-        <text fg="#666666">next file </text>
         <text fg="#ffffff">→</text>
       </box>
 
@@ -250,7 +245,8 @@ function App({ parsedFiles }: AppProps) {
         <text fg="#666666"> prev file</text>
         <box flexGrow={1} />
         <text fg="#ffffff">ctrl p</text>
-        <text fg="#666666"> select file</text>
+        <text fg="#666666"> select file </text>
+        <text fg="#666666">({validIndex + 1}/{parsedFiles.length})</text>
         <box flexGrow={1} />
         <text fg="#666666">next file </text>
         <text fg="#ffffff">→</text>
