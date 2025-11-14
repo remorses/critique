@@ -1,3 +1,11 @@
+# 0.0.12
+
+- Default command:
+  - Show one file at a time with navigation arrows (← filename →)
+  - Use left/right arrow keys to navigate between files
+  - Persist current file selection in zustand state across watch refreshes
+  - Files are sorted by diff size (smallest first)
+
 # 0.0.11
 
 - Dependencies:

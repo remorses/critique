@@ -62,6 +62,14 @@ class ScrollAcceleration {
   }
 }
 
+interface DiffState {
+  currentFileIndex: number;
+}
+
+const useDiffStore = create<DiffState>(() => ({
+  currentFileIndex: 0,
+}));
+
 interface AppProps {
   parsedFiles: Array<{
     oldFileName?: string;
@@ -74,6 +82,7 @@ function App({ parsedFiles }: AppProps) {
   const { width: initialWidth } = useTerminalDimensions();
   const [width, setWidth] = React.useState(initialWidth);
   const [scrollAcceleration] = React.useState(() => new ScrollAcceleration());
+  const currentFileIndex = useDiffStore((s) => s.currentFileIndex);
 
   useOnResize(
     React.useCallback((newWidth: number) => {
@@ -96,15 +105,48 @@ function App({ parsedFiles }: AppProps) {
         scrollAcceleration.multiplier = 10;
       }
     }
+    if (key.name === "left") {
+      useDiffStore.setState((state) => ({
+        currentFileIndex: Math.max(0, state.currentFileIndex - 1),
+      }));
+    }
+    if (key.name === "right") {
+      useDiffStore.setState((state) => ({
+        currentFileIndex: Math.min(parsedFiles.length - 1, state.currentFileIndex + 1),
+      }));
+    }
   });
 
   const { FileEditPreviewTitle, FileEditPreview } = require("./diff.tsx");
+
+  // Ensure current index is valid
+  const validIndex = Math.min(currentFileIndex, parsedFiles.length - 1);
+  const currentFile = parsedFiles[validIndex];
+
+  if (!currentFile) {
+    return (
+      <box style={{ padding: 1 }}>
+        <text>No files to display</text>
+      </box>
+    );
+  }
+
+  const fileName = currentFile.newFileName || currentFile.oldFileName || "unknown";
 
   return (
     <box
       key={String(useSplitView)}
       style={{ flexDirection: "column", height: "100%", padding: 1 }}
     >
+      {/* Navigation header */}
+      <box style={{ marginBottom: 1, justifyContent: "center", alignItems: "center" }}>
+        <text fg={validIndex > 0 ? "#ffffff" : "#666666"}>←</text>
+        <text style={{ marginLeft: 2, marginRight: 2 }}>
+          {fileName} ({validIndex + 1}/{parsedFiles.length})
+        </text>
+        <text fg={validIndex < parsedFiles.length - 1 ? "#ffffff" : "#666666"}>→</text>
+      </box>
+
       <scrollbox
         scrollAcceleration={scrollAcceleration}
         style={{
@@ -124,27 +166,17 @@ function App({ parsedFiles }: AppProps) {
         focused
       >
         <box style={{ flexDirection: "column" }}>
-          {parsedFiles.map((file, idx) => (
-            <box
-              key={idx}
-              style={{
-                flexDirection: "column",
-                marginBottom: idx < parsedFiles.length - 1 ? 2 : 0,
-              }}
-            >
-              <FileEditPreviewTitle
-                filePath={file.newFileName || file.oldFileName || "unknown"}
-                hunks={file.hunks}
-              />
-              <box paddingTop={1} />
-              <FileEditPreview
-                hunks={file.hunks}
-                paddingLeft={0}
-                splitView={useSplitView}
-                filePath={file.newFileName || file.oldFileName || ""}
-              />
-            </box>
-          ))}
+          <FileEditPreviewTitle
+            filePath={fileName}
+            hunks={currentFile.hunks}
+          />
+          <box paddingTop={1} />
+          <FileEditPreview
+            hunks={currentFile.hunks}
+            paddingLeft={0}
+            splitView={useSplitView}
+            filePath={fileName}
+          />
         </box>
       </scrollbox>
     </box>
@@ -256,6 +288,16 @@ cli
             }
           };
         }, []);
+
+        // Ensure currentFileIndex stays valid when files change
+        React.useEffect(() => {
+          if (parsedFiles && parsedFiles.length > 0) {
+            const currentIndex = useDiffStore.getState().currentFileIndex;
+            if (currentIndex >= parsedFiles.length) {
+              useDiffStore.setState({ currentFileIndex: parsedFiles.length - 1 });
+            }
+          }
+        }, [parsedFiles]);
 
         if (parsedFiles === null) {
           return (
