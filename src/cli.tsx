@@ -86,6 +86,7 @@ function App({ parsedFiles }: AppProps) {
   const [width, setWidth] = React.useState(initialWidth);
   const [scrollAcceleration] = React.useState(() => new ScrollAcceleration());
   const currentFileIndex = useDiffStore((s) => s.currentFileIndex);
+  const [showDropdown, setShowDropdown] = React.useState(false);
 
   useOnResize(
     React.useCallback((newWidth: number) => {
@@ -97,6 +98,18 @@ function App({ parsedFiles }: AppProps) {
   const renderer = useRenderer();
 
   useKeyboard((key) => {
+    if (showDropdown) {
+      if (key.name === "escape") {
+        setShowDropdown(false);
+      }
+      return;
+    }
+
+    if (key.name === "p" && key.ctrl) {
+      setShowDropdown(true);
+      return;
+    }
+
     if (key.name === "z" && key.ctrl) {
       renderer.console.toggle();
     }
@@ -120,7 +133,7 @@ function App({ parsedFiles }: AppProps) {
     }
   });
 
-
+  const { FileEditPreview } = require("./diff.tsx");
 
   // Ensure current index is valid
   const validIndex = Math.min(currentFileIndex, parsedFiles.length - 1);
@@ -136,21 +149,70 @@ function App({ parsedFiles }: AppProps) {
 
   const fileName = currentFile.newFileName || currentFile.oldFileName || "unknown";
 
+  // Calculate additions and deletions
+  let additions = 0;
+  let deletions = 0;
+  currentFile.hunks.forEach((hunk: any) => {
+    hunk.lines.forEach((line: string) => {
+      if (line.startsWith("+")) additions++;
+      if (line.startsWith("-")) deletions++;
+    });
+  });
+
+  const dropdownOptions = parsedFiles.map((file, idx) => {
+    const name = file.newFileName || file.oldFileName || "unknown";
+    return {
+      title: name,
+      value: String(idx),
+      keywords: name.split("/"),
+    };
+  });
+
+  const handleFileSelect = (value: string) => {
+    const index = parseInt(value, 10);
+    useDiffStore.setState({ currentFileIndex: index });
+    setShowDropdown(false);
+  };
+
+  if (showDropdown) {
+    return (
+      <box
+        style={{ flexDirection: "column", height: "100%", padding: 1, backgroundColor: BACKGROUND_COLOR }}
+      >
+        <box style={{ flexDirection: "column", justifyContent: "center", flexGrow: 1 }}>
+          <Dropdown
+            tooltip="Select file"
+            options={dropdownOptions}
+            selectedValues={[String(validIndex)]}
+            onChange={handleFileSelect}
+            placeholder="Search files..."
+          />
+        </box>
+      </box>
+    );
+  }
+
   return (
     <box
       key={String(useSplitView)}
       style={{ flexDirection: "column", height: "100%", padding: 1, backgroundColor: BACKGROUND_COLOR }}
     >
       {/* Navigation header */}
-      <box style={{ paddingBottom: 1, flexShrink: 0, flexDirection: "row", alignItems: "center",  }}>
-        <text fg={validIndex > 0 ? "#ffffff" : "#666666"}> ← </text>
-          <box flexGrow={1} />
-          <text>
-            {fileName.trim()} ({validIndex + 1}/{parsedFiles.length})
-          </text>
-          <box flexGrow={1} />
-
-        <text fg={validIndex < parsedFiles.length - 1 ? "#ffffff" : "#666666"}> → </text>
+      <box style={{ paddingBottom: 1, flexShrink: 0, flexDirection: "row", alignItems: "center" }}>
+        <text fg="#ffffff">←</text>
+        <text fg="#666666"> prev file</text>
+        <box flexGrow={1} />
+        <text onMouseDown={() => setShowDropdown(true)}>
+          {fileName.trim()} 
+        </text>
+        <text fg="#00ff00"> +{additions}</text>
+        <text fg="#ff0000">-{deletions} </text>
+        <text fg="#666666">
+          ({validIndex + 1}/{parsedFiles.length})
+        </text>
+        <box flexGrow={1} />
+        <text fg="#666666">next file </text>
+        <text fg="#ffffff">→</text>
       </box>
 
       <scrollbox
@@ -181,6 +243,18 @@ function App({ parsedFiles }: AppProps) {
           />
         </box>
       </scrollbox>
+
+      {/* Bottom navigation */}
+      <box style={{ paddingTop: 1, flexShrink: 0, flexDirection: "row", alignItems: "center" }}>
+        <text fg="#ffffff">←</text>
+        <text fg="#666666"> prev file</text>
+        <box flexGrow={1} />
+        <text fg="#ffffff">ctrl p</text>
+        <text fg="#666666"> select file</text>
+        <box flexGrow={1} />
+        <text fg="#666666">next file </text>
+        <text fg="#ffffff">→</text>
+      </box>
     </box>
   );
 }
