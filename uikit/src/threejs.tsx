@@ -479,7 +479,7 @@ function DiffHunk({ hunk }: { hunk: Hunk }) {
 
     // Split view for larger screens
     return (
-      <Container fontFamily={"inconsolata"} flexDirection="column" gap={0} flexShrink={0} width="100%">
+      <Container  flexDirection="column" gap={0} flexShrink={0} width="100%">
         {splitLines.map((splitLine, idx) => {
           // Get tokens for left line using original index
           const leftTokens = splitLine.left.originalIdx !== null ? beforeTokens[splitLine.left.originalIdx] : null
@@ -594,7 +594,7 @@ function DiffHunk({ hunk }: { hunk: Hunk }) {
 
   // Unified view for smaller screens
   return (
-    <Container fontFamily={"inconsolata"} flexDirection="column" gap={0} flexShrink={0} width="100%">
+    <Container flexDirection="column" gap={0} flexShrink={0} width="100%">
       {unifiedLines.map((line, idx) => {
         // Get the original line index to access tokens
         let originalIdx = 0
