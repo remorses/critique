@@ -198,7 +198,7 @@ function App({ parsedFiles }: AppProps) {
       style={{ flexDirection: "column", height: "100%", padding: 1, backgroundColor: BACKGROUND_COLOR }}
     >
       {/* Navigation header */}
-      <box style={{ paddingBottom: 1, flexShrink: 0, flexDirection: "row", alignItems: "center" }}>
+      <box style={{ paddingBottom: 1, paddingLeft: 1, paddingRight: 1, flexShrink: 0, flexDirection: "row", alignItems: "center" }}>
         <text fg="#ffffff">←</text>
         <text fg="#666666"> prev file</text>
         <box flexGrow={1} />
@@ -245,7 +245,7 @@ function App({ parsedFiles }: AppProps) {
       </scrollbox>
 
       {/* Bottom navigation */}
-      <box style={{ paddingTop: 1, flexShrink: 0, flexDirection: "row", alignItems: "center" }}>
+      <box style={{ paddingTop: 1, paddingLeft: 1, paddingRight: 1, flexShrink: 0, flexDirection: "row", alignItems: "center" }}>
         <text fg="#ffffff">←</text>
         <text fg="#666666"> prev file</text>
         <box flexGrow={1} />
