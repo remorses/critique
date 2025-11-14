@@ -1,3 +1,17 @@
+# 0.0.13
+
+- Default command:
+  - Add file selector dropdown with `ctrl+p` or click on filename
+  - Display additions/deletions count next to filename (+3-5 format)
+  - Add bottom navigation bar with navigation hints
+  - Improve navigation header layout with "prev file" and "next file" labels
+  - Add consistent background color throughout UI
+  - Add padding to top and bottom navigation rows
+  - Vertically center dropdown when opened
+- UI:
+  - Change theme primary color from blue to orange (#FFA500)
+  - Update all accent colors to orange
+
 # 0.0.12
 
 - Default command:
