@@ -38,11 +38,11 @@ const BACKGROUND_COLOR = "#0f0f0f";
 function getFileName(file: { oldFileName?: string; newFileName?: string }): string {
   const newName = file.newFileName;
   const oldName = file.oldFileName;
-  
+
   // Filter out /dev/null which appears for new/deleted files
   if (newName && newName !== "/dev/null") return newName;
   if (oldName && oldName !== "/dev/null") return oldName;
-  
+
   return "unknown";
 }
 
@@ -213,7 +213,7 @@ function App({ parsedFiles }: AppProps) {
         <text fg="#ffffff">←</text>
         <box flexGrow={1} />
         <text onMouseDown={() => setShowDropdown(true)}>
-          {fileName.trim()} 
+          {fileName.trim()}
         </text>
         <text fg="#00ff00"> +{additions}</text>
         <text fg="#ff0000">-{deletions}</text>
@@ -748,7 +748,7 @@ cli
         `gh gist create "${gistFile}" --public -d "Critique diff preview"`,
         { encoding: "utf-8" }
       );
-      
+
       const gistId = gistUrl.trim().split("/").pop();
       fs.unlinkSync(gistFile);
 
@@ -781,7 +781,7 @@ cli
 cli
   .command("web-render <diffFile>", "Internal: Render diff for web capture", { allowUnknownOptions: true })
   .option("--width <width>", "Terminal width", { default: 120 })
-  .option("--height <height>", "Terminal height", { default: 40 })
+  .option("--height <height>", "Terminal height", { default: 1000 })
   .action(async (diffFile: string, options) => {
     const width = parseInt(options.width) || 120;
     const height = parseInt(options.height) || 40;
@@ -815,7 +815,6 @@ cli
       process.exit(0);
     }
 
-    // Simple static renderer - just output ANSI for first file with split view
     const { FileEditPreview, ErrorBoundary } = diffModule;
 
     // Override terminal size
@@ -827,16 +826,22 @@ cli
       useAlternateScreen: false,
     });
 
-    // Render all files
-    function WebApp() {
-      React.useEffect(() => {
-        // Give time for initial render then exit
-        setTimeout(() => {
-          renderer.destroy();
-          process.exit(0);
-        }, 500);
-      }, []);
+    // Track if we've rendered once
+    let hasRendered = false;
+    const originalRequestRender = renderer.root.requestRender.bind(renderer.root);
+    renderer.root.requestRender = function() {
+      if (hasRendered) return; // Skip subsequent renders
+      hasRendered = true;
+      originalRequestRender();
+      // Exit after the first render completes
+      setTimeout(() => {
+        renderer.destroy();
+        process.exit(0);
+      }, 100);
+    };
 
+    // Static component - no hooks that cause re-renders
+    function WebApp() {
       return (
         <box style={{ flexDirection: "column", height: "100%", padding: 1, backgroundColor: BACKGROUND_COLOR }}>
           {sortedFiles.map((file, idx) => {
