@@ -12,9 +12,9 @@ const app = new Hono<{ Bindings: Bindings }>()
 // Enable CORS for all routes
 app.use("*", cors())
 
-// Health check
+// Redirect to GitHub repo
 app.get("/", (c) => {
-  return c.json({ status: "ok", service: "critique-worker" })
+  return c.redirect("https://github.com/remorses/critique")
 })
 
 // Upload HTML content
