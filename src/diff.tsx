@@ -829,9 +829,7 @@ const StructuredDiff = ({
                 backgroundColor:
                   leftLine.type === "remove"
                     ? REMOVED_BG_LIGHT
-                    : leftLine.type === "nochange"
-                      ? UNCHANGED_CODE_BG
-                      : undefined,
+                    : UNCHANGED_CODE_BG,
               }}
             >
               {leftLine.code}
@@ -876,9 +874,7 @@ const StructuredDiff = ({
                 backgroundColor:
                   rightLine.type === "add"
                     ? ADDED_BG_LIGHT
-                    : rightLine.type === "nochange"
-                      ? UNCHANGED_CODE_BG
-                      : undefined,
+                    : UNCHANGED_CODE_BG,
               }}
             >
               {rightLine.code}
