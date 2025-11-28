@@ -3,9 +3,10 @@
 - Web preview:
   - Rewrite ANSI-to-HTML conversion using `ptyToJson` instead of `ptyToHtml` for full control over output
   - Render each terminal line as a separate `<div>` element to prevent color bleeding between lines
-  - Add `white-space: pre` styling to preserve spacing within lines
+  - Use flexbox layout for lines so background colors extend to full line height (no stripes)
   - Trim empty lines from the end of output
   - Add responsive font sizing that adjusts based on viewport width and column count (8px-16px range)
+  - Increase line-height to 1.6 for better readability
 - Split view:
   - Fix background color bleeding by always setting explicit background color on empty lines
 

@@ -26,17 +26,18 @@ function escapeHtml(text: string): string {
 
 /**
  * Convert a single span to HTML
+ * Always wraps in a span element so flex layout works properly
  */
 function spanToHtml(span: TerminalSpan): string {
   const styles: string[] = []
-
+  
   if (span.fg) {
     styles.push(`color:${span.fg}`)
   }
   if (span.bg) {
     styles.push(`background-color:${span.bg}`)
   }
-
+  
   // Handle style flags
   if (span.flags & StyleFlags.BOLD) {
     styles.push("font-weight:bold")
@@ -53,13 +54,14 @@ function spanToHtml(span: TerminalSpan): string {
   if (span.flags & StyleFlags.FAINT) {
     styles.push("opacity:0.5")
   }
-
+  
   const escapedText = escapeHtml(span.text)
-
+  
+  // Always wrap in span for consistent flex behavior
   if (styles.length === 0) {
-    return escapedText
+    return `<span>${escapedText}</span>`
   }
-
+  
   return `<span style="${styles.join(";")}">${escapedText}</span>`
 }
 
@@ -71,6 +73,15 @@ function lineToHtml(line: TerminalLine): string {
     return ""
   }
   return line.spans.map(spanToHtml).join("")
+}
+
+/**
+ * Check if a line is empty (no spans or only whitespace content)
+ */
+function isLineEmpty(line: TerminalLine): boolean {
+  if (line.spans.length === 0) return true
+  // Check if all spans contain only whitespace
+  return line.spans.every(span => span.text.trim() === "")
 }
 
 /**
@@ -86,7 +97,7 @@ export function ansiToHtml(input: string | Buffer, options: AnsiToHtmlOptions = 
 
   // Trim empty lines from the end
   if (trimEmptyLines) {
-    while (lines.length > 0 && lines[lines.length - 1]!.spans.length === 0) {
+    while (lines.length > 0 && isLineEmpty(lines[lines.length - 1]!)) {
       lines = lines.slice(0, -1)
     }
   }
@@ -95,7 +106,8 @@ export function ansiToHtml(input: string | Buffer, options: AnsiToHtmlOptions = 
   const htmlLines = lines.map((line, idx) => {
     const content = lineToHtml(line)
     // Use a div for each line to ensure proper line breaks
-    return `<div class="line">${content || "&nbsp;"}</div>`
+    // Empty lines get a span with nbsp for consistent flex behavior
+    return `<div class="line">${content || "<span>&nbsp;</span>"}</div>`
   })
 
   return htmlLines.join("\n")
@@ -135,13 +147,17 @@ html, body {
   color: #c5c8c6;
   font-family: ${fontFamily};
   font-size: ${fontSize};
-  line-height: 1.4;
+  line-height: 1.6;
 }
 #content {
   padding: 16px;
   overflow-x: auto;
 }
 .line {
+  white-space: pre;
+  display: flex;
+}
+.line span {
   white-space: pre;
 }
 </style>
@@ -160,15 +176,21 @@ ${content}
 
   function adjustFontSize() {
     const viewportWidth = window.innerWidth;
-    // Calculate font size to fit cols characters in viewport
-    // cols * charRatio * fontSize = viewportWidth - padding
     const calculatedSize = (viewportWidth - padding) / (cols * charRatio);
     const fontSize = Math.max(minFontSize, Math.min(maxFontSize, calculatedSize));
     document.body.style.fontSize = fontSize + 'px';
   }
 
+  function debounce(fn, ms) {
+    let timeout;
+    return function() {
+      clearTimeout(timeout);
+      timeout = setTimeout(fn, ms);
+    };
+  }
+
   adjustFontSize();
-  window.addEventListener('resize', adjustFontSize);
+  window.addEventListener('resize', debounce(adjustFontSize, 100));
 })();
 </script>
 </body>
