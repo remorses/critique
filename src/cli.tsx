@@ -124,6 +124,9 @@ function App({ parsedFiles }: AppProps) {
     if (key.name === "z" && key.ctrl) {
       renderer.console.toggle();
     }
+    if (key.name === "escape" || key.name === "q") {
+      process.exit(0);
+    }
     if (key.option) {
       console.log(key);
       if (key.eventType === "release") {
