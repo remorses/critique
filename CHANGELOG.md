@@ -1,3 +1,10 @@
+# 0.0.19
+
+- Web preview:
+  - Add `content-visibility: auto` with `contain-intrinsic-block-size: auto 1lh` for better rendering performance on large diffs
+  - Debounce resize handler (100ms) for smoother font size adjustments
+  - Trim lines with only whitespace from the end (not just empty lines)
+
 # 0.0.18
 
 - Web preview:
