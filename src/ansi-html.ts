@@ -141,6 +141,10 @@ export function ansiToHtmlDocument(input: string | Buffer, options: AnsiToHtmlOp
 <title>Critique Diff</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
 html, body {
   height: 100%;
   background-color: ${backgroundColor};

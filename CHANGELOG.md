@@ -1,3 +1,8 @@
+# 0.0.26
+
+- Web preview:
+  - Add `text-size-adjust: 100%` CSS to prevent mobile browsers from auto-scaling text
+
 # 0.0.25
 
 - Change default worker URL to https://critique.work/
