@@ -680,7 +680,7 @@ cli
   .option("--height <height>", "Terminal height for rendering", { default: 2000 })
   .option("--local", "Open local preview instead of uploading")
   .action(async (ref, options) => {
-    const pty = await import("node-pty");
+    const pty = await import("@xmorse/bun-pty");
     const { ansiToHtmlDocument } = await import("./ansi-html.ts");
 
     const gitCommand = (() => {
@@ -719,11 +719,12 @@ cli
       name: "xterm-256color",
       cols: width,
       rows: height,
+
       cwd: process.cwd(),
-      env: { ...process.env, TERM: "xterm-256color" },
+      env: { ...process.env, TERM: "xterm-256color" } as Record<string, string>,
     });
 
-    ptyProcess.onData((data) => {
+    ptyProcess.onData((data: string) => {
       ansiOutput += data;
     });
 
@@ -743,6 +744,13 @@ cli
 
     console.log("Converting to HTML...");
 
+    // Strip terminal cleanup sequences that clear the screen
+    // The renderer outputs \x1b[H\x1b[J (cursor home + clear to end) on exit
+    const clearIdx = ansiOutput.lastIndexOf("\x1b[H\x1b[J");
+    if (clearIdx > 0) {
+      ansiOutput = ansiOutput.slice(0, clearIdx);
+    }
+
     // Convert ANSI to HTML document
     const html = ansiToHtmlDocument(ansiOutput, { cols: width, rows: height });
 
@@ -751,7 +759,7 @@ cli
       const htmlFile = join(tmpdir(), `critique-${Date.now()}.html`);
       fs.writeFileSync(htmlFile, html);
       console.log(`Saved to: ${htmlFile}`);
-      
+
       // Try to open in browser
       const openCmd = process.platform === "darwin" ? "open" : process.platform === "win32" ? "start" : "xdg-open";
       try {
@@ -779,7 +787,7 @@ cli
       }
 
       const result = await response.json() as { id: string; url: string };
-      
+
       console.log(`\nPreview URL: ${result.url}`);
       console.log(`(expires in 7 days)`);
 
@@ -792,7 +800,7 @@ cli
       }
     } catch (error: any) {
       console.error("Failed to upload:", error.message);
-      
+
       // Fallback to local file
       const htmlFile = join(tmpdir(), `critique-${Date.now()}.html`);
       fs.writeFileSync(htmlFile, html);

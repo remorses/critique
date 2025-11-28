@@ -6,6 +6,7 @@
   - HTML now uses CSS variables for color palette (better theming support)
 - Cleanup:
   - Remove unused `web/` directory and `vite.config.ts`
+  - Remove redundant `scripts/` directory (generate-html.tsx, capture-example.ts)
   - Fix TypeScript errors in `ansi-html.ts`
 
 # 0.0.16
