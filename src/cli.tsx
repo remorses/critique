@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 import { cac } from "cac";
-import { FileEditPreviewTitle, FileEditPreview } from "./diff.tsx";
+import { ErrorBoundary, diffSyntaxStyle, detectFiletype } from "./diff.tsx";
 import {
   createRoot,
   useKeyboard,
@@ -84,12 +84,15 @@ const useDiffStore = create<DiffState>(() => ({
   currentFileIndex: 0,
 }));
 
+interface ParsedFile {
+  oldFileName?: string;
+  newFileName?: string;
+  hunks: any[];
+  rawDiff?: string;
+}
+
 interface AppProps {
-  parsedFiles: Array<{
-    oldFileName?: string;
-    newFileName?: string;
-    hunks: any[];
-  }>;
+  parsedFiles: ParsedFile[];
 }
 
 function App({ parsedFiles }: AppProps) {

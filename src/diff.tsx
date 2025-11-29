@@ -1,4 +1,5 @@
-import { RGBA, type MouseEvent } from "@opentui/core";
+import { RGBA, DiffRenderable, SyntaxStyle, type MouseEvent } from "@opentui/core";
+import { extend } from "@opentui/react";
 import { execSync } from "child_process";
 import { diffWords } from "diff";
 
@@ -11,6 +12,64 @@ import {
     type GrammarState,
     type ThemedToken
 } from "shiki";
+
+// Register the diff component with opentui react
+extend({ diff: DiffRenderable });
+
+// Declare the diff component type for JSX
+declare module "@opentui/react" {
+  interface OpenTUIComponents {
+    diff: typeof DiffRenderable;
+  }
+}
+
+// GitHub Dark syntax style for the diff component
+export const diffSyntaxStyle = SyntaxStyle.fromStyles({
+  keyword: { fg: RGBA.fromHex("#FF7B72"), bold: true },
+  "keyword.import": { fg: RGBA.fromHex("#FF7B72"), bold: true },
+  string: { fg: RGBA.fromHex("#A5D6FF") },
+  comment: { fg: RGBA.fromHex("#8B949E"), italic: true },
+  number: { fg: RGBA.fromHex("#79C0FF") },
+  boolean: { fg: RGBA.fromHex("#79C0FF") },
+  constant: { fg: RGBA.fromHex("#79C0FF") },
+  function: { fg: RGBA.fromHex("#D2A8FF") },
+  "function.call": { fg: RGBA.fromHex("#D2A8FF") },
+  constructor: { fg: RGBA.fromHex("#FFA657") },
+  type: { fg: RGBA.fromHex("#FFA657") },
+  operator: { fg: RGBA.fromHex("#FF7B72") },
+  variable: { fg: RGBA.fromHex("#E6EDF3") },
+  property: { fg: RGBA.fromHex("#79C0FF") },
+  bracket: { fg: RGBA.fromHex("#F0F6FC") },
+  punctuation: { fg: RGBA.fromHex("#F0F6FC") },
+  default: { fg: RGBA.fromHex("#E6EDF3") },
+});
+
+// Detect filetype from filename for syntax highlighting
+export function detectFiletype(filePath: string): string | undefined {
+  const ext = filePath.split(".").pop()?.toLowerCase();
+  switch (ext) {
+    case "ts": return "typescript";
+    case "tsx": return "tsx";
+    case "jsx": return "jsx";
+    case "js": case "mjs": case "cjs": return "javascript";
+    case "json": return "json";
+    case "md": case "mdx": return "markdown";
+    case "html": case "htm": return "html";
+    case "css": return "css";
+    case "py": return "python";
+    case "rs": return "rust";
+    case "go": return "go";
+    case "java": return "java";
+    case "c": case "h": return "c";
+    case "cpp": case "cc": case "hpp": return "cpp";
+    case "yaml": case "yml": return "yaml";
+    case "toml": return "toml";
+    case "sh": case "bash": return "bash";
+    case "sql": return "sql";
+    case "zig": return "zig";
+    default: return undefined;
+  }
+}
 
 const UNCHANGED_CODE_BG = RGBA.fromInts(15, 15, 15, 255);
 const ADDED_BG_LIGHT = RGBA.fromInts(100, 250, 120, 12);
