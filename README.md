@@ -2,7 +2,8 @@
 
 A beautiful terminal UI for reviewing git diffs with syntax highlighting, split view, and word-level diff.
 
-![Diff Viewer Demo](diff-viewer-demo.png)
+<img width="3456" height="2152" alt="image" src="https://github.com/user-attachments/assets/13b9db4c-5b00-4da8-b4a6-104b0dffe956" />
+
 
 ## Installation
 
