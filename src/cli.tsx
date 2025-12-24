@@ -265,6 +265,11 @@ function App({ parsedFiles }: AppProps) {
       return;
     }
 
+    if (key.name === "escape" || key.name === "q") {
+      renderer.destroy();
+      return;
+    }
+
     if (key.name === "p" && key.ctrl) {
       setShowDropdown(true);
       return;
@@ -336,6 +341,12 @@ function App({ parsedFiles }: AppProps) {
     });
   });
 
+  // Use unified view for fully added or fully deleted files (one side would be empty in split view)
+  const isFullyAdded = additions > 0 && deletions === 0;
+  const isFullyDeleted = deletions > 0 && additions === 0;
+  const useUnifiedForFile = isFullyAdded || isFullyDeleted;
+  const viewMode = useUnifiedForFile ? "unified" : (useSplitView ? "split" : "unified");
+
   const dropdownOptions = parsedFiles.map((file, idx) => {
     const name = getFileName(file);
     return {
@@ -399,7 +410,7 @@ function App({ parsedFiles }: AppProps) {
         >
           <DiffView
             diff={currentFile.rawDiff || ""}
-            view={useSplitView ? "split" : "unified"}
+            view={viewMode}
             filetype={filetype}
             themeName={activeTheme}
           />
@@ -488,7 +499,7 @@ function App({ parsedFiles }: AppProps) {
       >
         <DiffView
           diff={currentFile.rawDiff || ""}
-          view={useSplitView ? "split" : "unified"}
+          view={viewMode}
           filetype={filetype}
           themeName={activeTheme}
         />
@@ -508,12 +519,14 @@ function App({ parsedFiles }: AppProps) {
         <text fg="#ffffff">←</text>
         <text fg="#666666"> prev</text>
         <box flexGrow={1} />
+        <text fg="#ffffff">q</text>
+        <text fg="#666666"> quit  </text>
         <text fg="#ffffff">ctrl p</text>
         <text fg="#666666"> files </text>
         <text fg="#666666">
           ({validIndex + 1}/{parsedFiles.length})
         </text>
-        <text fg="#666666"> </text>
+        <text fg="#666666">  </text>
         <text fg="#ffffff">t</text>
         <text fg="#666666"> theme</text>
         <box flexGrow={1} />
@@ -1233,6 +1246,12 @@ cli
               });
             });
 
+            // Use unified view for fully added or fully deleted files
+            const isFullyAdded = additions > 0 && deletions === 0;
+            const isFullyDeleted = deletions > 0 && additions === 0;
+            const useUnifiedForFile = isFullyAdded || isFullyDeleted;
+            const viewMode = useUnifiedForFile ? "unified" : (useSplitView ? "split" : "unified");
+
             return (
               <box
                 key={idx}
@@ -1254,7 +1273,7 @@ cli
                 </box>
                 <DiffView
                   diff={file.rawDiff || ""}
-                  view={useSplitView ? "split" : "unified"}
+                  view={viewMode}
                   filetype={filetype}
                   themeName={defaultThemeName}
                 />

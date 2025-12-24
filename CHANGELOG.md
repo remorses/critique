@@ -1,3 +1,10 @@
+# 0.0.30
+
+- Diff view:
+  - Use unified view for fully added or fully deleted files (split view would have one empty side)
+- Theme preview:
+  - Fix black background in scrollbox areas by using theme background color instead of transparent
+
 # 0.0.29
 
 - Persist theme preference to `~/.critique/state.json`
