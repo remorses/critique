@@ -10,35 +10,45 @@
     "gray500": "#454545",
     "gray600": "#878787",
     "gray700": "#8F8F8F",
-    "gray900": "#A1A1A1",
     "gray1000": "#EDEDED",
-    "blue600": "#0099FF",
     "blue700": "#0070F3",
-    "blue900": "#52A8FF",
     "blue1000": "#EBF8FF",
     "red700": "#E5484D",
-    "red900": "#FF6166",
     "red1000": "#FDECED",
     "amber700": "#FFB224",
-    "amber900": "#F2A700",
     "amber1000": "#FDF4DC",
     "green700": "#46A758",
-    "green900": "#63C46D",
     "green1000": "#E6F9E9",
     "teal700": "#12A594",
     "teal900": "#0AC7AC",
-    "purple700": "#8E4EC6",
-    "purple900": "#BF7AF0",
-    "pink700": "#E93D82",
-    "pink900": "#F75590",
-    "highlightPink": "#FF0080",
-    "highlightPurple": "#F81CE5",
     "cyan": "#50E3C2",
     "lightBackground": "#FFFFFF",
     "lightGray100": "#FAFAFA",
     "lightGray200": "#EAEAEA",
     "lightGray600": "#666666",
-    "lightGray1000": "#171717"
+    "lightGray1000": "#171717",
+    "darkForeground": "#EDEDED",
+    "darkConstant": "#47A8FF",
+    "darkString": "#00CA50",
+    "darkComment": "#A1A1A1",
+    "darkKeyword": "#FF4D8D",
+    "darkParameter": "#FF9300",
+    "darkFunction": "#C472FB",
+    "darkNumber": "#FFFFFF",
+    "darkDiffDeleted": "#F32E40",
+    "darkDiffInserted": "#00952D",
+    "darkHighlight": "#002F62",
+    "lightForeground": "#171717",
+    "lightConstant": "#005FF2",
+    "lightString": "#107D32",
+    "lightComment": "#666666",
+    "lightKeyword": "#C41562",
+    "lightParameter": "#AA4D00",
+    "lightFunction": "#7D00CC",
+    "lightNumber": "#111111",
+    "lightDiffDeleted": "#E2162A",
+    "lightDiffInserted": "#009432",
+    "lightHighlight": "#DFEFFF"
   },
   "theme": {
     "primary": {
@@ -46,51 +56,51 @@
       "light": "blue700"
     },
     "secondary": {
-      "dark": "blue900",
-      "light": "#0062D1"
+      "dark": "darkConstant",
+      "light": "lightConstant"
     },
     "accent": {
-      "dark": "purple700",
-      "light": "purple700"
+      "dark": "darkFunction",
+      "light": "lightFunction"
     },
     "error": {
       "dark": "red700",
       "light": "#DC3545"
     },
     "warning": {
-      "dark": "amber700",
-      "light": "#FF9500"
+      "dark": "darkParameter",
+      "light": "lightParameter"
     },
     "success": {
-      "dark": "green700",
-      "light": "#388E3C"
+      "dark": "darkString",
+      "light": "lightString"
     },
     "info": {
-      "dark": "blue900",
-      "light": "blue700"
+      "dark": "darkConstant",
+      "light": "lightConstant"
     },
     "text": {
-      "dark": "gray1000",
-      "light": "lightGray1000"
+      "dark": "darkForeground",
+      "light": "lightForeground"
     },
     "textMuted": {
-      "dark": "gray600",
-      "light": "lightGray600"
+      "dark": "darkComment",
+      "light": "lightComment"
     },
     "background": {
       "dark": "background200",
       "light": "lightBackground"
     },
     "backgroundPanel": {
-      "dark": "gray100",
+      "dark": "background200",
       "light": "lightGray100"
     },
     "backgroundElement": {
-      "dark": "gray300",
+      "dark": "gray200",
       "light": "lightGray200"
     },
     "border": {
-      "dark": "gray200",
+      "dark": "gray100",
       "light": "lightGray200"
     },
     "borderActive": {
@@ -98,39 +108,39 @@
       "light": "#999999"
     },
     "borderSubtle": {
-      "dark": "gray100",
+      "dark": "#111111",
       "light": "#EAEAEA"
     },
     "diffAdded": {
-      "dark": "green900",
-      "light": "green700"
+      "dark": "darkDiffInserted",
+      "light": "lightDiffInserted"
     },
     "diffRemoved": {
-      "dark": "red900",
-      "light": "red700"
+      "dark": "darkDiffDeleted",
+      "light": "lightDiffDeleted"
     },
     "diffContext": {
-      "dark": "gray600",
-      "light": "lightGray600"
+      "dark": "darkComment",
+      "light": "lightComment"
     },
     "diffHunkHeader": {
-      "dark": "gray600",
-      "light": "lightGray600"
+      "dark": "darkComment",
+      "light": "lightComment"
     },
     "diffHighlightAdded": {
-      "dark": "green900",
-      "light": "green700"
+      "dark": "darkDiffInserted",
+      "light": "lightDiffInserted"
     },
     "diffHighlightRemoved": {
-      "dark": "red900",
-      "light": "red700"
+      "dark": "darkDiffDeleted",
+      "light": "lightDiffDeleted"
     },
     "diffAddedBg": {
-      "dark": "#0B1D0F",
+      "dark": "#041208",
       "light": "#E6F9E9"
     },
     "diffRemovedBg": {
-      "dark": "#2A1314",
+      "dark": "#1A0809",
       "light": "#FDECED"
     },
     "diffContextBg": {
@@ -138,60 +148,60 @@
       "light": "lightBackground"
     },
     "diffLineNumber": {
-      "dark": "gray600",
-      "light": "lightGray600"
+      "dark": "darkComment",
+      "light": "lightComment"
     },
     "diffAddedLineNumberBg": {
-      "dark": "#0F2613",
+      "dark": "#06180C",
       "light": "#D6F5D6"
     },
     "diffRemovedLineNumberBg": {
-      "dark": "#3C1618",
+      "dark": "#200A0B",
       "light": "#FFE5E5"
     },
     "markdownText": {
-      "dark": "gray1000",
-      "light": "lightGray1000"
+      "dark": "darkForeground",
+      "light": "lightForeground"
     },
     "markdownHeading": {
-      "dark": "purple900",
-      "light": "purple700"
+      "dark": "darkFunction",
+      "light": "lightFunction"
     },
     "markdownLink": {
-      "dark": "blue900",
-      "light": "blue700"
+      "dark": "darkString",
+      "light": "lightString"
     },
     "markdownLinkText": {
       "dark": "teal900",
       "light": "teal700"
     },
     "markdownCode": {
-      "dark": "green900",
-      "light": "green700"
+      "dark": "darkString",
+      "light": "lightString"
     },
     "markdownBlockQuote": {
-      "dark": "gray600",
-      "light": "lightGray600"
+      "dark": "darkComment",
+      "light": "lightComment"
     },
     "markdownEmph": {
-      "dark": "amber900",
-      "light": "amber700"
+      "dark": "darkParameter",
+      "light": "lightParameter"
     },
     "markdownStrong": {
-      "dark": "pink900",
-      "light": "pink700"
+      "dark": "darkKeyword",
+      "light": "lightKeyword"
     },
     "markdownHorizontalRule": {
       "dark": "gray500",
       "light": "#999999"
     },
     "markdownListItem": {
-      "dark": "gray1000",
-      "light": "lightGray1000"
+      "dark": "darkForeground",
+      "light": "lightForeground"
     },
     "markdownListEnumeration": {
-      "dark": "blue900",
-      "light": "blue700"
+      "dark": "darkConstant",
+      "light": "lightConstant"
     },
     "markdownImage": {
       "dark": "teal900",
@@ -202,44 +212,44 @@
       "light": "teal700"
     },
     "markdownCodeBlock": {
-      "dark": "gray1000",
-      "light": "lightGray1000"
+      "dark": "darkForeground",
+      "light": "lightForeground"
     },
     "syntaxComment": {
-      "dark": "gray600",
-      "light": "#888888"
+      "dark": "darkComment",
+      "light": "lightComment"
     },
     "syntaxKeyword": {
-      "dark": "pink900",
-      "light": "pink700"
+      "dark": "darkKeyword",
+      "light": "lightKeyword"
     },
     "syntaxFunction": {
-      "dark": "purple900",
-      "light": "purple700"
+      "dark": "darkFunction",
+      "light": "lightFunction"
     },
     "syntaxVariable": {
-      "dark": "blue900",
-      "light": "blue700"
+      "dark": "darkConstant",
+      "light": "lightConstant"
     },
     "syntaxString": {
-      "dark": "green900",
-      "light": "green700"
+      "dark": "darkString",
+      "light": "lightString"
     },
     "syntaxNumber": {
-      "dark": "amber900",
-      "light": "amber700"
+      "dark": "darkNumber",
+      "light": "lightNumber"
     },
     "syntaxType": {
-      "dark": "teal900",
-      "light": "teal700"
+      "dark": "darkParameter",
+      "light": "lightParameter"
     },
     "syntaxOperator": {
-      "dark": "pink900",
-      "light": "pink700"
+      "dark": "darkKeyword",
+      "light": "lightKeyword"
     },
     "syntaxPunctuation": {
-      "dark": "gray1000",
-      "light": "lightGray1000"
+      "dark": "darkForeground",
+      "light": "lightForeground"
     }
   }
 }
