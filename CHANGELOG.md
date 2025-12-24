@@ -1,3 +1,8 @@
+# 0.1.3
+
+- Themes:
+  - Reduce intensity of diff added/removed background colors in GitHub theme for better readability
+
 # 0.1.2
 
 - Branch comparison:
