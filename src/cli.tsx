@@ -392,7 +392,7 @@ function App({ parsedFiles }: AppProps) {
           style={{
             flexGrow: 1,
             rootOptions: {
-              backgroundColor: "transparent",
+              backgroundColor: bgColor,
               border: false,
             },
           }}
@@ -473,14 +473,14 @@ function App({ parsedFiles }: AppProps) {
         style={{
           flexGrow: 1,
           rootOptions: {
-            backgroundColor: "transparent",
+            backgroundColor: bgColor,
             border: false,
           },
           scrollbarOptions: {
             showArrows: false,
             trackOptions: {
               foregroundColor: "#4a4a4a",
-              backgroundColor: "transparent",
+              backgroundColor: bgColor,
             },
           },
         }}
