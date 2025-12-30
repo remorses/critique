@@ -1,3 +1,10 @@
+# 0.1.9
+
+- Performance:
+  - Lazy-load themes: Only the default (github) theme is loaded at startup; other themes load on-demand when selected
+  - Lazy-load `@parcel/watcher`: Native file watcher module is only loaded when `--watch` flag is used
+  - Parallelize `diff` module import with renderer creation
+
 # 0.1.8
 
 - Web preview:

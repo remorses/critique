@@ -20,8 +20,16 @@ import { tmpdir, homedir } from "os";
 import { join } from "path";
 import { create } from "zustand";
 import Dropdown from "./dropdown.tsx";
-import * as watcher from "@parcel/watcher";
 import { debounce } from "./utils.ts";
+
+// Lazy-load watcher only when --watch is used
+let watcherModule: typeof import("@parcel/watcher") | null = null;
+async function getWatcher() {
+  if (!watcherModule) {
+    watcherModule = await import("@parcel/watcher");
+  }
+  return watcherModule;
+}
 import {
   getSyntaxTheme,
   getResolvedTheme,
@@ -352,7 +360,11 @@ function App({ parsedFiles }: AppProps) {
   const isFullyAdded = additions > 0 && deletions === 0;
   const isFullyDeleted = deletions > 0 && additions === 0;
   const useUnifiedForFile = isFullyAdded || isFullyDeleted;
-  const viewMode = useUnifiedForFile ? "unified" : (useSplitView ? "split" : "unified");
+  const viewMode = useUnifiedForFile
+    ? "unified"
+    : useSplitView
+      ? "split"
+      : "unified";
 
   const dropdownOptions = parsedFiles.map((file, idx) => {
     const name = getFileName(file);
@@ -527,13 +539,13 @@ function App({ parsedFiles }: AppProps) {
         <text fg="#666666"> prev</text>
         <box flexGrow={1} />
         <text fg="#ffffff">q</text>
-        <text fg="#666666"> quit  </text>
+        <text fg="#666666"> quit </text>
         <text fg="#ffffff">ctrl p</text>
         <text fg="#666666"> files </text>
         <text fg="#666666">
           ({validIndex + 1}/{parsedFiles.length})
         </text>
-        <text fg="#666666">  </text>
+        <text fg="#666666"> </text>
         <text fg="#ffffff">t</text>
         <text fg="#666666"> theme</text>
         <box flexGrow={1} />
@@ -569,9 +581,19 @@ cli
         return `git add -N . && git diff --no-prefix ${contextArg}`.trim();
       })();
 
-      const { parsePatch, formatPatch } = await import("diff");
-
       const shouldWatch = options.watch && !base && !head && !options.commit;
+
+      // Parallelize diff module loading with renderer creation
+      const [diffModule, renderer] = await Promise.all([
+        import("diff"),
+        createCliRenderer({
+          onDestroy() {
+            process.exit(0);
+          },
+          exitOnCtrlC: true,
+        }),
+      ]);
+      const { parsePatch, formatPatch } = diffModule;
 
       function AppWithWatch() {
         const [parsedFiles, setParsedFiles] = React.useState<
@@ -636,6 +658,7 @@ cli
 
           fetchDiff();
 
+          // Set up file watching only if --watch flag is used
           if (!shouldWatch) {
             return;
           }
@@ -646,21 +669,26 @@ cli
             fetchDiff();
           }, 200);
 
-          let subscription: watcher.AsyncSubscription | undefined;
+          let subscription:
+            | Awaited<ReturnType<typeof import("@parcel/watcher").subscribe>>
+            | undefined;
 
-          watcher
-            .subscribe(cwd, (err, events) => {
-              if (err) {
-                return;
-              }
+          // Lazy-load watcher module only when watching
+          getWatcher().then((watcher) => {
+            watcher
+              .subscribe(cwd, (err, events) => {
+                if (err) {
+                  return;
+                }
 
-              if (events.length > 0) {
-                debouncedFetch();
-              }
-            })
-            .then((sub) => {
-              subscription = sub;
-            });
+                if (events.length > 0) {
+                  debouncedFetch();
+                }
+              })
+              .then((sub) => {
+                subscription = sub;
+              });
+          });
 
           return () => {
             if (subscription) {
@@ -704,12 +732,6 @@ cli
         return <App parsedFiles={parsedFiles} />;
       }
 
-      const renderer = await createCliRenderer({
-        onDestroy() {
-          process.exit(0);
-        },
-        exitOnCtrlC: true,
-      });
       createRoot(renderer).render(
         React.createElement(
           ErrorBoundary,
@@ -987,8 +1009,7 @@ cli
   });
 
 // Worker URL for uploading HTML previews
-const WORKER_URL =
-  process.env.CRITIQUE_WORKER_URL || "https://critique.work";
+const WORKER_URL = process.env.CRITIQUE_WORKER_URL || "https://critique.work";
 
 cli
   .command("web [ref]", "Generate web preview of diff")
@@ -999,7 +1020,7 @@ cli
     "Number of columns for rendering (use ~100 for mobile)",
     { default: 240 },
   )
-  
+
   .option("--local", "Save local preview instead of uploading")
   .option("--open", "Open in browser after generating")
   .option("--context <lines>", "Number of context lines (default: 3)")
@@ -1035,7 +1056,10 @@ cli
     const { parsePatch } = await import("diff");
     const files = parsePatch(gitDiff);
     const renderRows = files.reduce((sum, file) => {
-      const diffLines = file.hunks.reduce((h, hunk) => h + hunk.lines.length, 0);
+      const diffLines = file.hunks.reduce(
+        (h, hunk) => h + hunk.lines.length,
+        0,
+      );
       return sum + diffLines + 5; // header + margin per file
     }, 100); // base padding
 
@@ -1272,7 +1296,11 @@ cli
             const isFullyAdded = additions > 0 && deletions === 0;
             const isFullyDeleted = deletions > 0 && additions === 0;
             const useUnifiedForFile = isFullyAdded || isFullyDeleted;
-            const viewMode = useUnifiedForFile ? "unified" : (useSplitView ? "split" : "unified");
+            const viewMode = useUnifiedForFile
+              ? "unified"
+              : useSplitView
+                ? "split"
+                : "unified";
 
             return (
               <box
