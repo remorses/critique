@@ -4,6 +4,17 @@
   - Lazy-load themes: Only the default (github) theme is loaded at startup; other themes load on-demand when selected
   - Lazy-load `@parcel/watcher`: Native file watcher module is only loaded when `--watch` flag is used
   - Parallelize `diff` module import with renderer creation
+- Web preview:
+  - Generate desktop and mobile HTML versions in parallel
+  - Add `--mobile-cols` option (default: 100) for mobile column width
+  - Worker auto-detects mobile devices via `CF-Device-Type`, `Sec-CH-UA-Mobile`, or User-Agent regex
+  - Add `?v=desktop` / `?v=mobile` query params to force a specific version
+  - Mobile version uses more rows to accommodate line wrapping
+- Themes:
+  - Add `opencode-light` theme - light mode variant of OpenCode theme
+  - Change default theme from `github` to `opencode-light`
+  - Web preview now uses theme-aware colors (background, text, diff colors)
+  - Theme is changeable via state (press `t` in TUI to pick theme)
 
 # 0.1.8
 

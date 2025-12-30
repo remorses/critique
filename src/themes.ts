@@ -89,6 +89,7 @@ const THEME_FILES: Record<string, string> = {
   everforest: "everforest.json",
   flexoki: "flexoki.json",
   github: "github.json",
+  "github-light": "github-light.json",
   gruvbox: "gruvbox.json",
   kanagawa: "kanagawa.json",
   "lucent-orng": "lucent-orng.json",
@@ -100,6 +101,7 @@ const THEME_FILES: Record<string, string> = {
   nord: "nord.json",
   "one-dark": "one-dark.json",
   opencode: "opencode.json",
+  "opencode-light": "opencode-light.json",
   orng: "orng.json",
   palenight: "palenight.json",
   rosepine: "rosepine.json",
@@ -235,7 +237,7 @@ export function getSyntaxTheme(
 
 export const themeNames = Object.keys(THEME_FILES).sort();
 
-export const defaultThemeName = "github";
+export const defaultThemeName = "github-light";
 
 // Helper to convert RGBA to hex string
 export function rgbaToHex(rgba: RGBA): string {

@@ -5,6 +5,8 @@ export interface AnsiToHtmlOptions {
   rows?: number
   /** Background color for the container */
   backgroundColor?: string
+  /** Text color for the container */
+  textColor?: string
   /** Font family for the output */
   fontFamily?: string
   /** Font size for the output */
@@ -121,7 +123,8 @@ export function ansiToHtml(input: string | Buffer, options: AnsiToHtmlOptions = 
 export function ansiToHtmlDocument(input: string | Buffer, options: AnsiToHtmlOptions = {}): string {
   const {
     cols = 500,
-    backgroundColor = "#0f0f0f",
+    backgroundColor = "#ffffff",
+    textColor = "#1a1a1a",
     fontFamily = "Monaco, Menlo, 'Ubuntu Mono', Consolas, monospace",
     fontSize = "14px",
   } = options
@@ -150,7 +153,7 @@ html, body {
   max-width: 100vw;
   overflow-x: hidden;
   background-color: ${backgroundColor};
-  color: #c5c8c6;
+  color: ${textColor};
   font-family: ${fontFamily};
   font-size: ${fontSize};
   line-height: 1.6;

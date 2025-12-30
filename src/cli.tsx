@@ -35,6 +35,7 @@ import {
   getResolvedTheme,
   themeNames,
   defaultThemeName,
+  rgbaToHex,
 } from "./themes.ts";
 
 // State persistence
@@ -1014,10 +1015,14 @@ cli
   .option("--commit <ref>", "Show changes from a specific commit")
   .option(
     "--cols <cols>",
-    "Number of columns for rendering (use ~100 for mobile)",
+    "Number of columns for desktop rendering",
     { default: 240 },
   )
-  
+  .option(
+    "--mobile-cols <cols>",
+    "Number of columns for mobile rendering",
+    { default: 100 },
+  )
   .option("--local", "Save local preview instead of uploading")
   .option("--open", "Open in browser after generating")
   .option("--context <lines>", "Number of context lines (default: 3)")
@@ -1035,7 +1040,8 @@ cli
       return `git add -N . && git diff --no-prefix ${contextArg}`.trim();
     })();
 
-    const cols = parseInt(options.cols) || 240;
+    const desktopCols = parseInt(options.cols) || 240;
+    const mobileCols = parseInt(options.mobileCols) || 100;
 
     console.log("Capturing diff output...");
 
@@ -1052,7 +1058,7 @@ cli
     // Calculate required rows from diff content
     const { parsePatch } = await import("diff");
     const files = parsePatch(gitDiff);
-    const renderRows = files.reduce((sum, file) => {
+    const baseRenderRows = files.reduce((sum, file) => {
       const diffLines = file.hunks.reduce((h, hunk) => h + hunk.lines.length, 0);
       return sum + diffLines + 5; // header + margin per file
     }, 100); // base padding
@@ -1061,67 +1067,83 @@ cli
     const diffFile = join(tmpdir(), `critique-web-diff-${Date.now()}.patch`);
     fs.writeFileSync(diffFile, gitDiff);
 
-    // Spawn the TUI in a PTY to capture ANSI output
-    let ansiOutput = "";
-    const ptyProcess = pty.spawn(
-      "bun",
-      [
-        process.argv[1]!, // path to cli.tsx
-        "web-render",
-        diffFile,
-        "--cols",
-        String(cols),
-        "--rows",
-        String(renderRows),
-      ],
-      {
-        name: "xterm-256color",
-        cols: cols,
-        rows: renderRows,
+    // Helper function to capture PTY output for a given column width
+    async function captureHtml(cols: number, renderRows: number): Promise<string> {
+      let ansiOutput = "";
+      const ptyProcess = pty.spawn(
+        "bun",
+        [
+          process.argv[1]!, // path to cli.tsx
+          "web-render",
+          diffFile,
+          "--cols",
+          String(cols),
+          "--rows",
+          String(renderRows),
+        ],
+        {
+          name: "xterm-256color",
+          cols: cols,
+          rows: renderRows,
+          cwd: process.cwd(),
+          env: { ...process.env, TERM: "xterm-256color" } as Record<
+            string,
+            string
+          >,
+        },
+      );
 
-        cwd: process.cwd(),
-        env: { ...process.env, TERM: "xterm-256color" } as Record<
-          string,
-          string
-        >,
-      },
-    );
-
-    ptyProcess.onData((data: string) => {
-      ansiOutput += data;
-    });
-
-    await new Promise<void>((resolve) => {
-      ptyProcess.onExit(() => {
-        resolve();
+      ptyProcess.onData((data: string) => {
+        ansiOutput += data;
       });
-    });
+
+      await new Promise<void>((resolve) => {
+        ptyProcess.onExit(() => {
+          resolve();
+        });
+      });
+
+      if (!ansiOutput.trim()) {
+        throw new Error("No output captured");
+      }
+
+      // Strip terminal cleanup sequences that clear the screen
+      const clearIdx = ansiOutput.lastIndexOf("\x1b[H\x1b[J");
+      if (clearIdx > 0) {
+        ansiOutput = ansiOutput.slice(0, clearIdx);
+      }
+
+      // Get theme colors for HTML output
+      const theme = getResolvedTheme(defaultThemeName);
+      const backgroundColor = rgbaToHex(theme.background);
+      const textColor = rgbaToHex(theme.text);
+
+      return ansiToHtmlDocument(ansiOutput, { cols, rows: renderRows, backgroundColor, textColor });
+    }
+
+    // Generate desktop and mobile versions in parallel
+    // Mobile needs more rows since lines wrap more with fewer columns
+    const mobileRenderRows = Math.ceil(baseRenderRows * (desktopCols / mobileCols));
+    console.log("Generating desktop and mobile versions in parallel...");
+    const [htmlDesktop, htmlMobile] = await Promise.all([
+      captureHtml(desktopCols, baseRenderRows),
+      captureHtml(mobileCols, mobileRenderRows),
+    ]);
 
     // Clean up temp file
     fs.unlinkSync(diffFile);
 
-    if (!ansiOutput.trim()) {
-      console.log("No output captured");
-      process.exit(1);
-    }
-
     console.log("Converting to HTML...");
-
-    // Strip terminal cleanup sequences that clear the screen
-    // The renderer outputs \x1b[H\x1b[J (cursor home + clear to end) on exit
-    const clearIdx = ansiOutput.lastIndexOf("\x1b[H\x1b[J");
-    if (clearIdx > 0) {
-      ansiOutput = ansiOutput.slice(0, clearIdx);
-    }
-
-    // Convert ANSI to HTML document
-    const html = ansiToHtmlDocument(ansiOutput, { cols, rows: renderRows });
 
     if (options.local) {
       // Save locally
-      const htmlFile = join(tmpdir(), `critique-${Date.now()}.html`);
-      fs.writeFileSync(htmlFile, html);
-      console.log(`Saved to: ${htmlFile}`);
+      const timestamp = Date.now();
+      const htmlFileDesktop = join(tmpdir(), `critique-${timestamp}-desktop.html`);
+      const htmlFileMobile = join(tmpdir(), `critique-${timestamp}-mobile.html`);
+      fs.writeFileSync(htmlFileDesktop, htmlDesktop);
+      fs.writeFileSync(htmlFileMobile, htmlMobile);
+      console.log(`Saved desktop to: ${htmlFileDesktop}`);
+      console.log(`Saved mobile to: ${htmlFileMobile}`);
 
       // Open in browser if requested
       if (options.open) {
@@ -1132,7 +1154,7 @@ cli
               ? "start"
               : "xdg-open";
         try {
-          await execAsync(`${openCmd} "${htmlFile}"`);
+          await execAsync(`${openCmd} "${htmlFileDesktop}"`);
         } catch {
           console.log("Could not open browser automatically");
         }
@@ -1148,7 +1170,7 @@ cli
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ html }),
+        body: JSON.stringify({ html: htmlDesktop, htmlMobile }),
       });
 
       if (!response.ok) {
@@ -1180,7 +1202,7 @@ cli
 
       // Fallback to local file
       const htmlFile = join(tmpdir(), `critique-${Date.now()}.html`);
-      fs.writeFileSync(htmlFile, html);
+      fs.writeFileSync(htmlFile, htmlDesktop);
       console.log(`\nFallback: Saved locally to ${htmlFile}`);
       process.exit(1);
     }
@@ -1264,7 +1286,11 @@ cli
     const useSplitView = cols >= 150;
 
     // Static component - no hooks that cause re-renders
-    const webBg = getResolvedTheme(defaultThemeName).background;
+    const webTheme = getResolvedTheme(defaultThemeName);
+    const webBg = webTheme.background;
+    const webText = rgbaToHex(webTheme.text);
+    const webAddedColor = rgbaToHex(webTheme.diffAddedBg);
+    const webRemovedColor = rgbaToHex(webTheme.diffRemovedBg);
     function WebApp() {
       return (
         <box
@@ -1307,9 +1333,9 @@ cli
                     alignItems: "center",
                   }}
                 >
-                  <text>{fileName.trim()}</text>
-                  <text fg="#00ff00"> +{additions}</text>
-                  <text fg="#ff0000">-{deletions}</text>
+                  <text fg={webText}>{fileName.trim()}</text>
+                  <text fg="#2d8a47"> +{additions}</text>
+                  <text fg="#c53b53">-{deletions}</text>
                 </box>
                 <DiffView
                   diff={file.rawDiff || ""}

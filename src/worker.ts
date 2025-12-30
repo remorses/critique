@@ -17,18 +17,47 @@ app.get("/", (c) => {
   return c.redirect("https://github.com/remorses/critique")
 })
 
+// Detect if request is from a mobile device
+function isMobileDevice(c: { req: { header: (name: string) => string | undefined } }): boolean {
+  // Check CF-Device-Type header (Cloudflare provides this on Enterprise/APO)
+  const cfDeviceType = c.req.header("CF-Device-Type")
+  if (cfDeviceType === "mobile" || cfDeviceType === "tablet") {
+    return true
+  }
+  if (cfDeviceType === "desktop") {
+    return false
+  }
+
+  // Check Sec-CH-UA-Mobile header (Chromium browsers only)
+  const secChUaMobile = c.req.header("Sec-CH-UA-Mobile")
+  if (secChUaMobile === "?1") {
+    return true
+  }
+  if (secChUaMobile === "?0") {
+    return false
+  }
+
+  // Fallback to User-Agent parsing with comprehensive regex
+  const userAgent = c.req.header("User-Agent") || ""
+  
+  // Comprehensive mobile detection regex (case-insensitive)
+  const mobileRegex = /Mobile|iP(hone|od|ad)|Android|BlackBerry|IEMobile|Kindle|Silk|NetFront|Opera M(obi|ini)|Windows Phone|webOS|Fennec|Minimo|UCBrowser|UCWEB|SonyEricsson|Symbian|Nintendo|PSP|PlayStation|MIDP|CLDC|AvantGo|Maemo|PalmOS|PalmSource|DoCoMo|UP\.Browser|Blazer|Xiino|OneBrowser/i
+  
+  return mobileRegex.test(userAgent)
+}
+
 // Upload HTML content
-// POST /upload with JSON body { html: string }
+// POST /upload with JSON body { html: string, htmlMobile?: string }
 // Returns { id: string, url: string }
 app.post("/upload", async (c) => {
   try {
-    const body = await c.req.json<{ html: string }>()
+    const body = await c.req.json<{ html: string; htmlMobile?: string }>()
 
     if (!body.html || typeof body.html !== "string") {
       return c.json({ error: "Missing or invalid 'html' field" }, 400)
     }
 
-    // Generate hash of the HTML content as the key (enables caching/deduplication)
+    // Generate hash of the desktop HTML content as the key (enables caching/deduplication)
     const encoder = new TextEncoder()
     const data = encoder.encode(body.html)
     const hashBuffer = await crypto.subtle.digest("SHA-256", data)
@@ -38,10 +67,17 @@ app.post("/upload", async (c) => {
     // Use first 32 chars of hash as ID (128 bits, secure against guessing)
     const id = hashHex.slice(0, 32)
 
-    // Store in KV with 7 day expiration
+    // Store desktop version in KV with 7 day expiration
     await c.env.CRITIQUE_KV.put(id, body.html, {
       expirationTtl: 60 * 60 * 24 * 7, // 7 days
     })
+
+    // Store mobile version if provided
+    if (body.htmlMobile && typeof body.htmlMobile === "string") {
+      await c.env.CRITIQUE_KV.put(`${id}-mobile`, body.htmlMobile, {
+        expirationTtl: 60 * 60 * 24 * 7, // 7 days
+      })
+    }
 
     const url = new URL(c.req.url)
     const viewUrl = `${url.origin}/view/${id}`
@@ -54,6 +90,7 @@ app.post("/upload", async (c) => {
 
 // View HTML content with streaming
 // GET /view/:id
+// Query params: ?v=desktop or ?v=mobile to force a version
 app.get("/view/:id", async (c) => {
   const id = c.req.param("id")
 
@@ -61,7 +98,21 @@ app.get("/view/:id", async (c) => {
     return c.text("Invalid ID", 400)
   }
 
-  const html = await c.env.CRITIQUE_KV.get(id)
+  // Check for forced version via query param
+  const forcedVersion = c.req.query("v")
+  const isMobile = forcedVersion === "mobile" || (forcedVersion !== "desktop" && isMobileDevice(c))
+
+  // Try to get the appropriate version
+  let html: string | null = null
+  if (isMobile) {
+    // Try mobile version first, fall back to desktop
+    html = await c.env.CRITIQUE_KV.get(`${id}-mobile`)
+    if (!html) {
+      html = await c.env.CRITIQUE_KV.get(id)
+    }
+  } else {
+    html = await c.env.CRITIQUE_KV.get(id)
+  }
 
   if (!html) {
     return c.text("Not found", 404)
@@ -71,6 +122,8 @@ app.get("/view/:id", async (c) => {
   return stream(c, async (s) => {
     // Set content type header
     c.header("Content-Type", "text/html; charset=utf-8")
+    // Vary by User-Agent and Sec-CH-UA-Mobile for proper caching
+    c.header("Vary", "User-Agent, Sec-CH-UA-Mobile")
     c.header("Cache-Control", "public, max-age=3600")
 
     // Stream in chunks for better performance
