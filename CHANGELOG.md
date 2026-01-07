@@ -5,6 +5,12 @@
 - Web command:
   - Add support for comparing two refs: `critique web <base> <head>`
   - Add `--filter <pattern>` option to filter files by glob pattern
+  - Add auto light/dark mode based on system preference (uses CSS `prefers-color-scheme`)
+  - Disabled when `--theme` is specified
+  - Fix browser rendering for Safari/Chrome subpixel issues
+- Themes:
+  - Change default theme to `github` (dark)
+  - Fix opencode theme line number contrast (was nearly invisible on dark background)
 
 # 0.1.9
 
