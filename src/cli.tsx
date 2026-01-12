@@ -566,7 +566,10 @@ cli
   .action(async (base, head, options) => {
     try {
       const contextArg = options.context ? `-U${options.context}` : "";
-      const filters = options.filter ? (Array.isArray(options.filter) ? options.filter : [options.filter]) : [];
+      // Combine --filter options with positional args after --
+      const filterOptions = options.filter ? (Array.isArray(options.filter) ? options.filter : [options.filter]) : [];
+      const positionalFilters = options['--'] || [];
+      const filters = [...filterOptions, ...positionalFilters];
       const filterArg = filters.length > 0 ? `-- ${filters.map((f: string) => `"${f}"`).join(" ")}` : "";
       const gitCommand = (() => {
         if (options.staged)
@@ -1031,12 +1034,16 @@ cli
   .option("--context <lines>", "Number of context lines (default: 3)")
   .option("--theme <name>", "Theme to use for rendering")
   .option("--filter <pattern>", "Filter files by glob pattern (can be used multiple times)")
+  .option("--title <title>", "HTML document title")
   .action(async (base, head, options) => {
     const pty = await import("@xmorse/bun-pty");
     const { ansiToHtmlDocument } = await import("./ansi-html.ts");
 
     const contextArg = options.context ? `-U${options.context}` : "";
-    const filters = options.filter ? (Array.isArray(options.filter) ? options.filter : [options.filter]) : [];
+    // Combine --filter options with positional args after --
+    const filterOptions = options.filter ? (Array.isArray(options.filter) ? options.filter : [options.filter]) : [];
+    const positionalFilters = options['--'] || [];
+    const filters = [...filterOptions, ...positionalFilters];
     const filterArg = filters.length > 0 ? `-- ${filters.map((f: string) => `"${f}"`).join(" ")}` : "";
     const gitCommand = (() => {
       if (options.staged)
@@ -1133,7 +1140,7 @@ cli
       const backgroundColor = rgbaToHex(theme.background);
       const textColor = rgbaToHex(theme.text);
 
-      return ansiToHtmlDocument(ansiOutput, { cols, rows: renderRows, backgroundColor, textColor, autoTheme: !customTheme });
+      return ansiToHtmlDocument(ansiOutput, { cols, rows: renderRows, backgroundColor, textColor, autoTheme: !customTheme, title: options.title });
     }
 
     // Generate desktop and mobile versions in parallel
@@ -1376,5 +1383,4 @@ cli
 
 cli.help();
 cli.version("1.0.0");
-// comment
 cli.parse();

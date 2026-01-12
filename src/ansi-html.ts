@@ -15,6 +15,8 @@ export interface AnsiToHtmlOptions {
   trimEmptyLines?: boolean
   /** Enable auto light/dark mode based on system preference */
   autoTheme?: boolean
+  /** HTML document title */
+  title?: string
 }
 
 /**
@@ -129,6 +131,7 @@ export function ansiToHtmlDocument(input: string | Buffer, options: AnsiToHtmlOp
     textColor = "#1a1a1a",
     fontFamily = "Monaco, Menlo, 'Ubuntu Mono', Consolas, monospace",
     fontSize = "14px",
+    title = "Critique Diff",
   } = options
 
   const content = ansiToHtml(input, options)
@@ -143,7 +146,7 @@ export function ansiToHtmlDocument(input: string | Buffer, options: AnsiToHtmlOp
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Critique Diff</title>
+<title>${escapeHtml(title)}</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 html {
@@ -189,10 +192,7 @@ ${options.autoTheme ? `@media (prefers-color-scheme: light) {
   html {
     filter: invert(1) hue-rotate(180deg);
   }
-}` : ''}
-</style>
-</head>
-<body>
+}` : ''}\nhtml{scrollbar-width:thin;scrollbar-color:#6b7280 #2d3748;}@media(prefers-color-scheme:light){html{scrollbar-color:#a0aec0 #edf2f7;}}::-webkit-scrollbar{width:12px;}::-webkit-scrollbar-track{background:#2d3748;}::-webkit-scrollbar-thumb{background:#6b7280;border-radius:6px;}::-webkit-scrollbar-thumb:hover{background:#a0aec0;}@media(prefers-color-scheme:light){::-webkit-scrollbar-track{background:#edf2f7;}::-webkit-scrollbar-thumb{background:#a0aec0;}::-webkit-scrollbar-thumb:hover{background:#cbd5e1;}}::-webkit-scrollbar {\n  width: 12px;\n}\n::-webkit-scrollbar-track {\n  background: #2d3748;\n}\n::-webkit-scrollbar-thumb {\n  background: #6b7280;\n  border-radius: 6px;\n}\n::-webkit-scrollbar-thumb:hover {\n  background: #a0aec0;\n}\n@media (prefers-color-scheme: light) {\n  ::-webkit-scrollbar-track {\n    background: #edf2f7;\n  }\n  ::-webkit-scrollbar-thumb {\n    background: #a0aec0;\n  }\n  ::-webkit-scrollbar-thumb:hover {\n    background: #cbd5e1;\n  }\n}\n</style>\n</head>\n<body>
 <div id="content">
 ${content}
 </div>

@@ -1,3 +1,11 @@
+# 0.1.11
+
+- All commands:
+  - Add support for passing file filters as positional args after `--` (e.g. `critique web -- src/cli.tsx`)
+- Web command:
+  - Add `--title` option for custom HTML document title
+  - Add scrollbar styling to HTML output (dark/light mode aware)
+
 # 0.1.10
 
 - Default command:
