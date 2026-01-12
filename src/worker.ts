@@ -80,7 +80,7 @@ app.post("/upload", async (c) => {
     }
 
     const url = new URL(c.req.url)
-    const viewUrl = `${url.origin}/view/${id}`
+    const viewUrl = `${url.origin}/v/${id}`
 
     return c.json({ id, url: viewUrl })
   } catch (error) {
@@ -89,10 +89,10 @@ app.post("/upload", async (c) => {
 })
 
 // View HTML content with streaming
-// GET /view/:id
+// GET /v/:id (short) or /view/:id (legacy)
 // Query params: ?v=desktop or ?v=mobile to select version
 // Server redirects mobile devices to ?v=mobile, client JS also handles redirect
-app.get("/view/:id", async (c) => {
+async function handleView(c: any) {
   const id = c.req.param("id")
 
   if (!id || !/^[a-f0-9]{16,32}$/.test(id)) {
@@ -144,7 +144,10 @@ app.get("/view/:id", async (c) => {
       offset += chunkSize
     }
   })
-})
+}
+
+app.get("/v/:id", handleView)
+app.get("/view/:id", handleView)
 
 // Get raw HTML content (for debugging/API access)
 // GET /raw/:id
@@ -167,8 +170,8 @@ app.get("/raw/:id", async (c) => {
 })
 
 // Check if content exists
-// HEAD /view/:id
-app.on("HEAD", "/view/:id", async (c) => {
+// HEAD /v/:id or /view/:id
+async function handleHead(c: any) {
   const id = c.req.param("id")
 
   if (!id || !/^[a-f0-9]{16,32}$/.test(id)) {
@@ -183,6 +186,9 @@ app.on("HEAD", "/view/:id", async (c) => {
 
   c.header("Content-Length", String(html.length))
   return c.body(null, 200)
-})
+}
+
+app.on("HEAD", "/v/:id", handleHead)
+app.on("HEAD", "/view/:id", handleHead)
 
 export default app
