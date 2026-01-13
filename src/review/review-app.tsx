@@ -104,11 +104,9 @@ export function ReviewApp({
 export interface ReviewAppViewProps {
   hunks: IndexedHunk[]
   reviewData: ReviewYaml | null
-  currentGroupIndex: number
   isGenerating: boolean
-  themeName: string
+  themeName?: string
   width: number
-  scrollAcceleration?: { tick: (delta: number) => number; reset: () => void }
 }
 
 /**
@@ -118,12 +116,12 @@ export interface ReviewAppViewProps {
 export function ReviewAppView({
   hunks,
   reviewData,
-  currentGroupIndex,
   isGenerating,
-  themeName,
+  themeName = defaultThemeName,
   width,
-  scrollAcceleration,
 }: ReviewAppViewProps) {
+  const [scrollAcceleration] = React.useState(() => new ScrollAcceleration())
+
   // Create a map of hunk ID to hunk for quick lookup
   const hunkMap = React.useMemo(() => new Map(hunks.map((h) => [h.id, h])), [hunks])
 
@@ -170,9 +168,8 @@ export function ReviewAppView({
   }
 
   const groups = reviewData.hunks
-  const currentGroup = groups[currentGroupIndex]
 
-  if (!currentGroup) {
+  if (groups.length === 0) {
     return (
       <box
         style={{
@@ -187,11 +184,6 @@ export function ReviewAppView({
     )
   }
 
-  // Get the hunks for the current group
-  const groupHunks = currentGroup.hunkIds
-    .map((id) => hunkMap.get(id))
-    .filter((h): h is IndexedHunk => h !== undefined)
-
   return (
     <box
       style={{
@@ -201,7 +193,7 @@ export function ReviewAppView({
         backgroundColor: bgColor,
       }}
     >
-      {/* Scrollable content */}
+      {/* Scrollable content - shows ALL groups */}
       <scrollbox
         scrollAcceleration={scrollAcceleration}
         style={{
@@ -221,24 +213,34 @@ export function ReviewAppView({
         focused
       >
         <box style={{ flexDirection: "column" }}>
-          {/* Markdown description */}
-          <MarkdownBlock
-            content={currentGroup.markdownDescription}
-            theme={resolvedTheme}
-            width={width}
-          />
+          {groups.map((group, groupIdx) => {
+            const groupHunks = group.hunkIds
+              .map((id) => hunkMap.get(id))
+              .filter((h): h is IndexedHunk => h !== undefined)
 
-          {/* Hunks */}
-          {groupHunks.map((hunk, idx) => (
-            <box key={hunk.id}>
-              <HunkView
-                hunk={hunk}
-                themeName={themeName}
-                width={width}
-                isLast={idx === groupHunks.length - 1}
-              />
-            </box>
-          ))}
+            return (
+              <box key={groupIdx} style={{ flexDirection: "column", marginBottom: groupIdx < groups.length - 1 ? 2 : 0 }}>
+                {/* Markdown description */}
+                <MarkdownBlock
+                  content={group.markdownDescription}
+                  theme={resolvedTheme}
+                  width={width}
+                />
+
+                {/* Hunks */}
+                {groupHunks.map((hunk, idx) => (
+                  <box key={hunk.id}>
+                    <HunkView
+                      hunk={hunk}
+                      themeName={themeName}
+                      width={width}
+                      isLast={idx === groupHunks.length - 1}
+                    />
+                  </box>
+                ))}
+              </box>
+            )
+          })}
         </box>
       </scrollbox>
 
@@ -253,19 +255,15 @@ export function ReviewAppView({
           alignItems: "center",
         }}
       >
-        <text fg="#ffffff">{"<-"}</text>
-        <text fg="#666666"> prev</text>
         <box flexGrow={1} />
         <text fg="#ffffff">q</text>
         <text fg="#666666"> quit  </text>
         <text fg="#ffffff">j/k</text>
-        <text fg="#666666"> navigate  </text>
+        <text fg="#666666"> scroll  </text>
         <text fg="#666666">
-          ({currentGroupIndex + 1}/{groups.length})
+          ({groups.length} section{groups.length !== 1 ? "s" : ""})
         </text>
         <box flexGrow={1} />
-        <text fg="#666666">next </text>
-        <text fg="#ffffff">{"->"}</text>
       </box>
     </box>
   )
