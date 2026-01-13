@@ -82,18 +82,44 @@ export class OpencodeAcpClient {
 
   /**
    * List sessions for the given working directory
-   * NOTE: opencode doesn't support this yet, so we early return
+   * Uses CLI command for opencode since ACP doesn't support listSessions yet
    */
   async listSessions(cwd: string): Promise<SessionInfo[]> {
-    if (!this.client) {
-      throw new Error("Client not connected")
+    // Use CLI command to list sessions (opencode ACP doesn't support this yet)
+    const result = Bun.spawnSync(["opencode", "session", "list", "--format", "json"], {
+      cwd,
+      stdout: "pipe",
+      stderr: "pipe",
+    })
+
+    if (result.exitCode !== 0) {
+      return []
     }
 
-    // TODO: opencode doesn't support unstable_listSessions yet
-    // Early return with empty array for now
-    return []
+    try {
+      const sessions = JSON.parse(result.stdout.toString()) as Array<{
+        id: string
+        title: string
+        updated: number
+        created: number
+        projectId: string
+        directory: string
+      }>
 
-    /* Real implementation for when opencode supports it:
+      // Filter sessions to only those matching the cwd
+      return sessions
+        .filter((s) => s.directory === cwd)
+        .map((s) => ({
+          sessionId: s.id,
+          cwd: s.directory,
+          title: s.title || undefined,
+          updatedAt: s.updated,
+        }))
+    } catch {
+      return []
+    }
+
+    /* ACP implementation for CLIs that support unstable_listSessions:
     if (this.client) {
       const response = await this.client.unstable_listSessions({ cwd })
       return response.sessions.map((s: AcpSessionInfo) => ({
