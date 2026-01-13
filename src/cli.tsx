@@ -13,7 +13,6 @@ import { promisify } from "util";
 import {
   createCliRenderer,
   MacOSScrollAccel,
-  SyntaxStyle,
 } from "@opentui/core";
 import fs from "fs";
 import { tmpdir, homedir } from "os";
@@ -21,6 +20,7 @@ import { join } from "path";
 import { create } from "zustand";
 import Dropdown from "./dropdown.tsx";
 import { debounce } from "./utils.ts";
+import { DiffView } from "./components/diff-view.tsx";
 import {
   buildGitCommand,
   getFileName,
@@ -78,7 +78,133 @@ function savePersistedState(state: PersistedState): void {
 
 const persistedState = loadPersistedState();
 
+// Review mode handler
+async function runReviewMode(gitCommand: string, agent: string) {
+  const { tmpdir } = await import("os");
+  const { join } = await import("path");
 
+  // Get the diff
+  const { stdout: gitDiff } = await execAsync(gitCommand, {
+    encoding: "utf-8",
+  });
+
+  if (!gitDiff.trim()) {
+    console.log("No changes to review");
+    process.exit(0);
+  }
+
+  // Lazy load review module
+  const {
+    parseHunksWithIds,
+    hunksToContextXml,
+    createAcpClient,
+    sessionsToContextXml,
+    compressSession,
+  } = await import("./review/index.ts");
+  const { ReviewApp } = await import("./review/review-app.tsx");
+
+  // Parse hunks with IDs
+  const hunks = await parseHunksWithIds(gitDiff);
+
+  if (hunks.length === 0) {
+    console.log("No hunks to review");
+    process.exit(0);
+  }
+
+  console.log(`Found ${hunks.length} hunks to review`);
+  console.log("Connecting to opencode ACP...");
+
+  // Create temp file for YAML output
+  const yamlPath = join(tmpdir(), `critique-review-${Date.now()}.yaml`);
+  fs.writeFileSync(yamlPath, "");
+
+  // Connect to ACP
+  let acpClient: Awaited<ReturnType<typeof createAcpClient>> | null = null;
+  let isGenerating = true;
+
+  try {
+    acpClient = await createAcpClient();
+
+    // List sessions (will return empty for now since opencode doesn't support it)
+    const cwd = process.cwd();
+    const sessions = await acpClient.listSessions(cwd);
+
+    // Build session context (empty for now)
+    let sessionsContext = "";
+    if (sessions.length > 0) {
+      // Load and compress sessions
+      const compressedSessions: Awaited<ReturnType<typeof compressSession>>[] = [];
+      for (const sessionInfo of sessions.slice(0, 3)) {
+        // Load max 3 recent sessions
+        try {
+          const content = await acpClient.loadSessionContent(sessionInfo.sessionId, cwd);
+          compressedSessions.push(compressSession(content));
+        } catch {
+          // Skip sessions that fail to load
+        }
+      }
+      sessionsContext = sessionsToContextXml(compressedSessions);
+    }
+
+    // Build hunks context
+    const hunksContext = hunksToContextXml(hunks);
+
+    console.log("Starting review analysis...");
+
+    // Start the TUI
+    const renderer = await createCliRenderer({
+      onDestroy() {
+        // Clean up ACP client and temp file
+        if (acpClient) {
+          acpClient.close();
+        }
+        try {
+          fs.unlinkSync(yamlPath);
+        } catch {
+          // Ignore cleanup errors
+        }
+        process.exit(0);
+      },
+      exitOnCtrlC: true,
+    });
+
+    // Create the review session in background
+    const reviewPromise = acpClient.createReviewSession(
+      cwd,
+      hunksContext,
+      sessionsContext,
+      yamlPath,
+    ).then(() => {
+      isGenerating = false;
+    }).catch((error) => {
+      console.error("Review generation failed:", error);
+      isGenerating = false;
+    });
+
+    // Render the review app
+    createRoot(renderer).render(
+      React.createElement(
+        ErrorBoundary,
+        null,
+        React.createElement(ReviewApp, {
+          hunks,
+          yamlPath,
+          themeName: persistedState.themeName ?? defaultThemeName,
+          isGenerating,
+        }),
+      ),
+    );
+
+    // Wait for review to complete (TUI will handle user interaction)
+    await reviewPromise;
+  } catch (error) {
+    console.error("Review mode error:", error);
+    if (acpClient) {
+      await acpClient.close();
+    }
+    process.exit(1);
+  }
+}
 
 // Error boundary component
 class ErrorBoundary extends React.Component<
@@ -171,43 +297,6 @@ useDiffStore.subscribe((state) => {
 
 interface AppProps {
   parsedFiles: ParsedFile[];
-}
-
-interface DiffViewProps {
-  diff: string;
-  view: "split" | "unified";
-  filetype?: string;
-  themeName: string;
-}
-
-function DiffView({ diff, view, filetype, themeName }: DiffViewProps) {
-  const syntaxTheme = getSyntaxTheme(themeName);
-  const resolvedTheme = getResolvedTheme(themeName);
-  const syntaxStyle = React.useMemo(
-    () => SyntaxStyle.fromStyles(syntaxTheme),
-    [themeName],
-  );
-
-  return (
-    <diff
-      diff={diff}
-      view={view}
-      treeSitterClient={undefined}
-      filetype={filetype}
-      syntaxStyle={syntaxStyle}
-      showLineNumbers
-      wrapMode="wrap"
-      addedContentBg={resolvedTheme.diffAddedBg}
-      removedContentBg={resolvedTheme.diffRemovedBg}
-      contextContentBg={resolvedTheme.backgroundPanel}
-      lineNumberFg={resolvedTheme.diffLineNumber}
-      lineNumberBg={resolvedTheme.backgroundPanel}
-      addedLineNumberBg={resolvedTheme.diffAddedLineNumberBg}
-      removedLineNumberBg={resolvedTheme.diffRemovedLineNumberBg}
-      selectionBg="#264F78"
-      selectionFg="#FFFFFF"
-    />
-  );
 }
 
 function App({ parsedFiles }: AppProps) {
@@ -645,6 +734,37 @@ cli
       );
     } catch (error) {
       console.error("Error getting git diff:", error);
+      process.exit(1);
+    }
+  });
+
+cli
+  .command("explain [base] [head]", "AI-powered diff explanation and review")
+  .option("--agent <name>", "AI agent to use (default: opencode)", { default: "opencode" })
+  .option("--staged", "Explain staged changes")
+  .option("--commit <ref>", "Explain changes from a specific commit")
+  .option("--context <lines>", "Number of context lines (default: 3)")
+  .option("--filter <pattern>", "Filter files by glob pattern")
+  .action(async (base, head, options) => {
+    try {
+      if (options.agent !== "opencode") {
+        console.error(`Unknown agent: ${options.agent}. Supported: opencode`);
+        process.exit(1);
+      }
+
+      const gitCommand = buildGitCommand({
+        staged: options.staged,
+        commit: options.commit,
+        base,
+        head,
+        context: options.context,
+        filter: options.filter,
+        positionalFilters: options['--'],
+      });
+
+      await runReviewMode(gitCommand, options.agent);
+    } catch (error) {
+      console.error("Error running explain:", error);
       process.exit(1);
     }
   });

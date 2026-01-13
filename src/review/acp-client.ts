@@ -1,0 +1,261 @@
+// ACP client for connecting to opencode agent
+
+import {
+  ClientSideConnection,
+  ndJsonStream,
+  type SessionNotification,
+  type SessionInfo as AcpSessionInfo,
+} from "@agentclientprotocol/sdk"
+import type { SessionInfo, SessionContent } from "./types.ts"
+
+/**
+ * Client for communicating with opencode via ACP protocol
+ */
+export class OpencodeAcpClient {
+  private proc: ReturnType<typeof Bun.spawn> | null = null
+  private client: ClientSideConnection | null = null
+  private sessionUpdates: Map<string, SessionNotification[]> = new Map()
+
+  constructor() {
+    this.connect = this.connect.bind(this)
+    this.listSessions = this.listSessions.bind(this)
+    this.loadSessionContent = this.loadSessionContent.bind(this)
+    this.createReviewSession = this.createReviewSession.bind(this)
+    this.close = this.close.bind(this)
+  }
+
+  /**
+   * Spawn opencode ACP server and establish connection
+   */
+  async connect(): Promise<void> {
+    // Spawn opencode in ACP mode
+    this.proc = Bun.spawn(["bunx", "opencode", "acp"], {
+      stdin: "pipe",
+      stdout: "pipe",
+      stderr: "inherit",
+    })
+
+    const procStdin = this.proc.stdin
+    const procStdout = this.proc.stdout
+
+    if (!procStdin || !procStdout) {
+      throw new Error("Failed to create stdin/stdout pipes")
+    }
+
+    // Create writable stream adapter for Bun
+    const stdin = new WritableStream<Uint8Array>({
+      write: (chunk) => {
+        if (typeof procStdin !== "number" && "write" in procStdin) {
+          procStdin.write(chunk)
+        }
+      },
+    })
+
+    // Create readable stream from Bun stdout
+    const stdout = procStdout as ReadableStream<Uint8Array>
+
+    // Create the ndjson stream for ACP communication
+    const stream = ndJsonStream(stdin, stdout)
+
+    // Bind sessionUpdates to use in the handler
+    const sessionUpdates = this.sessionUpdates
+    this.client = new ClientSideConnection(
+      () => ({
+        async sessionUpdate(params: SessionNotification) {
+          const updates = sessionUpdates.get(params.sessionId) || []
+          updates.push(params)
+          sessionUpdates.set(params.sessionId, updates)
+        },
+        async requestPermission() {
+          return { outcome: { outcome: "cancelled" as const } }
+        },
+      }),
+      stream,
+    )
+
+    // Initialize the connection
+    await this.client.initialize({
+      protocolVersion: 1,
+      clientCapabilities: {},
+    })
+  }
+
+  /**
+   * List sessions for the given working directory
+   * NOTE: opencode doesn't support this yet, so we early return
+   */
+  async listSessions(cwd: string): Promise<SessionInfo[]> {
+    if (!this.client) {
+      throw new Error("Client not connected")
+    }
+
+    // TODO: opencode doesn't support unstable_listSessions yet
+    // Early return with empty array for now
+    return []
+
+    /* Real implementation for when opencode supports it:
+    if (this.client) {
+      const response = await this.client.unstable_listSessions({ cwd })
+      return response.sessions.map((s: AcpSessionInfo) => ({
+        sessionId: s.sessionId,
+        cwd: s.cwd,
+        title: s.title ?? undefined,
+        updatedAt: s.updatedAt ?? undefined,
+      }))
+    }
+    return []
+    */
+  }
+
+  /**
+   * Load a session and return its content
+   */
+  async loadSessionContent(sessionId: string, cwd: string): Promise<SessionContent> {
+    if (!this.client) {
+      throw new Error("Client not connected")
+    }
+
+    // Clear any existing updates for this session
+    this.sessionUpdates.set(sessionId, [])
+
+    // Load the session - this will stream updates via sessionUpdate handler
+    if (this.client.loadSession) {
+      await this.client.loadSession({
+        sessionId,
+        cwd,
+        mcpServers: [],
+      })
+    }
+
+    // Return collected notifications
+    return {
+      sessionId,
+      notifications: this.sessionUpdates.get(sessionId) || [],
+    }
+  }
+
+  /**
+   * Create a new session and send the review prompt
+   * Returns when the prompt completes
+   */
+  async createReviewSession(
+    cwd: string,
+    hunksContext: string,
+    sessionsContext: string,
+    outputPath: string,
+    onUpdate?: (notification: SessionNotification) => void,
+  ): Promise<void> {
+    if (!this.client) {
+      throw new Error("Client not connected")
+    }
+
+    // Create new session
+    const { sessionId } = await this.client.newSession({
+      cwd,
+      mcpServers: [],
+    })
+
+    // Set up update handler if provided
+    if (onUpdate) {
+      const originalUpdates = this.sessionUpdates.get(sessionId) || []
+      this.sessionUpdates.set(sessionId, originalUpdates)
+
+      // Create a new connection handler that calls onUpdate
+      // Note: This is a simplification - in practice you'd want to
+      // wire this up before creating the session
+    }
+
+    // Build the review prompt
+    const prompt = buildReviewPrompt(hunksContext, sessionsContext, outputPath)
+
+    // Send the prompt and wait for completion
+    await this.client.prompt({
+      sessionId,
+      prompt: [{ type: "text", text: prompt }],
+    })
+  }
+
+  /**
+   * Get collected session updates
+   */
+  getSessionUpdates(sessionId: string): SessionNotification[] {
+    return this.sessionUpdates.get(sessionId) || []
+  }
+
+  /**
+   * Close the connection and kill the process
+   */
+  async close(): Promise<void> {
+    if (this.proc) {
+      this.proc.kill()
+      this.proc = null
+    }
+    this.client = null
+    this.sessionUpdates.clear()
+  }
+}
+
+/**
+ * Build the review prompt for the AI
+ */
+function buildReviewPrompt(
+  hunksContext: string,
+  sessionsContext: string,
+  outputPath: string,
+): string {
+  return `You are reviewing a git diff. Your task is to analyze the changes and group related hunks together with clear markdown descriptions.
+
+<task>
+Review the following git diff hunks. Group related hunks together and provide a concise markdown description explaining what each group of changes does.
+
+Write your output to the file at: ${outputPath}
+
+Use this YAML format, updating the file progressively as you analyze each group:
+
+\`\`\`yaml
+hunks:
+- hunkIds: [1, 2]
+  markdownDescription: |
+    ## Brief title
+    
+    Description of what these changes do and why they're related...
+- hunkIds: [3]
+  markdownDescription: |
+    ## Another title
+    
+    Description...
+\`\`\`
+
+Guidelines:
+- Group hunks that are logically related (same feature, same refactor, etc.)
+- Order groups for optimal code review flow:
+  1. Infrastructure/config changes first
+  2. Core/shared code changes
+  3. Feature implementations
+  4. Tests
+  5. Documentation
+- Keep descriptions concise but informative
+- Mention file names when relevant
+- Highlight any potential issues or things to pay attention to
+</task>
+
+<hunks>
+${hunksContext}
+</hunks>
+
+${sessionsContext ? `<session-context>
+The following is context from coding sessions that may have created these changes:
+${sessionsContext}
+</session-context>` : ""}
+
+Now analyze the hunks and write the review YAML to ${outputPath}.`
+}
+
+/**
+ * Create and connect an ACP client
+ */
+export async function createAcpClient(): Promise<OpencodeAcpClient> {
+  const client = new OpencodeAcpClient()
+  await client.connect()
+  return client
+}

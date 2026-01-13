@@ -1,3 +1,33 @@
+# 0.1.14
+
+- New `explain` command:
+  - AI-powered diff explanation and review using ACP (Agent Client Protocol)
+  - Usage: `critique explain [base] [head]`
+  - Options:
+    - `--agent <name>` - AI agent to use (default: opencode)
+    - `--staged` - Explain staged changes
+    - `--commit <ref>` - Explain changes from a specific commit
+    - `--filter <pattern>` - Filter files by glob pattern
+  - Features:
+    - Parses git diff into indexed hunks with unique IDs
+    - Connects to opencode via ACP to analyze changes
+    - AI groups related hunks and generates markdown descriptions
+    - Streams results as YAML file is updated
+    - Renders scrollable TUI with prose descriptions above each hunk group
+    - Supports keyboard navigation (j/k or arrows) between groups
+    - Uses split view for hunks with both additions and deletions
+    - Centers prose descriptions with max-width 80
+  - New dependencies: `js-yaml`, `@agentclientprotocol/sdk`
+- New `src/review/` module:
+  - `acp-client.ts` - ACP client for opencode communication
+  - `hunk-parser.ts` - Parse diffs into indexed hunks with `buildPatch`/`createHunk` helpers
+  - `session-context.ts` - Compress sessions for AI context
+  - `yaml-watcher.ts` - Watch and parse streaming YAML output
+  - `review-app.tsx` - TUI component for review mode
+  - `review-app.test.tsx` - Inline snapshot tests using opentui test renderer
+- New `src/components/` module:
+  - `diff-view.tsx` - Shared DiffView component extracted from cli.tsx
+
 # 0.1.13
 
 - Docs:
