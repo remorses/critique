@@ -119,6 +119,74 @@ Database configuration now reads from environment variables:
   ],
 }
 
+// Large hunk that can be split into parts
+const largeHunk = createHunk(1, "src/api/handlers.ts", 0, 10, 10, [
+  " export async function handleRequest(req: Request) {",
+  "-  const data = req.body",
+  "+  // Input validation",
+  "+  if (!req.body) {",
+  "+    throw new ValidationError('Request body is required')",
+  "+  }",
+  "+  const data = validateInput(req.body)",
+  " ",
+  "   // Process the request",
+  "-  const result = process(data)",
+  "+  const result = await processAsync(data)",
+  "+  ",
+  "+  // Logging",
+  "+  logger.info('Request processed', { requestId: req.id })",
+  " ",
+  "   return result",
+  " }",
+])
+
+// Review data that splits the large hunk into two parts
+const partialHunkReviewData: ReviewYaml = {
+  hunks: [
+    {
+      // First part: lines 1-7 (1-based) - validation changes
+      hunkId: 1,
+      lineRange: [1, 7],
+      markdownDescription: `## Input Validation
+
+Added proper input validation at the start of the handler:
+- Check for missing request body
+- Validate input before processing`,
+    },
+    {
+      // Second part: lines 8-16 (1-based) - processing and logging
+      hunkId: 1,
+      lineRange: [8, 16],
+      markdownDescription: `## Async Processing and Logging
+
+Improved the processing logic:
+- Made process call async for better performance
+- Added request logging for debugging`,
+    },
+  ],
+}
+
+// Mix of full hunks and partial hunks
+const mixedHunkReviewData: ReviewYaml = {
+  hunks: [
+    {
+      // Full hunk using hunkIds
+      hunkIds: [3],
+      markdownDescription: `## Import changes
+
+Added logger import.`,
+    },
+    {
+      // Partial hunk - just the validation part
+      hunkId: 1,
+      lineRange: [1, 7],
+      markdownDescription: `## Validation
+
+Input validation logic.`,
+    },
+  ],
+}
+
 describe("ReviewAppView", () => {
   let testSetup: Awaited<ReturnType<typeof testRender>>
 
@@ -422,6 +490,253 @@ describe("ReviewAppView", () => {
                                                                                                                                                   
                                                             q quit  j/k scroll  (3 sections)                                                      
                                                                                                                                                   
+      "
+    `)
+  })
+
+  it("should render partial hunk - first part only", async () => {
+    // Test splitting a hunk - show only lines 1-7 (validation part)
+    testSetup = await testRender(
+      <ReviewAppView
+        hunks={[largeHunk]}
+        reviewData={{
+          hunks: [{
+            hunkId: 1,
+            lineRange: [1, 7],
+            markdownDescription: `## Input Validation
+
+Added validation at handler start.`,
+          }],
+        }}
+        isGenerating={false}
+        themeName="github"
+        width={100}
+      />,
+      {
+        width: 100,
+        height: 25,
+      },
+    )
+
+    await testSetup.renderOnce()
+    const frame = testSetup.captureCharFrame()
+    // Should only show lines 1-7 of the hunk, not the full thing
+    expect(frame).toMatchInlineSnapshot(`
+      "                                                                                                    
+                 Input Validation                                                                       █ 
+                                                                                                        █ 
+                 Added validation at handler start.                                                     █ 
+                                                                                                        █ 
+        #1 src/api/handlers.ts +5-1                                                                     █ 
+        10   export async function handleRequest(req:    10   export async function handleRequest(req:  █ 
+             Request) {                                       Request) {                                █ 
+        11 -   const data = req.body                     11 +   // Input validation                     █ 
+                                                         12 +   if (!req.body) {                        █ 
+                                                         13 +     throw new ValidationError('Request    █ 
+                                                              body is required')                        ▀ 
+                                                         14 +   }                                         
+                                                         15 +   const data = validateInput(req.body)      
+                                                                                                          
+                                                                                                          
+                                                                                                          
+                                                                                                          
+                                                                                                          
+                                                                                                          
+                                                                                                          
+                                                                                                          
+                                                                                                          
+                                        q quit  j/k scroll  (1 section)                                   
+                                                                                                          
+      "
+    `)
+  })
+
+  it("should render same hunk split into two parts with different descriptions", async () => {
+    // Test: same hunk appears twice with different line ranges and descriptions
+    testSetup = await testRender(
+      <ReviewAppView
+        hunks={[largeHunk]}
+        reviewData={partialHunkReviewData}
+        isGenerating={false}
+        themeName="github"
+        width={120}
+      />,
+      {
+        width: 120,
+        height: 50,
+      },
+    )
+
+    await testSetup.renderOnce()
+    const frame = testSetup.captureCharFrame()
+    // Should show two sections: validation (lines 1-7) then processing (lines 8-16)
+    expect(frame).toMatchInlineSnapshot(`
+      "                                                                                                                        
+                           Input Validation                                                                                 █ 
+                                                                                                                            █ 
+                           Added proper input validation at the start of the handler:                                       █ 
+                           - Check for missing request body                                                                 █ 
+                           - Validate input before processing                                                               █ 
+                                                                                                                            █ 
+        #1 src/api/handlers.ts +5-1                                                                                         █ 
+        10   export async function handleRequest(req: Request) {   10   export async function handleRequest(req: Request) { █ 
+        11 -   const data = req.body                               11 +   // Input validation                               █ 
+                                                                   12 +   if (!req.body) {                                  █ 
+                                                                   13 +     throw new ValidationError('Request body is      █ 
+                                                                        required')                                          █ 
+                                                                   14 +   }                                                 █ 
+                                                                   15 +   const data = validateInput(req.body)              █ 
+                                                                                                                            █ 
+                                                                                                                            █ 
+                           Async Processing and Logging                                                                     █ 
+                                                                                                                            █ 
+                           Improved the processing logic:                                                                   █ 
+                           - Made process call async for better performance                                                 █ 
+                           - Added request logging for debugging                                                            █ 
+                                                                                                                            █ 
+        #1 src/api/handlers.ts +4-1                                                                                         █ 
+        12                                                         16                                                         
+        13     // Process the request                              17     // Process the request                              
+        14 -   const result = process(data)                        18 +   const result = await processAsync(data)             
+                                                                   19 +                                                       
+                                                                   20 +   // Logging                                          
+                                                                   21 +   logger.info('Request processed', { requestId: req.  
+        15                                                              id })                                                 
+        16     return result                                       22                                                         
+                                                                   23     return result                                       
+                                                                                                                              
+                                                                                                                              
+                                                                                                                              
+                                                                                                                              
+                                                                                                                              
+                                                                                                                              
+                                                                                                                              
+                                                                                                                              
+                                                                                                                              
+                                                                                                                              
+                                                                                                                              
+                                                                                                                              
+                                                                                                                              
+                                                                                                                              
+                                                                                                                              
+                                                  q quit  j/k scroll  (2 sections)                                            
+                                                                                                                              
+      "
+    `)
+  })
+
+  it("should render mix of full hunks and partial hunks", async () => {
+    // Combine full hunk (hunkIds) with partial hunk (hunkId + lineRange)
+    testSetup = await testRender(
+      <ReviewAppView
+        hunks={[...exampleHunks, largeHunk]}
+        reviewData={mixedHunkReviewData}
+        isGenerating={false}
+        themeName="github"
+        width={100}
+      />,
+      {
+        width: 100,
+        height: 35,
+      },
+    )
+
+    await testSetup.renderOnce()
+    const frame = testSetup.captureCharFrame()
+    // Should show: full hunk #3, then partial of largeHunk (lines 1-7)
+    expect(frame).toMatchInlineSnapshot(`
+      "                                                                                                    
+                 Import changes                                                                         █ 
+                                                                                                        █ 
+                 Added logger import.                                                                   █ 
+                                                                                                        █ 
+        #3 src/index.ts +1-0                                                                            █ 
+        1   import { main } from './utils'                                                              █ 
+        2 + import { logger } from './logger'                                                           █ 
+                                                                                                        █ 
+                                                                                                        █ 
+                 Validation                                                                             █ 
+                                                                                                        █ 
+                 Input validation logic.                                                                █ 
+                                                                                                        █ 
+        #1 src/api/handlers.ts +5-1                                                                     █ 
+        10   export async function handleRequest(req:    10   export async function handleRequest(req:  █ 
+             Request) {                                       Request) {                                ▀ 
+        11 -   const data = req.body                     11 +   // Input validation                       
+                                                         12 +   if (!req.body) {                          
+                                                         13 +     throw new ValidationError('Request      
+                                                              body is required')                          
+                                                         14 +   }                                         
+                                                         15 +   const data = validateInput(req.body)      
+                                                                                                          
+                                                                                                          
+                                                                                                          
+                                                                                                          
+                                                                                                          
+                                                                                                          
+                                                                                                          
+                                                                                                          
+                                                                                                          
+                                                                                                          
+                                        q quit  j/k scroll  (2 sections)                                  
+                                                                                                          
+      "
+    `)
+  })
+
+  it("should handle single hunkId without lineRange as full hunk", async () => {
+    // hunkId without lineRange should show entire hunk
+    testSetup = await testRender(
+      <ReviewAppView
+        hunks={exampleHunks}
+        reviewData={{
+          hunks: [{
+            hunkId: 1,
+            // No lineRange - should show full hunk
+            markdownDescription: `## Full hunk via hunkId
+
+This uses hunkId instead of hunkIds but shows full hunk.`,
+          }],
+        }}
+        isGenerating={false}
+        themeName="github"
+        width={100}
+      />,
+      {
+        width: 100,
+        height: 25,
+      },
+    )
+
+    await testSetup.renderOnce()
+    const frame = testSetup.captureCharFrame()
+    // Should show full hunk #1
+    expect(frame).toMatchInlineSnapshot(`
+      "                                                                                                    
+                 Full hunk via hunkId                                                                   █ 
+                                                                                                        █ 
+                 This uses hunkId instead of hunkIds but shows full hunk.                               █ 
+                                                                                                        █ 
+        #1 src/utils.ts +3-1                                                                            █ 
+        10   function helper() {                         10   function helper() {                       █ 
+        11 -   return null                               11 +   // Add validation                       █ 
+                                                         12 +   if (!input) return null                 █ 
+                                                         13 +   return process(input)                   █ 
+        12   }                                           14   }                                         █ 
+                                                                                                        ▀ 
+                                                                                                          
+                                                                                                          
+                                                                                                          
+                                                                                                          
+                                                                                                          
+                                                                                                          
+                                                                                                          
+                                                                                                          
+                                                                                                          
+                                                                                                          
+                                                                                                          
+                                        q quit  j/k scroll  (1 section)                                   
+                                                                                                          
       "
     `)
   })

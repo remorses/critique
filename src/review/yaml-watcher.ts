@@ -77,7 +77,7 @@ export function watchReviewYaml(
 
 /**
  * Parse potentially incomplete YAML content
- * Handles partial writes gracefully
+ * Simply tries to parse - if it fails, the file isn't ready yet
  */
 function parsePartialYaml(content: string): ReviewYaml | null {
   // Remove markdown code fences if present
@@ -100,56 +100,31 @@ function parsePartialYaml(content: string): ReviewYaml | null {
     if (Array.isArray(parsed.hunks)) {
       for (const item of parsed.hunks) {
         if (isValidReviewGroup(item)) {
-          result.hunks.push({
-            hunkIds: item.hunkIds,
-            markdownDescription: item.markdownDescription || "",
-          })
+          const group: ReviewGroup = {
+            markdownDescription: dedentDescription(String(item.markdownDescription || "")),
+          }
+          
+          // Support both formats
+          if (item.hunkIds) {
+            group.hunkIds = item.hunkIds
+          }
+          if (item.hunkId !== undefined) {
+            group.hunkId = item.hunkId
+          }
+          if (item.lineRange) {
+            group.lineRange = item.lineRange
+          }
+          
+          result.hunks.push(group)
         }
       }
     }
 
     return result
   } catch {
-    // YAML parsing failed - probably incomplete
-    // Try to salvage what we can by parsing up to the last complete entry
-    return tryPartialParse(content)
+    // YAML parsing failed - file probably not ready yet, ignore
+    return null
   }
-}
-
-/**
- * Try to parse a partial YAML document by finding complete entries
- */
-function tryPartialParse(content: string): ReviewYaml | null {
-  const result: ReviewYaml = { hunks: [] }
-
-  // Find all complete hunk entries using regex
-  // Look for patterns like:
-  // - hunkIds: [1, 2]
-  //   markdownDescription: |
-  //     ...content...
-  const entryPattern = /-\s*hunkIds:\s*\[([^\]]+)\]\s*\n\s*markdownDescription:\s*\|?\s*\n([\s\S]*?)(?=\n-\s*hunkIds:|\n*$)/g
-
-  let match
-  while ((match = entryPattern.exec(content)) !== null) {
-    try {
-      const idsStr = match[1]!
-      const description = match[2]!
-
-      // Parse hunk IDs
-      const ids = idsStr.split(",").map((s) => parseInt(s.trim(), 10)).filter((n) => !isNaN(n))
-
-      if (ids.length > 0) {
-        result.hunks.push({
-          hunkIds: ids,
-          markdownDescription: dedentDescription(description),
-        })
-      }
-    } catch {
-      // Skip malformed entries
-    }
-  }
-
-  return result.hunks.length > 0 ? result : null
 }
 
 /**
@@ -178,15 +153,38 @@ function dedentDescription(text: string): string {
 
 /**
  * Validate that an object is a valid ReviewGroup
+ * Supports two formats:
+ * 1. hunkIds: [1, 2, 3] - multiple full hunks
+ * 2. hunkId: 1, lineRange: [0, 5] - single hunk with optional line range
  */
 function isValidReviewGroup(obj: unknown): obj is ReviewGroup {
   if (!obj || typeof obj !== "object") return false
   const o = obj as Record<string, unknown>
-  return (
-    Array.isArray(o.hunkIds) &&
-    o.hunkIds.every((id: unknown) => typeof id === "number") &&
-    (typeof o.markdownDescription === "string" || o.markdownDescription === undefined)
-  )
+  
+  // Must have some form of hunk reference
+  const hasHunkIds = Array.isArray(o.hunkIds) && o.hunkIds.every((id: unknown) => typeof id === "number")
+  const hasSingleHunkId = typeof o.hunkId === "number"
+  
+  if (!hasHunkIds && !hasSingleHunkId) {
+    return false
+  }
+  
+  // If lineRange is present, it must be a valid tuple
+  if (o.lineRange !== undefined) {
+    if (!Array.isArray(o.lineRange) || o.lineRange.length !== 2) {
+      return false
+    }
+    if (typeof o.lineRange[0] !== "number" || typeof o.lineRange[1] !== "number") {
+      return false
+    }
+  }
+  
+  // markdownDescription is optional but if present must be a string
+  if (o.markdownDescription !== undefined && typeof o.markdownDescription !== "string") {
+    return false
+  }
+  
+  return true
 }
 
 /**

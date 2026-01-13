@@ -26,10 +26,56 @@ export interface ReviewYaml {
 
 /**
  * A group of related hunks with a description
+ * Supports both full hunks and partial hunks (line ranges)
  */
 export interface ReviewGroup {
-  hunkIds: number[]
+  // Option 1: Multiple full hunks (backwards compatible)
+  hunkIds?: number[]
+  // Option 2: Single hunk with optional line range
+  hunkId?: number
+  lineRange?: [number, number] // [startLine, endLine] inclusive, 0-based
+  // The markdown description for this group
   markdownDescription: string
+}
+
+/**
+ * Resolved hunk reference - either a full hunk or a partial hunk
+ */
+export interface ResolvedHunk {
+  hunk: IndexedHunk
+  lineRange?: [number, number] // if set, only show these lines
+  isPartial: boolean
+}
+
+/**
+ * Coverage tracking for hunks
+ * Tracks which lines of each hunk have been explained by the AI
+ */
+export interface HunkCoverage {
+  hunkId: number
+  totalLines: number
+  coveredRanges: [number, number][] // list of [start, end] ranges that have been covered
+}
+
+/**
+ * Overall coverage state for the review
+ */
+export interface ReviewCoverage {
+  hunks: Map<number, HunkCoverage>
+  totalHunks: number
+  fullyExplainedHunks: number
+  partiallyExplainedHunks: number
+  unexplainedHunks: number
+}
+
+/**
+ * Uncovered portion of a hunk
+ */
+export interface UncoveredPortion {
+  hunkId: number
+  filename: string
+  uncoveredRanges: [number, number][]
+  totalUncoveredLines: number
 }
 
 /**

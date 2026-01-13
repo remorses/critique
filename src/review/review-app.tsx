@@ -7,7 +7,8 @@ import { getResolvedTheme, defaultThemeName, rgbaToHex } from "../themes.ts"
 import { detectFiletype, countChanges, getViewMode } from "../diff-utils.ts"
 import { DiffView } from "../components/diff-view.tsx"
 import { watchReviewYaml } from "./yaml-watcher.ts"
-import type { IndexedHunk, ReviewYaml } from "./types.ts"
+import { createSubHunk } from "./hunk-parser.ts"
+import type { IndexedHunk, ReviewYaml, ReviewGroup } from "./types.ts"
 
 export interface ReviewAppProps {
   hunks: IndexedHunk[]
@@ -41,9 +42,7 @@ export function ReviewApp({
 }: ReviewAppProps) {
   const { width } = useTerminalDimensions()
   const renderer = useRenderer()
-  const [scrollAcceleration] = React.useState(() => new ScrollAcceleration())
   const [reviewData, setReviewData] = React.useState<ReviewYaml | null>(null)
-  const [currentGroupIndex, setCurrentGroupIndex] = React.useState(0)
 
   // Watch YAML file for updates
   React.useEffect(() => {
@@ -59,29 +58,11 @@ export function ReviewApp({
     return cleanup
   }, [yamlPath])
 
-  // Keyboard navigation
+  // Keyboard navigation - just quit, scrollbox handles scrolling
   useKeyboard((key) => {
     if (key.name === "escape" || key.name === "q") {
       renderer.destroy()
       return
-    }
-
-    if (key.name === "j" || key.name === "down") {
-      if (reviewData && reviewData.hunks.length > 0) {
-        setCurrentGroupIndex((i) => Math.min(i + 1, reviewData.hunks.length - 1))
-      }
-    }
-
-    if (key.name === "k" || key.name === "up") {
-      setCurrentGroupIndex((i) => Math.max(i - 1, 0))
-    }
-
-    if (key.option) {
-      if (key.eventType === "release") {
-        scrollAcceleration.multiplier = 1
-      } else {
-        scrollAcceleration.multiplier = 10
-      }
     }
   })
 
@@ -89,11 +70,9 @@ export function ReviewApp({
     <ReviewAppView
       hunks={hunks}
       reviewData={reviewData}
-      currentGroupIndex={currentGroupIndex}
       isGenerating={isGenerating}
       themeName={themeName}
       width={width}
-      scrollAcceleration={scrollAcceleration}
     />
   )
 }
@@ -214,9 +193,8 @@ export function ReviewAppView({
       >
         <box style={{ flexDirection: "column" }}>
           {groups.map((group, groupIdx) => {
-            const groupHunks = group.hunkIds
-              .map((id) => hunkMap.get(id))
-              .filter((h): h is IndexedHunk => h !== undefined)
+            // Resolve hunks from group - supports both hunkIds and hunkId with lineRange
+            const groupHunks = resolveGroupHunks(group, hunkMap)
 
             return (
               <box key={groupIdx} style={{ flexDirection: "column", marginBottom: groupIdx < groups.length - 1 ? 2 : 0 }}>
@@ -229,7 +207,7 @@ export function ReviewAppView({
 
                 {/* Hunks */}
                 {groupHunks.map((hunk, idx) => (
-                  <box key={hunk.id}>
+                  <box key={`${hunk.id}-${idx}`}>
                     <HunkView
                       hunk={hunk}
                       themeName={themeName}
@@ -267,6 +245,54 @@ export function ReviewAppView({
       </box>
     </box>
   )
+}
+
+/**
+ * Resolve hunks from a ReviewGroup
+ * Supports both full hunks (hunkIds) and partial hunks (hunkId + lineRange)
+ * Note: lineRange from AI uses 1-based line numbers (like cat -n), converted to 0-based internally
+ */
+function resolveGroupHunks(
+  group: ReviewGroup,
+  hunkMap: Map<number, IndexedHunk>,
+): IndexedHunk[] {
+  const result: IndexedHunk[] = []
+
+  // Handle hunkIds (full hunks)
+  if (group.hunkIds) {
+    for (const id of group.hunkIds) {
+      const hunk = hunkMap.get(id)
+      if (hunk) {
+        result.push(hunk)
+      }
+    }
+  }
+
+  // Handle single hunkId with optional lineRange
+  if (group.hunkId !== undefined) {
+    const hunk = hunkMap.get(group.hunkId)
+    if (hunk) {
+      if (group.lineRange) {
+        // Convert from 1-based (AI/cat -n format) to 0-based (internal)
+        const startLine = group.lineRange[0] - 1
+        const endLine = group.lineRange[1] - 1
+        
+        // Create a sub-hunk for the specified line range
+        try {
+          const subHunk = createSubHunk(hunk, startLine, endLine)
+          result.push(subHunk)
+        } catch {
+          // If sub-hunk creation fails, fall back to full hunk
+          result.push(hunk)
+        }
+      } else {
+        // No line range, use full hunk
+        result.push(hunk)
+      }
+    }
+  }
+
+  return result
 }
 
 interface MarkdownBlockProps {

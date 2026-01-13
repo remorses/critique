@@ -214,20 +214,41 @@ Use this YAML format, updating the file progressively as you analyze each group:
 
 \`\`\`yaml
 hunks:
+# Option 1: Group multiple full hunks together
 - hunkIds: [1, 2]
   markdownDescription: |
     ## Brief title
     
     Description of what these changes do and why they're related...
+
+# Option 2: Reference a single hunk
 - hunkIds: [3]
   markdownDescription: |
     ## Another title
     
     Description...
+
+# Option 3: Reference part of a hunk using line numbers (for large hunks)
+- hunkId: 4
+  lineRange: [1, 10]
+  markdownDescription: |
+    ## First part of hunk 4
+    
+    Description of lines 1-10...
+
+- hunkId: 4
+  lineRange: [11, 25]
+  markdownDescription: |
+    ## Second part of hunk 4
+    
+    Description of lines 11-25...
 \`\`\`
+
+Lines are shown using cat -n format, with line numbers starting at 1. Use lineRange with these 1-based line numbers to split large hunks into logical parts if they contain multiple unrelated changes.
 
 Guidelines:
 - Group hunks that are logically related (same feature, same refactor, etc.)
+- For large hunks with multiple logical changes, split them using lineRange
 - Order groups for optimal code review flow:
   1. Infrastructure/config changes first
   2. Core/shared code changes
@@ -235,8 +256,10 @@ Guidelines:
   4. Tests
   5. Documentation
 - Keep descriptions concise but informative
+- Use markdown formatting: headers (##), bullet points, **bold** for emphasis
 - Mention file names when relevant
 - Highlight any potential issues or things to pay attention to
+- Ensure ALL hunks (or all lines within hunks) are covered by your explanations
 </task>
 
 <hunks>
@@ -248,7 +271,7 @@ The following is context from coding sessions that may have created these change
 ${sessionsContext}
 </session-context>` : ""}
 
-Now analyze the hunks and write the review YAML to ${outputPath}.`
+Now analyze the hunks and write the review YAML to ${outputPath}. Make sure to explain all changes - do not leave any hunks unexplained.`
 }
 
 /**
