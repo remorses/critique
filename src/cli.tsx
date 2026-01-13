@@ -21,6 +21,16 @@ import { join } from "path";
 import { create } from "zustand";
 import Dropdown from "./dropdown.tsx";
 import { debounce } from "./utils.ts";
+import {
+  buildGitCommand,
+  getFileName,
+  countChanges,
+  getViewMode,
+  processFiles,
+  detectFiletype,
+  IGNORED_FILES,
+  type ParsedFile,
+} from "./diff-utils.ts";
 
 // Lazy-load watcher only when --watch is used
 let watcherModule: typeof import("@parcel/watcher") | null = null;
@@ -68,33 +78,7 @@ function savePersistedState(state: PersistedState): void {
 
 const persistedState = loadPersistedState();
 
-// Detect filetype from filename for syntax highlighting
-// Maps to tree-sitter parsers available in @opentui/core: typescript, javascript, markdown, zig
-function detectFiletype(filePath: string): string | undefined {
-  const ext = filePath.split(".").pop()?.toLowerCase();
-  switch (ext) {
-    // TypeScript parser handles TS, TSX, JS, JSX (it's a superset)
-    case "ts":
-    case "tsx":
-    case "js":
-    case "jsx":
-    case "mjs":
-    case "cjs":
-    case "mts":
-    case "cts":
-      return "typescript";
-    // JSON uses JavaScript parser (JSON is valid JS)
-    case "json":
-      return "javascript";
-    case "md":
-    case "mdx":
-      return "markdown";
-    case "zig":
-      return "zig";
-    default:
-      return undefined;
-  }
-}
+
 
 // Error boundary component
 class ErrorBoundary extends React.Component<
@@ -134,30 +118,9 @@ class ErrorBoundary extends React.Component<
 
 const execAsync = promisify(exec);
 
-const IGNORED_FILES = [
-  "pnpm-lock.yaml",
-  "package-lock.json",
-  "yarn.lock",
-  "bun.lockb",
-  "Cargo.lock",
-  "poetry.lock",
-  "Gemfile.lock",
-  "composer.lock",
-];
 
-function getFileName(file: {
-  oldFileName?: string;
-  newFileName?: string;
-}): string {
-  const newName = file.newFileName;
-  const oldName = file.oldFileName;
 
-  // Filter out /dev/null which appears for new/deleted files
-  if (newName && newName !== "/dev/null") return newName;
-  if (oldName && oldName !== "/dev/null") return oldName;
 
-  return "unknown";
-}
 
 function execSyncWithError(
   command: string,
@@ -204,12 +167,7 @@ useDiffStore.subscribe((state) => {
   savePersistedState({ themeName: state.themeName });
 });
 
-interface ParsedFile {
-  oldFileName?: string;
-  newFileName?: string;
-  hunks: any[];
-  rawDiff?: string;
-}
+
 
 interface AppProps {
   parsedFiles: ParsedFile[];
@@ -348,20 +306,8 @@ function App({ parsedFiles }: AppProps) {
   const bgColor = resolvedTheme.background;
 
   // Calculate additions and deletions
-  let additions = 0;
-  let deletions = 0;
-  currentFile.hunks.forEach((hunk: any) => {
-    hunk.lines.forEach((line: string) => {
-      if (line.startsWith("+")) additions++;
-      if (line.startsWith("-")) deletions++;
-    });
-  });
-
-  // Use unified view for fully added or fully deleted files (one side would be empty in split view)
-  const isFullyAdded = additions > 0 && deletions === 0;
-  const isFullyDeleted = deletions > 0 && additions === 0;
-  const useUnifiedForFile = isFullyAdded || isFullyDeleted;
-  const viewMode = useUnifiedForFile ? "unified" : (useSplitView ? "split" : "unified");
+  const { additions, deletions } = countChanges(currentFile.hunks);
+  const viewMode = getViewMode(additions, deletions, width);
 
   const dropdownOptions = parsedFiles.map((file, idx) => {
     const name = getFileName(file);
@@ -565,24 +511,15 @@ cli
   .option("--filter <pattern>", "Filter files by glob pattern (can be used multiple times)")
   .action(async (base, head, options) => {
     try {
-      const contextArg = options.context ? `-U${options.context}` : "";
-      // Combine --filter options with positional args after --
-      const filterOptions = options.filter ? (Array.isArray(options.filter) ? options.filter : [options.filter]) : [];
-      const positionalFilters = options['--'] || [];
-      const filters = [...filterOptions, ...positionalFilters];
-      const filterArg = filters.length > 0 ? `-- ${filters.map((f: string) => `"${f}"`).join(" ")}` : "";
-      const gitCommand = (() => {
-        if (options.staged)
-          return `git diff --cached --no-prefix ${contextArg} ${filterArg}`.trim();
-        if (options.commit)
-          return `git show ${options.commit} --no-prefix ${contextArg} ${filterArg}`.trim();
-        // Two refs: compare base...head (three-dot, shows changes since branches diverged, like GitHub PRs)
-        if (base && head)
-          return `git diff ${base}...${head} --no-prefix ${contextArg} ${filterArg}`.trim();
-        // Single ref: show that commit's changes
-        if (base) return `git show ${base} --no-prefix ${contextArg} ${filterArg}`.trim();
-        return `git add -N . && git diff --no-prefix ${contextArg} ${filterArg}`.trim();
-      })();
+      const gitCommand = buildGitCommand({
+        staged: options.staged,
+        commit: options.commit,
+        base,
+        head,
+        context: options.context,
+        filter: options.filter,
+        positionalFilters: options['--'],
+      });
 
       const shouldWatch = options.watch && !base && !head && !options.commit;
 
@@ -616,44 +553,8 @@ cli
               }
 
               const files = parsePatch(gitDiff);
-
-              const filteredFiles = files.filter((file) => {
-                const fileName = getFileName(file);
-                const baseName = fileName.split("/").pop() || "";
-
-                if (
-                  IGNORED_FILES.includes(baseName) ||
-                  baseName.endsWith(".lock")
-                ) {
-                  return false;
-                }
-
-                const totalLines = file.hunks.reduce(
-                  (sum, hunk) => sum + hunk.lines.length,
-                  0,
-                );
-                return totalLines <= 6000;
-              });
-
-              const sortedFiles = filteredFiles.sort((a, b) => {
-                const aSize = a.hunks.reduce(
-                  (sum, hunk) => sum + hunk.lines.length,
-                  0,
-                );
-                const bSize = b.hunks.reduce(
-                  (sum, hunk) => sum + hunk.lines.length,
-                  0,
-                );
-                return aSize - bSize;
-              });
-
-              // Add rawDiff for each file
-              const filesWithRawDiff = sortedFiles.map((file) => ({
-                ...file,
-                rawDiff: formatPatch(file),
-              }));
-
-              setParsedFiles(filesWithRawDiff);
+              const processedFiles = processFiles(files, formatPatch);
+              setParsedFiles(processedFiles);
             } catch (error) {
               setParsedFiles([]);
             }
@@ -1039,24 +940,15 @@ cli
     const pty = await import("@xmorse/bun-pty");
     const { ansiToHtmlDocument } = await import("./ansi-html.ts");
 
-    const contextArg = options.context ? `-U${options.context}` : "";
-    // Combine --filter options with positional args after --
-    const filterOptions = options.filter ? (Array.isArray(options.filter) ? options.filter : [options.filter]) : [];
-    const positionalFilters = options['--'] || [];
-    const filters = [...filterOptions, ...positionalFilters];
-    const filterArg = filters.length > 0 ? `-- ${filters.map((f: string) => `"${f}"`).join(" ")}` : "";
-    const gitCommand = (() => {
-      if (options.staged)
-        return `git diff --cached --no-prefix ${contextArg} ${filterArg}`.trim();
-      if (options.commit)
-        return `git show ${options.commit} --no-prefix ${contextArg} ${filterArg}`.trim();
-      // Two refs: compare base...head (three-dot, shows changes since branches diverged, like GitHub PRs)
-      if (base && head)
-        return `git diff ${base}...${head} --no-prefix ${contextArg} ${filterArg}`.trim();
-      // Single ref: show that commit's changes
-      if (base) return `git show ${base} --no-prefix ${contextArg} ${filterArg}`.trim();
-      return `git add -N . && git diff --no-prefix ${contextArg} ${filterArg}`.trim();
-    })();
+    const gitCommand = buildGitCommand({
+      staged: options.staged,
+      commit: options.commit,
+      base,
+      head,
+      context: options.context,
+      filter: options.filter,
+      positionalFilters: options['--'],
+    });
 
     const desktopCols = parseInt(options.cols) || 240;
     const mobileCols = parseInt(options.mobileCols) || 100;
@@ -1249,31 +1141,7 @@ cli
 
     const gitDiff = fs.readFileSync(diffFile, "utf-8");
     const files = parsePatch(gitDiff);
-
-    const filteredFiles = files.filter((file) => {
-      const fileName = getFileName(file);
-      const baseName = fileName.split("/").pop() || "";
-      if (IGNORED_FILES.includes(baseName) || baseName.endsWith(".lock")) {
-        return false;
-      }
-      const totalLines = file.hunks.reduce(
-        (sum, hunk) => sum + hunk.lines.length,
-        0,
-      );
-      return totalLines <= 6000;
-    });
-
-    const sortedFiles = filteredFiles.sort((a, b) => {
-      const aSize = a.hunks.reduce((sum, hunk) => sum + hunk.lines.length, 0);
-      const bSize = b.hunks.reduce((sum, hunk) => sum + hunk.lines.length, 0);
-      return aSize - bSize;
-    });
-
-    // Add rawDiff for each file
-    const filesWithRawDiff = sortedFiles.map((file) => ({
-      ...file,
-      rawDiff: formatPatch(file),
-    }));
+    const filesWithRawDiff = processFiles(files, formatPatch);
 
     if (filesWithRawDiff.length === 0) {
       console.log("No files to display");
@@ -1308,9 +1176,6 @@ cli
       }, 1000);
     };
 
-    // Use unified diff for narrow viewports (mobile), split view for wider ones
-    const useSplitView = cols >= 150;
-
     // Static component - no hooks that cause re-renders
     const webTheme = getResolvedTheme(themeName);
     const webBg = webTheme.background;
@@ -1329,20 +1194,9 @@ cli
           {filesWithRawDiff.map((file, idx) => {
             const fileName = getFileName(file);
             const filetype = detectFiletype(fileName);
-            let additions = 0;
-            let deletions = 0;
-            file.hunks.forEach((hunk: any) => {
-              hunk.lines.forEach((line: string) => {
-                if (line.startsWith("+")) additions++;
-                if (line.startsWith("-")) deletions++;
-              });
-            });
-
-            // Use unified view for fully added or fully deleted files
-            const isFullyAdded = additions > 0 && deletions === 0;
-            const isFullyDeleted = deletions > 0 && additions === 0;
-            const useUnifiedForFile = isFullyAdded || isFullyDeleted;
-            const viewMode = useUnifiedForFile ? "unified" : (useSplitView ? "split" : "unified");
+            const { additions, deletions } = countChanges(file.hunks);
+            // Use higher threshold (150) for web rendering vs TUI (100)
+            const viewMode = getViewMode(additions, deletions, cols, 150);
 
             return (
               <box
