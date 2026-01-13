@@ -1,0 +1,98 @@
+[
+  {
+    "sessionId": "ses_447a94d2effez8MzakosCaltpW",
+    "update": {
+      "availableCommands": [
+        {
+          "description": "create/update AGENTS.md",
+          "name": "init"
+        },
+        {
+          "description": "review changes [commit|branch|pr], defaults to uncommitted",
+          "name": "review"
+        },
+        {
+          "description": "",
+          "name": "branch-diff"
+        },
+        {
+          "description": "Remove AI code slop",
+          "name": "rmslop"
+        },
+        {
+          "description": "Commit, update changelog, npm publish",
+          "name": "changepub"
+        },
+        {
+          "description": "",
+          "name": "raycast-publish-extension"
+        },
+        {
+          "description": "compact the session",
+          "name": "compact"
+        }
+      ],
+      "sessionUpdate": "available_commands_update"
+    }
+  },
+  {
+    "sessionId": "ses_447a94d2effez8MzakosCaltpW",
+    "update": {
+      "content": {
+        "text": "The user wants me to say a",
+        "type": "text"
+      },
+      "sessionUpdate": "agent_thought_chunk"
+    }
+  },
+  {
+    "sessionId": "ses_447a94d2effez8MzakosCaltpW",
+    "update": {
+      "content": {
+        "text": " specific",
+        "type": "text"
+      },
+      "sessionUpdate": "agent_thought_chunk"
+    }
+  },
+  {
+    "sessionId": "ses_447a94d2effez8MzakosCaltpW",
+    "update": {
+      "content": {
+        "text": " greeting",
+        "type": "text"
+      },
+      "sessionUpdate": "agent_thought_chunk"
+    }
+  },
+  {
+    "sessionId": "ses_447a94d2effez8MzakosCaltpW",
+    "update": {
+      "content": {
+        "text": " and nothing else.",
+        "type": "text"
+      },
+      "sessionUpdate": "agent_thought_chunk"
+    }
+  },
+  {
+    "sessionId": "ses_447a94d2effez8MzakosCaltpW",
+    "update": {
+      "content": {
+        "text": "Hello! I'm ready to help you",
+        "type": "text"
+      },
+      "sessionUpdate": "agent_message_chunk"
+    }
+  },
+  {
+    "sessionId": "ses_447a94d2effez8MzakosCaltpW",
+    "update": {
+      "content": {
+        "text": " review code.",
+        "type": "text"
+      },
+      "sessionUpdate": "agent_message_chunk"
+    }
+  }
+]

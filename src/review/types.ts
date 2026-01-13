@@ -94,7 +94,7 @@ export interface SessionInfo {
   sessionId: string
   cwd: string
   title?: string
-  updatedAt?: string
+  updatedAt?: number
 }
 
 /**

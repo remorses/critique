@@ -16,6 +16,7 @@ export class OpencodeAcpClient {
   private proc: ReturnType<typeof Bun.spawn> | null = null
   private client: ClientSideConnection | null = null
   private sessionUpdates: Map<string, SessionNotification[]> = new Map()
+  private onUpdateCallback: ((notification: SessionNotification) => void) | null = null
 
   constructor() {
     this.connect = this.connect.bind(this)
@@ -27,8 +28,10 @@ export class OpencodeAcpClient {
 
   /**
    * Spawn opencode ACP server and establish connection
+   * @param onUpdate - Optional callback for session update notifications
    */
-  async connect(): Promise<void> {
+  async connect(onUpdate?: (notification: SessionNotification) => void): Promise<void> {
+    this.onUpdateCallback = onUpdate || null
     logger.info("Spawning opencode ACP server...")
     
     // Spawn opencode in ACP mode
@@ -60,14 +63,19 @@ export class OpencodeAcpClient {
     // Create the ndjson stream for ACP communication
     const stream = ndJsonStream(stdin, stdout)
 
-    // Bind sessionUpdates to use in the handler
+    // Bind sessionUpdates and onUpdateCallback to use in the handler
     const sessionUpdates = this.sessionUpdates
+    const onUpdateCallback = this.onUpdateCallback
     this.client = new ClientSideConnection(
       () => ({
         async sessionUpdate(params: SessionNotification) {
           const updates = sessionUpdates.get(params.sessionId) || []
           updates.push(params)
           sessionUpdates.set(params.sessionId, updates)
+          // Call the update callback if provided
+          if (onUpdateCallback) {
+            onUpdateCallback(params)
+          }
         },
         async requestPermission(params) {
           // Auto-approve all tool calls for review mode
@@ -191,15 +199,16 @@ export class OpencodeAcpClient {
 
   /**
    * Create a new session and send the review prompt
-   * Returns when the prompt completes
+   * Returns the sessionId immediately, completes when prompt finishes
+   * Note: Use connect(onUpdate) to receive streaming notifications
    */
   async createReviewSession(
     cwd: string,
     hunksContext: string,
     sessionsContext: string,
     outputPath: string,
-    onUpdate?: (notification: SessionNotification) => void,
-  ): Promise<void> {
+    onSessionCreated?: (sessionId: string) => void,
+  ): Promise<string> {
     if (!this.client) {
       throw new Error("Client not connected")
     }
@@ -212,15 +221,10 @@ export class OpencodeAcpClient {
       mcpServers: [],
     })
     logger.info("Session created", { sessionId })
-
-    // Set up update handler if provided
-    if (onUpdate) {
-      const originalUpdates = this.sessionUpdates.get(sessionId) || []
-      this.sessionUpdates.set(sessionId, originalUpdates)
-
-      // Create a new connection handler that calls onUpdate
-      // Note: This is a simplification - in practice you'd want to
-      // wire this up before creating the session
+    
+    // Notify caller of sessionId so they can start filtering notifications
+    if (onSessionCreated) {
+      onSessionCreated(sessionId)
     }
 
     // Build the review prompt
@@ -238,6 +242,8 @@ export class OpencodeAcpClient {
       logger.error("Review prompt failed", error)
       throw error
     }
+    
+    return sessionId
   }
 
   /**
@@ -341,9 +347,12 @@ Now analyze the hunks and write the review YAML to ${outputPath}. Make sure to e
 
 /**
  * Create and connect an ACP client
+ * @param onUpdate - Optional callback for session update notifications
  */
-export async function createAcpClient(): Promise<OpencodeAcpClient> {
+export async function createAcpClient(
+  onUpdate?: (notification: SessionNotification) => void,
+): Promise<OpencodeAcpClient> {
   const client = new OpencodeAcpClient()
-  await client.connect()
+  await client.connect(onUpdate)
   return client
 }

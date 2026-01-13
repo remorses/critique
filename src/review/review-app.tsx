@@ -8,6 +8,8 @@ import { detectFiletype, countChanges, getViewMode } from "../diff-utils.ts"
 import { DiffView } from "../components/diff-view.tsx"
 import { watchReviewYaml } from "./yaml-watcher.ts"
 import { createSubHunk } from "./hunk-parser.ts"
+import { StreamDisplay } from "./stream-display.tsx"
+import type { SessionNotification } from "@agentclientprotocol/sdk"
 import type { IndexedHunk, ReviewYaml, ReviewGroup } from "./types.ts"
 
 export interface ReviewAppProps {
@@ -15,6 +17,7 @@ export interface ReviewAppProps {
   yamlPath: string
   themeName?: string
   isGenerating: boolean
+  subscribeToNotifications?: (callback: (notifications: SessionNotification[]) => void) => () => void
 }
 
 class ScrollAcceleration {
@@ -39,10 +42,12 @@ export function ReviewApp({
   yamlPath,
   themeName = defaultThemeName,
   isGenerating,
+  subscribeToNotifications,
 }: ReviewAppProps) {
   const { width } = useTerminalDimensions()
   const renderer = useRenderer()
   const [reviewData, setReviewData] = React.useState<ReviewYaml | null>(null)
+  const [notifications, setNotifications] = React.useState<SessionNotification[]>([])
 
   // Watch YAML file for updates
   React.useEffect(() => {
@@ -57,6 +62,17 @@ export function ReviewApp({
     )
     return cleanup
   }, [yamlPath])
+
+  // Subscribe to notification updates for real-time streaming
+  React.useEffect(() => {
+    if (!subscribeToNotifications) return
+    
+    const unsubscribe = subscribeToNotifications((newNotifications) => {
+      setNotifications(newNotifications)
+    })
+
+    return unsubscribe
+  }, [subscribeToNotifications])
 
   // Keyboard navigation - just quit, scrollbox handles scrolling
   useKeyboard((key) => {
@@ -73,6 +89,7 @@ export function ReviewApp({
       isGenerating={isGenerating}
       themeName={themeName}
       width={width}
+      notifications={notifications}
     />
   )
 }
@@ -86,6 +103,7 @@ export interface ReviewAppViewProps {
   isGenerating: boolean
   themeName?: string
   width: number
+  notifications?: SessionNotification[]
 }
 
 /**
@@ -98,6 +116,7 @@ export function ReviewAppView({
   isGenerating,
   themeName = defaultThemeName,
   width,
+  notifications = [],
 }: ReviewAppViewProps) {
   const [scrollAcceleration] = React.useState(() => new ScrollAcceleration())
 
@@ -107,7 +126,7 @@ export function ReviewAppView({
   const resolvedTheme = getResolvedTheme(themeName)
   const bgColor = resolvedTheme.background
 
-  // Loading state - waiting for data
+  // Loading state - show streaming display while waiting for YAML
   if (!reviewData) {
     return (
       <box
@@ -121,9 +140,17 @@ export function ReviewAppView({
         <text fg={rgbaToHex(resolvedTheme.text)}>
           Analyzing {hunks.length} hunks...
         </text>
-        <text fg="#666666">
-          {isGenerating ? "Waiting for AI to generate review..." : ""}
-        </text>
+        {notifications.length > 0 ? (
+          <StreamDisplay
+            notifications={notifications}
+            themeName={themeName}
+            width={width}
+          />
+        ) : (
+          <text fg="#666666">
+            {isGenerating ? "Waiting for AI to generate review..." : ""}
+          </text>
+        )}
       </box>
     )
   }

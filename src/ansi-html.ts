@@ -202,7 +202,7 @@ ${content}
   const charRatio = ${charWidthRatio};
   const padding = ${padding};
   const minFontSize = 4;
-  const maxFontSize = 16;
+  const maxFontSize = 14;
 
   // Redirect mobile devices to ?v=mobile for optimized view
   // Only redirect if not already on a forced version

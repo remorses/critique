@@ -128,8 +128,33 @@ async function runReviewMode(gitCommand: string, agent: string) {
   let acpClient: Awaited<ReturnType<typeof createAcpClient>> | null = null;
   let isGenerating = true;
 
+  // Store notifications for streaming display with subscriber pattern
+  // Only collect notifications for the review session (not loading old sessions)
+  const notifications: import("@agentclientprotocol/sdk").SessionNotification[] = [];
+  type NotificationCallback = (notifications: import("@agentclientprotocol/sdk").SessionNotification[]) => void;
+  let subscriber: NotificationCallback | null = null;
+  let reviewSessionId: string | null = null;
+  
+  const subscribeToNotifications = (callback: NotificationCallback) => {
+    subscriber = callback;
+    // Immediately send any accumulated notifications
+    if (notifications.length > 0) {
+      callback([...notifications]);
+    }
+    return () => { subscriber = null; };
+  };
+
   try {
-    acpClient = await createAcpClient();
+    acpClient = await createAcpClient((notification) => {
+      // Only collect notifications for the review session
+      if (reviewSessionId && notification.sessionId === reviewSessionId) {
+        notifications.push(notification);
+        // Notify subscriber immediately
+        if (subscriber) {
+          subscriber([...notifications]);
+        }
+      }
+    });
 
     // List sessions (will return empty for now since opencode doesn't support it)
     const cwd = process.cwd();
@@ -181,6 +206,11 @@ async function runReviewMode(gitCommand: string, agent: string) {
       hunksContext,
       sessionsContext,
       yamlPath,
+      (sessionId) => {
+        // Start collecting notifications for this session
+        reviewSessionId = sessionId;
+        logger.info("Review session started, collecting notifications", { sessionId });
+      },
     ).then(() => {
       logger.info("Review generation completed");
       isGenerating = false;
@@ -200,6 +230,7 @@ async function runReviewMode(gitCommand: string, agent: string) {
           yamlPath,
           themeName: persistedState.themeName ?? defaultThemeName,
           isGenerating,
+          subscribeToNotifications,
         }),
       ),
     );
