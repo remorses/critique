@@ -70,10 +70,14 @@ describe("ansiToHtml", () => {
     expect(html).toContain("background-color:")
   })
 
-  test("includes style tag with palette", () => {
+  test("returns content only without document wrapper", () => {
     const html = ansiToHtml("Test")
-    expect(html).toContain("<style>")
-    expect(html).toContain("--vt-palette-")
+    // ansiToHtml returns just the content, not a full document
+    expect(html).toContain('<div class="line">')
+    expect(html).toContain("Test")
+    // Should not include document elements - that's ansiToHtmlDocument's job
+    expect(html).not.toContain("<!DOCTYPE")
+    expect(html).not.toContain("<html>")
   })
 })
 
