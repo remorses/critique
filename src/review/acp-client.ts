@@ -7,6 +7,7 @@ import {
   type SessionInfo as AcpSessionInfo,
 } from "@agentclientprotocol/sdk"
 import type { SessionInfo, SessionContent } from "./types.ts"
+import { logger } from "../logger.ts"
 
 /**
  * Client for communicating with opencode via ACP protocol
@@ -28,6 +29,8 @@ export class OpencodeAcpClient {
    * Spawn opencode ACP server and establish connection
    */
   async connect(): Promise<void> {
+    logger.info("Spawning opencode ACP server...")
+    
     // Spawn opencode in ACP mode
     this.proc = Bun.spawn(["bunx", "opencode", "acp"], {
       stdin: "pipe",
@@ -66,7 +69,31 @@ export class OpencodeAcpClient {
           updates.push(params)
           sessionUpdates.set(params.sessionId, updates)
         },
-        async requestPermission() {
+        async requestPermission(params) {
+          // Auto-approve all tool calls for review mode
+          // The AI needs to write to temp files for YAML output
+          logger.info("Permission requested", { 
+            tool: params.toolCall?.title,
+            options: params.options?.map(o => ({ id: o.optionId, kind: o.kind }))
+          })
+          
+          // Find an "allow" option from the provided options
+          const allowOption = params.options?.find(
+            o => o.kind === "allow_once" || o.kind === "allow_always"
+          )
+          
+          if (allowOption) {
+            logger.info("Auto-approving with option", { optionId: allowOption.optionId })
+            return { 
+              outcome: { 
+                outcome: "selected" as const, 
+                optionId: allowOption.optionId 
+              } 
+            }
+          }
+          
+          // If no allow option found, cancel (shouldn't happen)
+          logger.warn("No allow option found, cancelling")
           return { outcome: { outcome: "cancelled" as const } }
         },
       }),
@@ -74,10 +101,12 @@ export class OpencodeAcpClient {
     )
 
     // Initialize the connection
+    logger.info("Initializing ACP connection...")
     await this.client.initialize({
       protocolVersion: 1,
       clientCapabilities: {},
     })
+    logger.info("ACP connection established")
   }
 
   /**
@@ -175,11 +204,14 @@ export class OpencodeAcpClient {
       throw new Error("Client not connected")
     }
 
+    logger.info("Creating new ACP session...", { cwd, outputPath })
+
     // Create new session
     const { sessionId } = await this.client.newSession({
       cwd,
       mcpServers: [],
     })
+    logger.info("Session created", { sessionId })
 
     // Set up update handler if provided
     if (onUpdate) {
@@ -193,12 +225,19 @@ export class OpencodeAcpClient {
 
     // Build the review prompt
     const prompt = buildReviewPrompt(hunksContext, sessionsContext, outputPath)
+    logger.info("Sending review prompt to AI...", { promptLength: prompt.length })
 
     // Send the prompt and wait for completion
-    await this.client.prompt({
-      sessionId,
-      prompt: [{ type: "text", text: prompt }],
-    })
+    try {
+      await this.client.prompt({
+        sessionId,
+        prompt: [{ type: "text", text: prompt }],
+      })
+      logger.info("Review prompt completed successfully")
+    } catch (error) {
+      logger.error("Review prompt failed", error)
+      throw error
+    }
   }
 
   /**

@@ -3,6 +3,7 @@
 import fs from "fs"
 import YAML from "js-yaml"
 import type { ReviewYaml, ReviewGroup } from "./types.ts"
+import { logger } from "../logger.ts"
 
 /**
  * Watch a YAML file for changes and parse it as it updates
@@ -39,9 +40,14 @@ export function watchReviewYaml(
       // Try to parse the YAML
       const parsed = parsePartialYaml(content)
       if (parsed) {
+        logger.debug("YAML parsed successfully", { 
+          groupCount: parsed.hunks.length,
+          contentLength: content.length 
+        })
         onUpdate(parsed)
       }
     } catch (error) {
+      logger.error("YAML watcher error", error)
       if (onError && error instanceof Error) {
         onError(error)
       }

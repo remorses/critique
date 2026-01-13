@@ -21,6 +21,7 @@ import { create } from "zustand";
 import Dropdown from "./dropdown.tsx";
 import { debounce } from "./utils.ts";
 import { DiffView } from "./components/diff-view.tsx";
+import { logger } from "./logger.ts";
 import {
   buildGitCommand,
   getFileName,
@@ -83,10 +84,14 @@ async function runReviewMode(gitCommand: string, agent: string) {
   const { tmpdir } = await import("os");
   const { join } = await import("path");
 
+  logger.info("Starting review mode", { gitCommand, agent });
+
   // Get the diff
   const { stdout: gitDiff } = await execAsync(gitCommand, {
     encoding: "utf-8",
   });
+
+  logger.info("Got git diff", { length: gitDiff.length });
 
   if (!gitDiff.trim()) {
     console.log("No changes to review");
@@ -105,6 +110,7 @@ async function runReviewMode(gitCommand: string, agent: string) {
 
   // Parse hunks with IDs
   const hunks = await parseHunksWithIds(gitDiff);
+  logger.info("Parsed hunks", { count: hunks.length });
 
   if (hunks.length === 0) {
     console.log("No hunks to review");
@@ -169,14 +175,17 @@ async function runReviewMode(gitCommand: string, agent: string) {
     });
 
     // Create the review session in background
+    logger.info("Creating review session in background", { yamlPath });
     const reviewPromise = acpClient.createReviewSession(
       cwd,
       hunksContext,
       sessionsContext,
       yamlPath,
     ).then(() => {
+      logger.info("Review generation completed");
       isGenerating = false;
     }).catch((error) => {
+      logger.error("Review generation failed", error);
       console.error("Review generation failed:", error);
       isGenerating = false;
     });
@@ -198,6 +207,7 @@ async function runReviewMode(gitCommand: string, agent: string) {
     // Wait for review to complete (TUI will handle user interaction)
     await reviewPromise;
   } catch (error) {
+    logger.error("Review mode error", error);
     console.error("Review mode error:", error);
     if (acpClient) {
       await acpClient.close();
