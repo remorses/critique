@@ -1,3 +1,9 @@
+# 0.1.14
+
+- Integration:
+  - Add `--stdin` option to read diff from stdin (for use as a pager in lazygit)
+  - Add README documentation for lazygit integration
+
 # 0.1.13
 
 - Docs:

@@ -553,7 +553,7 @@ function App({ parsedFiles }: AppProps) {
   );
 }
 
-cli
+  cli
   .command(
     "[base] [head]",
     "Show diff for git references (defaults to unstaged changes)",
@@ -563,8 +563,111 @@ cli
   .option("--watch", "Watch for file changes and refresh diff")
   .option("--context <lines>", "Number of context lines (default: 3)")
   .option("--filter <pattern>", "Filter files by glob pattern (can be used multiple times)")
+  .option("--stdin", "Read diff from stdin (for use as a pager)")
   .action(async (base, head, options) => {
     try {
+      // Handle stdin mode for lazygit integration
+      if (options.stdin) {
+        let gitDiff = "";
+        for await (const chunk of process.stdin) {
+          gitDiff += chunk;
+        }
+
+        const [diffModule, renderer] = await Promise.all([
+          import("diff"),
+          createCliRenderer({
+            onDestroy() {
+              process.exit(0);
+            },
+            exitOnCtrlC: true,
+          }),
+        ]);
+        const { parsePatch, formatPatch } = diffModule;
+
+        function StdinApp() {
+          const [parsedFiles, setParsedFiles] = React.useState<
+            ParsedFile[] | null
+          >(null);
+
+          React.useEffect(() => {
+            try {
+              if (!gitDiff.trim()) {
+                setParsedFiles([]);
+                return;
+              }
+
+              const files = parsePatch(gitDiff);
+
+              const filteredFiles = files.filter((file) => {
+                const fileName = getFileName(file);
+                const baseName = fileName.split("/").pop() || "";
+
+                if (
+                  IGNORED_FILES.includes(baseName) ||
+                  baseName.endsWith(".lock")
+                ) {
+                  return false;
+                }
+
+                const totalLines = file.hunks.reduce(
+                  (sum, hunk) => sum + hunk.lines.length,
+                  0,
+                );
+                return totalLines <= 6000;
+              });
+
+              const sortedFiles = filteredFiles.sort((a, b) => {
+                const aSize = a.hunks.reduce(
+                  (sum, hunk) => sum + hunk.lines.length,
+                  0,
+                );
+                const bSize = b.hunks.reduce(
+                  (sum, hunk) => sum + hunk.lines.length,
+                  0,
+                );
+                return aSize - bSize;
+              });
+
+              const filesWithRawDiff = sortedFiles.map((file) => ({
+                ...file,
+                rawDiff: formatPatch(file),
+              }));
+
+              setParsedFiles(filesWithRawDiff);
+            } catch {
+              setParsedFiles([]);
+            }
+          }, []);
+
+          if (parsedFiles === null) {
+            return (
+              <box style={{ padding: 1, backgroundColor: "#0d1117" }}>
+                <text>Loading...</text>
+              </box>
+            );
+          }
+
+          if (parsedFiles.length === 0) {
+            return (
+              <box style={{ padding: 1, backgroundColor: "#0d1117" }}>
+                <text>No changes to display</text>
+              </box>
+            );
+          }
+
+          return <App parsedFiles={parsedFiles} />;
+        }
+
+        createRoot(renderer).render(
+          React.createElement(
+            ErrorBoundary,
+            null,
+            React.createElement(StdinApp),
+          ),
+        );
+        return;
+      }
+
       const contextArg = options.context ? `-U${options.context}` : "";
       // Combine --filter options with positional args after --
       const filterOptions = options.filter ? (Array.isArray(options.filter) ? options.filter : [options.filter]) : [];

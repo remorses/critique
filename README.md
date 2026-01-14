@@ -74,6 +74,28 @@ Then use:
 git difftool HEAD~1
 ```
 
+### Lazygit Integration
+
+Use critique as a custom pager in [lazygit](https://github.com/jesseduffield/lazygit):
+
+**As a pager (reads diff from stdin):**
+
+```yaml
+git:
+  pagers:
+    - pager: critique --stdin
+```
+
+**As an external diff command:**
+
+```yaml
+git:
+  pagers:
+    - externalDiffCommand: critique
+```
+
+For more details, see [lazygit's Custom Pagers documentation](https://github.com/jesseduffield/lazygit/blob/master/docs/Custom_Pagers.md).
+
 ### Pick Files from Another Branch
 
 Selectively apply changes from another branch to your current HEAD:
