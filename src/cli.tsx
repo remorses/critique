@@ -74,6 +74,9 @@ async function runReviewMode(
 
   logger.info("Starting review mode", { gitCommand, agent });
 
+  // Intro
+  clack.intro("critique review");
+
   // Get the diff
   const { stdout: gitDiff } = await execAsync(gitCommand, {
     encoding: "utf-8",
@@ -82,7 +85,8 @@ async function runReviewMode(
   logger.info("Got git diff", { length: gitDiff.length });
 
   if (!gitDiff.trim()) {
-    console.log("No changes to review");
+    clack.log.warn("No changes to review");
+    clack.outro("");
     process.exit(0);
   }
 
@@ -102,12 +106,12 @@ async function runReviewMode(
   logger.info("Parsed hunks", { count: hunks.length });
 
   if (hunks.length === 0) {
-    console.log("No hunks to review");
+    clack.log.warn("No hunks to review");
+    clack.outro("");
     process.exit(0);
   }
 
-  console.log(`Found ${hunks.length} hunks to review`);
-  console.log(`Connecting to ${agent} ACP...`);
+  clack.log.step(`Found ${hunks.length} hunk${hunks.length === 1 ? "" : "s"} to review`);
 
   // Create temp file for YAML output
   const yamlPath = join(tmpdir(), `critique-review-${Date.now()}.yaml`);
@@ -117,58 +121,55 @@ async function runReviewMode(
   let acpClient: ReturnType<typeof createAcpClient> | null = null;
   let reviewSessionId: string | null = null;
 
-  // Console streaming state
+  // Streaming state for taskLog
+  let analysisLog: ReturnType<typeof clack.taskLog> | null = null;
+  let analysisSpinner: ReturnType<typeof clack.spinner> | null = null;
+  let toolSpinner: ReturnType<typeof clack.spinner> | null = null;
+  let activeToolCalls = new Set<string>();
+  let lastToolCount = 0;
   let lastThinking = false;
   let currentMessage = "";
   const seenToolCalls = new Set<string>();
-  let generatingShown = false;
-  let dotPhase = 0;
-  let generatingInterval: ReturnType<typeof setInterval> | null = null;
 
-  const clearGenerating = () => {
-    if (generatingInterval) {
-      clearInterval(generatingInterval);
-      generatingInterval = null;
+  const ensureAnalysisLog = () => {
+    if (!analysisLog) {
+      analysisSpinner?.stop("Analysis started");
+      analysisSpinner = null;
+      analysisLog = clack.taskLog({ title: "Analyzing diff..." });
     }
-    if (generatingShown) {
-      process.stdout.write("\x1b[1A\x1b[2K");
-      generatingShown = false;
-    }
+    return analysisLog;
   };
 
-  const showGenerating = () => {
-    if (generatingShown) return;
-
-    const render = () => {
-      const dots = ".".repeat(dotPhase).padEnd(3, " ");
-      process.stdout.write("\x1b[1A\x1b[2K");
-      console.log(pc.default.gray(`┣ ${dots}`));
-      dotPhase = (dotPhase + 1) % 4;
-    };
-
-    console.log(pc.default.gray("┣    "));
-    generatingShown = true;
-    dotPhase = 1;
-
-    generatingInterval = setInterval(render, 300);
-  };
-
-  const printLine = (text: string) => {
-    clearGenerating();
-    console.log(text);
-    showGenerating();
+  const updateToolSpinner = (count: number) => {
+    if (count <= 0) {
+      if (toolSpinner) {
+        toolSpinner.stop("Tools finished");
+        toolSpinner = null;
+      }
+      lastToolCount = 0;
+      return;
+    }
+    if (!toolSpinner) {
+      toolSpinner = clack.spinner();
+      toolSpinner.start(`Running ${count} tool${count === 1 ? "" : "s"}...`);
+    } else if (count !== lastToolCount) {
+      toolSpinner.message(`Running ${count} tool${count === 1 ? "" : "s"}...`);
+    }
+    lastToolCount = count;
   };
 
   const printNotification = (notification: import("@agentclientprotocol/sdk").SessionNotification) => {
+    const log = ensureAnalysisLog();
+    
     const update = notification.update;
     
     if (update.sessionUpdate === "agent_thought_chunk") {
       if (!lastThinking) {
-        printLine(pc.default.gray("┣ thinking"));
+        log.message(pc.default.gray("thinking..."));
         lastThinking = true;
       }
       if (currentMessage) {
-        printLine(pc.default.white("⬥ " + currentMessage.split("\n")[0]));
+        log.message(pc.default.dim(currentMessage.split("\n")[0]));
         currentMessage = "";
       }
       return;
@@ -184,7 +185,7 @@ async function runReviewMode(
     if (update.sessionUpdate === "tool_call" || update.sessionUpdate === "tool_call_update") {
       lastThinking = false;
       if (currentMessage) {
-        printLine(pc.default.white("⬥ " + currentMessage.split("\n")[0]));
+        log.message(pc.default.dim(currentMessage.split("\n")[0]));
         currentMessage = "";
       }
 
@@ -195,23 +196,65 @@ async function runReviewMode(
         locations?: { path: string }[];
         additions?: number;
         deletions?: number;
+        rawInput?: Record<string, unknown>;
+        status?: string;
       };
 
       const toolId = tool.toolCallId || "";
-      if (seenToolCalls.has(toolId)) return;
-      seenToolCalls.add(toolId);
-
       const kind = tool.kind || "";
-      const isEdit = kind.toLowerCase().includes("edit") || kind.toLowerCase().includes("write");
-      const isWrite = kind.toLowerCase().includes("write");
-      const file = tool.locations?.[0]?.path?.split("/").pop() || "";
+      const kindLower = kind.toLowerCase();
+      const isEdit = kindLower.includes("edit") || kindLower.includes("write");
+      const isWrite = kindLower.includes("write");
+      const isRead = kindLower.includes("read");
+      const status = (tool.status || "").toLowerCase();
+      const isActiveStatus = status === "pending" || status === "in_progress";
+      const isDoneStatus = status === "completed" || status === "error" || status === "cancelled";
       
-      let line = isWrite && file ? `write ${file}` : isEdit && file ? `edit  ${file}` : (tool.title || kind || "tool") + (file ? ` ${file}` : "");
-      if (isEdit && (tool.additions !== undefined || tool.deletions !== undefined)) {
-        line += ` (+${tool.additions || 0}-${tool.deletions || 0})`;
+      // Get file from locations or rawInput.filePath
+      let file = tool.locations?.[0]?.path?.split("/").pop() || "";
+      if (!file && tool.rawInput) {
+        const inputPath = (tool.rawInput.filePath || tool.rawInput.path || tool.rawInput.file) as string | undefined;
+        if (inputPath) file = inputPath.split("/").pop() || "";
       }
 
-      printLine((isEdit ? pc.default.green : pc.default.gray)(`${isEdit ? "◼︎" : "┣"} ${line}`));
+      if (toolId) {
+        if (isActiveStatus) {
+          activeToolCalls.add(toolId);
+        } else if (isDoneStatus) {
+          activeToolCalls.delete(toolId);
+        }
+        updateToolSpinner(activeToolCalls.size);
+      }
+      
+      // Skip if we've already shown this tool call with file info
+      // (first notification often has empty locations, update has the file)
+      if (seenToolCalls.has(toolId)) {
+        // Already shown with file info, skip
+        return;
+      }
+      
+      // For read/write/edit, wait until we have file info before showing
+      if ((isRead || isWrite || isEdit) && !file) {
+        return;
+      }
+      
+      seenToolCalls.add(toolId);
+      
+      let line: string;
+      if (isWrite && file) {
+        line = `write ${file}`;
+      } else if (isEdit && file) {
+        line = `edit  ${file}`;
+        if (tool.additions !== undefined || tool.deletions !== undefined) {
+          line += ` (+${tool.additions || 0}-${tool.deletions || 0})`;
+        }
+      } else if (isRead && file) {
+        line = `read  ${file}`;
+      } else {
+        line = (tool.title || kind || "tool") + (file ? ` ${file}` : "");
+      }
+
+      log.message((isEdit ? pc.default.green : pc.default.gray)(line));
     }
   };
 
@@ -236,7 +279,7 @@ async function runReviewMode(
       // If session IDs provided via --session, use those
       if (sessionIds && sessionIds.length > 0) {
         selectedSessionIds = sessionIds;
-        console.log(`Using ${selectedSessionIds.length} specified session(s) for context`);
+        clack.log.info(`Using ${selectedSessionIds.length} specified session(s) for context`);
       } else {
         // Show multiselect prompt to pick sessions
         const formatTimeAgo = (timestamp: number) => {
@@ -265,7 +308,7 @@ async function runReviewMode(
           .slice(0, 10);
 
         if (filteredSessions.length === 0) {
-          console.log("No sessions available for context");
+          clack.log.info("No sessions available for context");
         }
 
         const selected = filteredSessions.length > 0
@@ -287,14 +330,17 @@ async function runReviewMode(
 
         selectedSessionIds = selected as string[];
         if (selectedSessionIds.length > 0) {
-          console.log(`Selected ${selectedSessionIds.length} session(s) for context`);
+          clack.log.info(`Selected ${selectedSessionIds.length} session(s) for context`);
         } else {
-          console.log("No sessions selected, proceeding without session context");
+          clack.log.info("No sessions selected, proceeding without context");
         }
       }
 
       // Load selected sessions
       if (selectedSessionIds.length > 0) {
+        const loadSpinner = clack.spinner();
+        loadSpinner.start(`Loading ${selectedSessionIds.length} session${selectedSessionIds.length === 1 ? "" : "s"}...`);
+        
         const compressedSessions: Awaited<ReturnType<typeof compressSession>>[] = [];
         const sessionsToLoad = sessions.filter((s) => selectedSessionIds.includes(s.sessionId));
         
@@ -307,12 +353,14 @@ async function runReviewMode(
           }
         }
         sessionsContext = sessionsToContextXml(compressedSessions);
+        loadSpinner.stop(`Loaded ${compressedSessions.length} session${compressedSessions.length === 1 ? "" : "s"}`);
       }
     }
 
     const hunksContext = hunksToContextXml(hunks);
-    console.log("Starting review analysis...\n");
-    showGenerating();
+    
+    analysisSpinner = clack.spinner();
+    analysisSpinner.start("Analyzing diff...");
 
     // Start the review session (don't await - let it run in background)
     logger.info("Creating review session", { yamlPath });
@@ -332,16 +380,19 @@ async function runReviewMode(
       // Wait for generation to complete
       try {
         await sessionPromise;
-        clearGenerating();
+        const log = ensureAnalysisLog();
         if (currentMessage) {
-          console.log(pc.default.white("⬥ " + currentMessage.split("\n")[0]));
+          log.message(pc.default.dim(currentMessage.split("\n")[0]));
         }
+        updateToolSpinner(0);
+        log.success("Analysis complete");
         logger.info("Review generation completed, generating web preview");
-        console.log("\nGenerating web preview...");
       } catch (error) {
-        clearGenerating();
+        const log = ensureAnalysisLog();
+        updateToolSpinner(0);
+        log.error("Analysis failed");
         logger.error("Review session error", error);
-        console.error("Review generation failed:", error);
+        clack.log.error(`Review generation failed: ${error}`);
         if (acpClient) await acpClient.close();
         try { fs.unlinkSync(yamlPath); } catch (e) { logger.debug("Failed to cleanup yaml file", { error: e }); }
         process.exit(1);
@@ -373,6 +424,9 @@ async function runReviewMode(
         themeName,
       ];
 
+      const webSpinner = clack.spinner();
+      webSpinner.start("Generating web preview...");
+      
       try {
         const { htmlDesktop, htmlMobile } = await captureResponsiveHtml(
           renderCommand,
@@ -384,30 +438,37 @@ async function runReviewMode(
         cleanupTempFile(yamlPath);
         if (acpClient) await acpClient.close();
 
-        console.log("Uploading to worker...");
+        webSpinner.message("Uploading...");
         const result = await uploadHtml(htmlDesktop, htmlMobile);
-        console.log(`\nPreview URL: ${result.url}`);
-        console.log(`(expires in 7 days)`);
+        webSpinner.stop("Uploaded");
+        
+        clack.log.success(`Preview URL: ${result.url}`);
+        clack.log.info("(expires in 7 days)");
+        clack.outro("");
 
         if (webOptions.open) {
           await openInBrowser(result.url);
         }
         process.exit(0);
       } catch (error: any) {
+        webSpinner.stop("Failed");
         cleanupTempFile(hunksFile);
         cleanupTempFile(yamlPath);
         if (acpClient) await acpClient.close();
-        console.error("Failed to generate web preview:", error.message);
+        clack.log.error(`Failed to generate web preview: ${error.message}`);
+        clack.outro("");
         process.exit(1);
       }
     }
 
     // TUI mode: wait for first valid group, then start interactive UI
     await waitForFirstValidGroup(yamlPath);
-    clearGenerating();
+    const log = ensureAnalysisLog();
     if (currentMessage) {
-      console.log(pc.default.white("⬥ " + currentMessage.split("\n")[0]));
+      log.message(pc.default.dim(currentMessage.split("\n")[0]));
     }
+    updateToolSpinner(0);
+    log.success("Analysis complete");
     logger.info("First valid group appeared, starting TUI");
 
     // Start TUI immediately with isGenerating: true
@@ -458,7 +519,11 @@ async function runReviewMode(
       });
   } catch (error) {
     logger.error("Review mode error", error);
-    console.error("Review mode error:", error);
+    const log = ensureAnalysisLog();
+    updateToolSpinner(0);
+    log.error("Analysis failed");
+    clack.log.error(`Review mode error: ${error}`);
+    clack.outro("");
     if (acpClient) {
       await acpClient.close();
     }

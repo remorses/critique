@@ -125,7 +125,6 @@ export function ReviewApp({
             placeholder="Search themes..."
             itemsPerPage={6}
             theme={resolvedTheme}
-            focused
           />
         </box>
         <scrollbox
@@ -161,6 +160,26 @@ export function ReviewApp({
       themeName={activeTheme}
       width={width}
     />
+  )
+}
+
+/**
+ * Animated "generating..." indicator with cycling dots
+ */
+function GeneratingIndicator({ color }: { color: string }) {
+  const [dotPhase, setDotPhase] = React.useState(0)
+  
+  React.useEffect(() => {
+    const interval = setInterval(() => {
+      setDotPhase((p) => (p + 1) % 4)
+    }, 300)
+    return () => clearInterval(interval)
+  }, [])
+  
+  const dots = ".".repeat(dotPhase).padEnd(3, " ")
+  
+  return (
+    <text fg={color}>generating{dots}  </text>
   )
 }
 
@@ -324,6 +343,9 @@ export function ReviewAppView({
             alignItems: "center",
           }}
         >
+          {isGenerating && (
+            <GeneratingIndicator color={rgbaToHex(resolvedTheme.textMuted)} />
+          )}
           <box flexGrow={1} />
           <text fg={rgbaToHex(resolvedTheme.text)}>q</text>
           <text fg={rgbaToHex(resolvedTheme.textMuted)}> quit  </text>

@@ -1,3 +1,12 @@
+# 0.1.21
+
+- `review` command:
+  - Add clack spinners for analysis start and tool call activity
+  - Show file names for read/write/edit tool logs
+  - Show animated "generating..." indicator in the TUI footer
+  - Add spinner while loading session context
+  - Upgrade `@clack/prompts` for taskLog support
+
 # 0.1.20
 
 - Add theme picker to `review` command:
