@@ -18,7 +18,7 @@ export {
 } from "./hunk-parser.ts"
 export { OpencodeAcpClient, createAcpClient } from "./acp-client.ts"
 export { compressSession, sessionsToContextXml } from "./session-context.ts"
-export { watchReviewYaml, readReviewYaml } from "./yaml-watcher.ts"
+export { watchReviewYaml, readReviewYaml, waitForFirstValidGroup } from "./yaml-watcher.ts"
 export { StreamDisplay } from "./stream-display.tsx"
 export { formatNotifications, formatNotification, type StreamLine } from "./acp-stream-display.ts"
 export type {

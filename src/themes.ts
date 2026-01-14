@@ -47,33 +47,32 @@ export interface ResolvedTheme {
   // Background
   background: RGBA;
   backgroundPanel: RGBA;
+  // Markdown colors
+  markdownText: RGBA;
+  markdownHeading: RGBA;
+  markdownLink: RGBA;
+  markdownLinkText: RGBA;
+  markdownCode: RGBA;
+  markdownBlockQuote: RGBA;
+  markdownEmph: RGBA;
+  markdownStrong: RGBA;
+  markdownHorizontalRule: RGBA;
+  markdownListItem: RGBA;
+  markdownListEnumeration: RGBA;
+  markdownImage: RGBA;
+  markdownImageText: RGBA;
+  markdownCodeBlock: RGBA;
 }
 
 export interface SyntaxThemeStyle {
   fg: RGBA;
   bold?: boolean;
   italic?: boolean;
+  underline?: boolean;
 }
 
 export interface SyntaxTheme {
   [key: string]: SyntaxThemeStyle;
-  keyword: SyntaxThemeStyle;
-  "keyword.import": SyntaxThemeStyle;
-  string: SyntaxThemeStyle;
-  comment: SyntaxThemeStyle;
-  number: SyntaxThemeStyle;
-  boolean: SyntaxThemeStyle;
-  constant: SyntaxThemeStyle;
-  function: SyntaxThemeStyle;
-  "function.call": SyntaxThemeStyle;
-  constructor: SyntaxThemeStyle;
-  type: SyntaxThemeStyle;
-  operator: SyntaxThemeStyle;
-  variable: SyntaxThemeStyle;
-  property: SyntaxThemeStyle;
-  bracket: SyntaxThemeStyle;
-  punctuation: SyntaxThemeStyle;
-  default: SyntaxThemeStyle;
 }
 
 // Theme name to file mapping for lazy loading
@@ -174,6 +173,8 @@ function resolveTheme(
   const fallbackBg: ColorValue = "#1e1e1e";
   const fallbackText: ColorValue = "#d4d4d4";
 
+  const text = resolveColor(t.text ?? fallbackText);
+  
   return {
     primary: resolveColor(t.primary ?? t.syntaxFunction ?? fallbackGray),
     syntaxComment: resolveColor(t.syntaxComment ?? fallbackGray),
@@ -185,7 +186,7 @@ function resolveTheme(
     syntaxType: resolveColor(t.syntaxType ?? fallbackGray),
     syntaxOperator: resolveColor(t.syntaxOperator ?? fallbackGray),
     syntaxPunctuation: resolveColor(t.syntaxPunctuation ?? fallbackGray),
-    text: resolveColor(t.text ?? fallbackText),
+    text,
     textMuted: resolveColor(t.textMuted ?? fallbackGray),
     diffAddedBg: resolveColor(t.diffAddedBg ?? "#1e3a1e"),
     diffRemovedBg: resolveColor(t.diffRemovedBg ?? "#3a1e1e"),
@@ -197,6 +198,21 @@ function resolveTheme(
     diffLineNumber: resolveColor(t.diffLineNumber ?? fallbackGray),
     background: resolveColor(t.background ?? fallbackBg),
     backgroundPanel: resolveColor(t.backgroundPanel ?? fallbackBg),
+    // Markdown colors - fallback to text/syntax colors if not defined
+    markdownText: resolveColor(t.markdownText ?? t.text ?? fallbackText),
+    markdownHeading: resolveColor(t.markdownHeading ?? t.primary ?? fallbackGray),
+    markdownLink: resolveColor(t.markdownLink ?? t.syntaxString ?? fallbackGray),
+    markdownLinkText: resolveColor(t.markdownLinkText ?? t.primary ?? fallbackGray),
+    markdownCode: resolveColor(t.markdownCode ?? t.syntaxString ?? fallbackGray),
+    markdownBlockQuote: resolveColor(t.markdownBlockQuote ?? t.syntaxComment ?? fallbackGray),
+    markdownEmph: resolveColor(t.markdownEmph ?? t.text ?? fallbackText),
+    markdownStrong: resolveColor(t.markdownStrong ?? t.text ?? fallbackText),
+    markdownHorizontalRule: resolveColor(t.markdownHorizontalRule ?? fallbackGray),
+    markdownListItem: resolveColor(t.markdownListItem ?? t.syntaxKeyword ?? fallbackGray),
+    markdownListEnumeration: resolveColor(t.markdownListEnumeration ?? t.syntaxNumber ?? fallbackGray),
+    markdownImage: resolveColor(t.markdownImage ?? t.syntaxString ?? fallbackGray),
+    markdownImageText: resolveColor(t.markdownImageText ?? t.primary ?? fallbackGray),
+    markdownCodeBlock: resolveColor(t.markdownCodeBlock ?? t.text ?? fallbackText),
   };
 }
 
@@ -215,23 +231,72 @@ export function getSyntaxTheme(
   const resolved = getResolvedTheme(name, mode);
 
   return {
-    keyword: { fg: resolved.syntaxKeyword, bold: true },
-    "keyword.import": { fg: resolved.syntaxKeyword, bold: true },
+    // Default text style
+    default: { fg: resolved.text },
+    
+    // Code syntax styles
+    keyword: { fg: resolved.syntaxKeyword, italic: true },
+    "keyword.import": { fg: resolved.syntaxKeyword },
+    "keyword.return": { fg: resolved.syntaxKeyword, italic: true },
+    "keyword.conditional": { fg: resolved.syntaxKeyword, italic: true },
+    "keyword.repeat": { fg: resolved.syntaxKeyword, italic: true },
+    "keyword.type": { fg: resolved.syntaxType, bold: true, italic: true },
+    "keyword.function": { fg: resolved.syntaxFunction },
+    "keyword.operator": { fg: resolved.syntaxOperator },
+    "keyword.modifier": { fg: resolved.syntaxKeyword, italic: true },
+    "keyword.exception": { fg: resolved.syntaxKeyword, italic: true },
     string: { fg: resolved.syntaxString },
+    symbol: { fg: resolved.syntaxString },
     comment: { fg: resolved.syntaxComment, italic: true },
+    "comment.documentation": { fg: resolved.syntaxComment, italic: true },
     number: { fg: resolved.syntaxNumber },
     boolean: { fg: resolved.syntaxNumber },
     constant: { fg: resolved.syntaxNumber },
     function: { fg: resolved.syntaxFunction },
     "function.call": { fg: resolved.syntaxFunction },
-    constructor: { fg: resolved.syntaxType },
+    "function.method": { fg: resolved.syntaxFunction },
+    "function.method.call": { fg: resolved.syntaxVariable },
+    constructor: { fg: resolved.syntaxFunction },
     type: { fg: resolved.syntaxType },
+    module: { fg: resolved.syntaxType },
+    class: { fg: resolved.syntaxType },
     operator: { fg: resolved.syntaxOperator },
     variable: { fg: resolved.syntaxVariable },
+    "variable.parameter": { fg: resolved.syntaxVariable },
+    "variable.member": { fg: resolved.syntaxFunction },
     property: { fg: resolved.syntaxVariable },
+    parameter: { fg: resolved.syntaxVariable },
     bracket: { fg: resolved.syntaxPunctuation },
     punctuation: { fg: resolved.syntaxPunctuation },
-    default: { fg: resolved.text },
+    "punctuation.bracket": { fg: resolved.syntaxPunctuation },
+    "punctuation.delimiter": { fg: resolved.syntaxOperator },
+    "punctuation.special": { fg: resolved.syntaxOperator },
+    
+    // Markdown styles - these are the Tree-sitter scope names for markdown
+    "markup.heading": { fg: resolved.markdownHeading, bold: true },
+    "markup.heading.1": { fg: resolved.markdownHeading, bold: true },
+    "markup.heading.2": { fg: resolved.markdownHeading, bold: true },
+    "markup.heading.3": { fg: resolved.markdownHeading, bold: true },
+    "markup.heading.4": { fg: resolved.markdownHeading, bold: true },
+    "markup.heading.5": { fg: resolved.markdownHeading, bold: true },
+    "markup.heading.6": { fg: resolved.markdownHeading, bold: true },
+    "markup.bold": { fg: resolved.markdownStrong, bold: true },
+    "markup.strong": { fg: resolved.markdownStrong, bold: true },
+    "markup.italic": { fg: resolved.markdownEmph, italic: true },
+    "markup.list": { fg: resolved.markdownListItem },
+    "markup.quote": { fg: resolved.markdownBlockQuote, italic: true },
+    "markup.raw": { fg: resolved.markdownCode },
+    "markup.raw.block": { fg: resolved.markdownCode },
+    "markup.raw.inline": { fg: resolved.markdownCode },
+    "markup.link": { fg: resolved.markdownLink, underline: true },
+    "markup.link.label": { fg: resolved.markdownLinkText, underline: true },
+    "markup.link.url": { fg: resolved.markdownLink, underline: true },
+    label: { fg: resolved.markdownLinkText },
+    spell: { fg: resolved.text },
+    nospell: { fg: resolved.text },
+    conceal: { fg: resolved.textMuted },
+    "string.special": { fg: resolved.markdownLink, underline: true },
+    "string.special.url": { fg: resolved.markdownLink, underline: true },
   };
 }
 

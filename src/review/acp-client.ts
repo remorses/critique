@@ -33,7 +33,7 @@ export class OpencodeAcpClient {
   async connect(onUpdate?: (notification: SessionNotification) => void): Promise<void> {
     this.onUpdateCallback = onUpdate || null
     logger.info("Spawning opencode ACP server...")
-    
+
     // Spawn opencode in ACP mode
     this.proc = Bun.spawn(["bunx", "opencode", "acp"], {
       stdin: "pipe",
@@ -80,26 +80,26 @@ export class OpencodeAcpClient {
         async requestPermission(params) {
           // Auto-approve all tool calls for review mode
           // The AI needs to write to temp files for YAML output
-          logger.info("Permission requested", { 
+          logger.info("Permission requested", {
             tool: params.toolCall?.title,
             options: params.options?.map(o => ({ id: o.optionId, kind: o.kind }))
           })
-          
+
           // Find an "allow" option from the provided options
           const allowOption = params.options?.find(
             o => o.kind === "allow_once" || o.kind === "allow_always"
           )
-          
+
           if (allowOption) {
             logger.info("Auto-approving with option", { optionId: allowOption.optionId })
-            return { 
-              outcome: { 
-                outcome: "selected" as const, 
-                optionId: allowOption.optionId 
-              } 
+            return {
+              outcome: {
+                outcome: "selected" as const,
+                optionId: allowOption.optionId
+              }
             }
           }
-          
+
           // If no allow option found, cancel (shouldn't happen)
           logger.warn("No allow option found, cancelling")
           return { outcome: { outcome: "cancelled" as const } }
@@ -221,7 +221,7 @@ export class OpencodeAcpClient {
       mcpServers: [],
     })
     logger.info("Session created", { sessionId })
-    
+
     // Notify caller of sessionId so they can start filtering notifications
     if (onSessionCreated) {
       onSessionCreated(sessionId)
@@ -242,7 +242,7 @@ export class OpencodeAcpClient {
       logger.error("Review prompt failed", error)
       throw error
     }
-    
+
     return sessionId
   }
 
@@ -274,63 +274,126 @@ function buildReviewPrompt(
   sessionsContext: string,
   outputPath: string,
 ): string {
-  return `You are reviewing a git diff. Your task is to analyze the changes and group related hunks together with clear markdown descriptions.
+  return `You are reviewing a git diff. Explain the changes so a reader builds a clear mental model.
 
 <task>
-Review the following git diff hunks. Group related hunks together and provide a concise markdown description explaining what each group of changes does.
+Output file: ${outputPath}
 
-Write your output to the file at: ${outputPath}
+IMPORTANT: Never use emojis or non-ASCII characters except for box-drawing characters in diagrams.
 
-Use this YAML format, updating the file progressively as you analyze each group:
+═══════════════════════════════════════════════════════════════════════════════
+READING ORDER - The Guiding Principle
+═══════════════════════════════════════════════════════════════════════════════
+
+The reader reads top to bottom. You control their mental model. Order groups so each builds on the previous:
+
+1. Config/infrastructure (sets the stage)
+2. Types and interfaces (vocabulary)
+3. Core utilities (foundational pieces)
+4. Main implementation (reader now has context)
+5. Integration and usage (how it connects)
+6. Tests and docs (validation)
+
+Show "what" before "how". Show data structures before code that uses them.
+
+═══════════════════════════════════════════════════════════════════════════════
+HOW TO EXPLAIN - Diagrams First, Text Last
+═══════════════════════════════════════════════════════════════════════════════
+
+PREFER ASCII DIAGRAMS - they explain better than words.
+ALWAYS wrap diagrams in \`\`\` code blocks - never render them as plain text:
+
+\`\`\`
+┌─────────────┐      ┌─────────────┐      ┌────────────┐
+│   Request   │ ───> │   Router    │ ───> │   Handler  │
+└─────────────┘      └──────┬──────┘      └──────┬─────┘
+                            │                    │
+                            v                    v
+                    ┌─────────────┐      ┌─────────────┐
+                    │  Middleware │      │  Response   │
+                    └─────────────┘      └─────────────┘
+\`\`\`
+
+\`\`\`
+                    ┌──────────────────┐
+                    │     Initial      │
+                    └────────┬─────────┘
+                             │ start()
+                             v
+┌───────────┐ fail   ┌──────────────────┐  success  ┌───────────┐
+│   Error   │ <───── │    Processing    │ ────────> │  Complete │
+└───────────┘        └──────────────────┘           └───────────┘
+                             │ cancel()
+                             v
+                     ┌──────────────────┐
+                     │    Cancelled     │
+                     └──────────────────┘
+\`\`\`
+
+USE TABLES for comparisons and summaries:
+
+| Field     | Before   | After    |
+|-----------|----------|----------|
+| timeout   | 5000     | 10000    |
+| retries   | 3        | 5        |
+
+TEXT IS LAST RESORT - max 3 lines, no filler, every word must add value.
+
+═══════════════════════════════════════════════════════════════════════════════
+SPLITTING RULES
+═══════════════════════════════════════════════════════════════════════════════
+
+- Each diff chunk: MAX 10 lines. Split aggressively to reduce cognitive load.
+- Use numbered headers for sequential parts: ## 1. Parse input  ## 2. Validate  ## 3. Execute
+- Split by logical boundaries (functions, concerns)
+- Every chunk needs a description, even just a few words
+
+Lines use cat -n format (1-based). Use lineRange to reference specific portions.
+
+═══════════════════════════════════════════════════════════════════════════════
+SKIPPING FILES
+═══════════════════════════════════════════════════════════════════════════════
+
+You MAY skip files that add noise without insight:
+
+- Lock files (package-lock.json, bun.lockb, yarn.lock)
+- Auto-generated code (*.generated.ts, *.d.ts from codegen)
+- Build artifacts, minified files, source maps
+- Large machine-generated diffs (migrations with timestamps, etc.)
+
+When skipping, add ONE entry at the end:
 
 \`\`\`yaml
-hunks:
-# Option 1: Group multiple full hunks together
+- hunkIds: [45, 46, 47]
+  markdownDescription: |
+    ## Skipped: Auto-generated files
+    Lock files and generated types - no manual changes.
+\`\`\`
+
+═══════════════════════════════════════════════════════════════════════════════
+OUTPUT FORMAT
+═══════════════════════════════════════════════════════════════════════════════
+
+Write YAML progressively (one item at a time so user sees progress):
+
+1. First Write tool: create file with just "hunks:"
+2. Then Edit tool for EACH item (one at a time)
+
+\`\`\`yaml
+# Group related hunks
 - hunkIds: [1, 2]
   markdownDescription: |
-    ## Brief title
-    
-    Description of what these changes do and why they're related...
+    ## Title
+    Brief explanation with diagram...
 
-# Option 2: Reference a single hunk
-- hunkIds: [3]
-  markdownDescription: |
-    ## Another title
-    
-    Description...
-
-# Option 3: Reference part of a hunk using line numbers (for large hunks)
+# Or reference part of a large hunk
 - hunkId: 4
   lineRange: [1, 10]
   markdownDescription: |
-    ## First part of hunk 4
-    
-    Description of lines 1-10...
-
-- hunkId: 4
-  lineRange: [11, 25]
-  markdownDescription: |
-    ## Second part of hunk 4
-    
-    Description of lines 11-25...
+    ## 1. First part
+    What this section does...
 \`\`\`
 
-Lines are shown using cat -n format, with line numbers starting at 1. Use lineRange with these 1-based line numbers to split large hunks into logical parts if they contain multiple unrelated changes.
-
-Guidelines:
-- Group hunks that are logically related (same feature, same refactor, etc.)
-- For large hunks with multiple logical changes, split them using lineRange
-- Order groups for optimal code review flow:
-  1. Infrastructure/config changes first
-  2. Core/shared code changes
-  3. Feature implementations
-  4. Tests
-  5. Documentation
-- Keep descriptions concise but informative
-- Use markdown formatting: headers (##), bullet points, **bold** for emphasis
-- Mention file names when relevant
-- Highlight any potential issues or things to pay attention to
-- Ensure ALL hunks (or all lines within hunks) are covered by your explanations
 </task>
 
 <hunks>
@@ -338,11 +401,11 @@ ${hunksContext}
 </hunks>
 
 ${sessionsContext ? `<session-context>
-The following is context from coding sessions that may have created these changes:
+Context from coding sessions that may have created these changes:
 ${sessionsContext}
 </session-context>` : ""}
 
-Now analyze the hunks and write the review YAML to ${outputPath}. Make sure to explain all changes - do not leave any hunks unexplained.`
+Write the review to ${outputPath}. Cover ALL hunks. Use diagrams liberally.`
 }
 
 /**

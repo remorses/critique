@@ -2,14 +2,12 @@
 
 import * as React from "react"
 import { useKeyboard, useRenderer, useTerminalDimensions } from "@opentui/react"
-import { MacOSScrollAccel } from "@opentui/core"
-import { getResolvedTheme, defaultThemeName, rgbaToHex } from "../themes.ts"
+import { MacOSScrollAccel, SyntaxStyle } from "@opentui/core"
+import { getResolvedTheme, getSyntaxTheme, defaultThemeName, rgbaToHex } from "../themes.ts"
 import { detectFiletype, countChanges, getViewMode } from "../diff-utils.ts"
 import { DiffView } from "../components/diff-view.tsx"
 import { watchReviewYaml } from "./yaml-watcher.ts"
 import { createSubHunk } from "./hunk-parser.ts"
-import { StreamDisplay } from "./stream-display.tsx"
-import type { SessionNotification } from "@agentclientprotocol/sdk"
 import type { IndexedHunk, ReviewYaml, ReviewGroup } from "./types.ts"
 
 export interface ReviewAppProps {
@@ -17,7 +15,6 @@ export interface ReviewAppProps {
   yamlPath: string
   themeName?: string
   isGenerating: boolean
-  subscribeToNotifications?: (callback: (notifications: SessionNotification[]) => void) => () => void
 }
 
 class ScrollAcceleration {
@@ -42,12 +39,10 @@ export function ReviewApp({
   yamlPath,
   themeName = defaultThemeName,
   isGenerating,
-  subscribeToNotifications,
 }: ReviewAppProps) {
   const { width } = useTerminalDimensions()
   const renderer = useRenderer()
   const [reviewData, setReviewData] = React.useState<ReviewYaml | null>(null)
-  const [notifications, setNotifications] = React.useState<SessionNotification[]>([])
 
   // Watch YAML file for updates
   React.useEffect(() => {
@@ -62,17 +57,6 @@ export function ReviewApp({
     )
     return cleanup
   }, [yamlPath])
-
-  // Subscribe to notification updates for real-time streaming
-  React.useEffect(() => {
-    if (!subscribeToNotifications) return
-    
-    const unsubscribe = subscribeToNotifications((newNotifications) => {
-      setNotifications(newNotifications)
-    })
-
-    return unsubscribe
-  }, [subscribeToNotifications])
 
   // Keyboard navigation - just quit, scrollbox handles scrolling
   useKeyboard((key) => {
@@ -89,7 +73,6 @@ export function ReviewApp({
       isGenerating={isGenerating}
       themeName={themeName}
       width={width}
-      notifications={notifications}
     />
   )
 }
@@ -103,7 +86,7 @@ export interface ReviewAppViewProps {
   isGenerating: boolean
   themeName?: string
   width: number
-  notifications?: SessionNotification[]
+  showFooter?: boolean // defaults to true, set false for web rendering
 }
 
 /**
@@ -116,7 +99,7 @@ export function ReviewAppView({
   isGenerating,
   themeName = defaultThemeName,
   width,
-  notifications = [],
+  showFooter = true,
 }: ReviewAppViewProps) {
   const [scrollAcceleration] = React.useState(() => new ScrollAcceleration())
 
@@ -126,7 +109,7 @@ export function ReviewAppView({
   const resolvedTheme = getResolvedTheme(themeName)
   const bgColor = resolvedTheme.background
 
-  // Loading state - show streaming display while waiting for YAML
+  // Loading state - TUI now only starts after YAML is parsed, so this is a fallback
   if (!reviewData) {
     return (
       <box
@@ -138,19 +121,8 @@ export function ReviewAppView({
         }}
       >
         <text fg={rgbaToHex(resolvedTheme.text)}>
-          Analyzing {hunks.length} hunks...
+          Loading review...
         </text>
-        {notifications.length > 0 ? (
-          <StreamDisplay
-            notifications={notifications}
-            themeName={themeName}
-            width={width}
-          />
-        ) : (
-          <text fg="#666666">
-            {isGenerating ? "Waiting for AI to generate review..." : ""}
-          </text>
-        )}
       </box>
     )
   }
@@ -180,7 +152,7 @@ export function ReviewAppView({
       <box
         style={{
           flexDirection: "column",
-          height: "100%",
+          flexGrow: 1,
           padding: 1,
           backgroundColor: bgColor,
         }}
@@ -194,7 +166,7 @@ export function ReviewAppView({
     <box
       style={{
         flexDirection: "column",
-        height: "100%",
+        flexGrow: 1,
         padding: 1,
         backgroundColor: bgColor,
       }}
@@ -204,9 +176,13 @@ export function ReviewAppView({
         scrollAcceleration={scrollAcceleration}
         style={{
           flexGrow: 1,
+          flexShrink: 1,
           rootOptions: {
             backgroundColor: bgColor,
             border: false,
+          },
+          contentOptions: {
+            minHeight: 0, // let scrollbox shrink with content for web rendering
           },
           scrollbarOptions: {
             showArrows: false,
@@ -228,7 +204,7 @@ export function ReviewAppView({
                 {/* Markdown description */}
                 <MarkdownBlock
                   content={group.markdownDescription}
-                  theme={resolvedTheme}
+                  themeName={themeName}
                   width={width}
                 />
 
@@ -249,27 +225,29 @@ export function ReviewAppView({
         </box>
       </scrollbox>
 
-      {/* Footer */}
-      <box
-        style={{
-          paddingTop: 1,
-          paddingLeft: 1,
-          paddingRight: 1,
-          flexShrink: 0,
-          flexDirection: "row",
-          alignItems: "center",
-        }}
-      >
-        <box flexGrow={1} />
-        <text fg="#ffffff">q</text>
-        <text fg="#666666"> quit  </text>
-        <text fg="#ffffff">j/k</text>
-        <text fg="#666666"> scroll  </text>
-        <text fg="#666666">
-          ({groups.length} section{groups.length !== 1 ? "s" : ""})
-        </text>
-        <box flexGrow={1} />
-      </box>
+      {/* Footer - hidden in web mode */}
+      {showFooter && (
+        <box
+          style={{
+            paddingTop: 1,
+            paddingLeft: 1,
+            paddingRight: 1,
+            flexShrink: 0,
+            flexDirection: "row",
+            alignItems: "center",
+          }}
+        >
+          <box flexGrow={1} />
+          <text fg="#ffffff">q</text>
+          <text fg="#666666"> quit  </text>
+          <text fg="#ffffff">j/k</text>
+          <text fg="#666666"> scroll  </text>
+          <text fg="#666666">
+            ({groups.length} section{groups.length !== 1 ? "s" : ""})
+          </text>
+          <box flexGrow={1} />
+        </box>
+      )}
     </box>
   )
 }
@@ -324,18 +302,20 @@ function resolveGroupHunks(
 
 interface MarkdownBlockProps {
   content: string
-  theme: ReturnType<typeof getResolvedTheme>
+  themeName: string
   width: number
 }
 
-function MarkdownBlock({ content, theme, width }: MarkdownBlockProps) {
-  // Simple markdown rendering - headers, bold, code
-  const lines = content.split("\n")
+function MarkdownBlock({ content, themeName, width }: MarkdownBlockProps) {
+  const syntaxTheme = getSyntaxTheme(themeName)
+  const syntaxStyle = React.useMemo(
+    () => SyntaxStyle.fromStyles(syntaxTheme),
+    [syntaxTheme],
+  )
 
   // Max width 80, centered
   const maxWidth = 80
-  const contentWidth = Math.min(width - 4, maxWidth) // Account for padding
-  const sidePadding = Math.max(1, Math.floor((width - contentWidth) / 2))
+  const contentWidth = Math.min(width - 4, maxWidth)
 
   return (
     <box
@@ -346,38 +326,16 @@ function MarkdownBlock({ content, theme, width }: MarkdownBlockProps) {
         paddingBottom: 1,
       }}
     >
-      <box
+      <code
+        content={content}
+        filetype="markdown"
+        syntaxStyle={syntaxStyle}
         style={{
-          flexDirection: "column",
           width: contentWidth,
           paddingLeft: 1,
           paddingRight: 1,
         }}
-      >
-        {lines.map((line, idx) => {
-          // Headers - use brighter color for emphasis
-          if (line.startsWith("## ")) {
-            return (
-              <text key={idx} fg="#ffffff">
-                {line.slice(3)}
-              </text>
-            )
-          }
-          if (line.startsWith("# ")) {
-            return (
-              <text key={idx} fg="#ffffff">
-                {line.slice(2)}
-              </text>
-            )
-          }
-          // Regular text
-          return (
-            <text key={idx} fg={rgbaToHex(theme.text)}>
-              {line || " "}
-            </text>
-          )
-        })}
-      </box>
+      />
     </box>
   )
 }

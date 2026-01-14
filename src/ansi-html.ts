@@ -129,7 +129,7 @@ export function ansiToHtmlDocument(input: string | Buffer, options: AnsiToHtmlOp
     cols = 500,
     backgroundColor = "#ffffff",
     textColor = "#1a1a1a",
-    fontFamily = "Monaco, Menlo, 'Ubuntu Mono', Consolas, monospace",
+    fontFamily = "'Fira Code', Monaco, Menlo, 'Ubuntu Mono', Consolas, monospace",
     fontSize = "14px",
     title = "Critique Diff",
   } = options
@@ -146,6 +146,9 @@ export function ansiToHtmlDocument(input: string | Buffer, options: AnsiToHtmlOp
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;700&display=swap" rel="stylesheet">
 <title>${escapeHtml(title)}</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }

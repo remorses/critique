@@ -1,3 +1,31 @@
+# 0.1.16
+
+- `explain` command:
+  - Add explicit instruction that diagrams must be wrapped in code blocks
+
+# 0.1.15
+
+- `explain` command:
+  - Add `--web` flag to generate web preview instead of TUI
+  - Add `--open` flag to open web preview in browser
+  - Web mode waits for full AI generation before rendering
+  - Hide keyboard shortcuts footer in web mode
+- New `src/web-utils.ts` module:
+  - Shared utilities for web preview generation
+  - `captureToHtml` - PTY capture and ANSI to HTML conversion
+  - `captureResponsiveHtml` - Generate desktop and mobile versions
+  - `uploadHtml` - Upload to critique.work worker
+  - `openInBrowser` - Platform-specific browser opening
+  - `writeTempFile` / `cleanupTempFile` - Temp file helpers
+- Refactored `web` command to use shared utilities
+- Fix markdown syntax highlighting in review mode:
+  - Add markdown colors to theme resolution
+  - Add Tree-sitter markdown scopes (markup.heading, markup.bold, etc.)
+- Fix empty space in web preview rendering:
+  - Add `minHeight: 0` to scrollbox contentOptions
+  - Replace `height: 100%` with `flexGrow: 1` for flexible layout
+  - Add `showFooter` prop to ReviewAppView for web mode
+
 # 0.1.14
 
 - New `explain` command:

@@ -216,19 +216,19 @@ describe("ReviewAppView", () => {
     const frame = testSetup.captureCharFrame()
     expect(frame).toMatchInlineSnapshot(`
       "                                                                                                    
-                 Import changes                                                                         █ 
+               ## Import changes                                                                        █ 
                                                                                                         █ 
-                 Added logger import to support new logging functionality.                              █ 
+               Added logger import to support new logging functionality.                                █ 
                                                                                                         █ 
         #3 src/index.ts +1-0                                                                            █ 
         1   import { main } from './utils'                                                              █ 
         2 + import { logger } from './logger'                                                           █ 
                                                                                                         █ 
                                                                                                         █ 
-                 Input validation and logging                                                           █ 
+               ## Input validation and logging                                                          █ 
                                                                                                         █ 
-                 These changes add input validation to the helper function and integrate                █ 
-                 logging in the main function.                                                          █ 
+               These changes add input validation to the helper function and integrate logging          █ 
+               in the main function.                                                                    █ 
                                                                                                         █ 
         #1 src/utils.ts +3-1                                                                            █ 
         10   function helper() {                         10   function helper() {                       █ 
@@ -283,8 +283,8 @@ describe("ReviewAppView", () => {
     const frame = testSetup.captureCharFrame()
     expect(frame).toMatchInlineSnapshot(`
       "                                                            
-       Analyzing 3 hunks...                                       
-       Waiting for AI to generate review...                       
+       Loading review...                                          
+                                                                  
                                                                   
                                                                   
                                                                   
@@ -348,19 +348,19 @@ describe("ReviewAppView", () => {
     const frame = testSetup.captureCharFrame()
     expect(frame).toMatchInlineSnapshot(`
       "                                                                                                                                            
-                                     Import changes                                                                                             █ 
+                                   ## Import changes                                                                                            █ 
                                                                                                                                                 █ 
-                                     Added logger import to support new logging functionality.                                                  █ 
+                                   Added logger import to support new logging functionality.                                                    █ 
                                                                                                                                                 █ 
         #3 src/index.ts +1-0                                                                                                                    █ 
         1   import { main } from './utils'                                                                                                      █ 
         2 + import { logger } from './logger'                                                                                                   █ 
                                                                                                                                                 █ 
                                                                                                                                                 █ 
-                                     Input validation and logging                                                                               █ 
+                                   ## Input validation and logging                                                                              █ 
                                                                                                                                                 █ 
-                                     These changes add input validation to the helper function and integrate                                    █ 
-                                     logging in the main function.                                                                              █ 
+                                   These changes add input validation to the helper function and integrate logging                              █ 
+                                   in the main function.                                                                                        █ 
                                                                                                                                                 █ 
         #1 src/utils.ts +3-1                                                                                                                    █ 
         10   function helper() {                                             10   function helper() {                                           █ 
@@ -421,13 +421,13 @@ describe("ReviewAppView", () => {
     const frame = testSetup.captureCharFrame()
     expect(frame).toMatchInlineSnapshot(`
       "                                                                                                                                            
-                                     Custom Error Classes                                                                                       █ 
+                                   ## Custom Error Classes                                                                                      █ 
                                                                                                                                                 █ 
-                                     Introduces a new error class for better error handling:                                                    █ 
+                                   Introduces a new error class for better error handling:                                                      █ 
                                                                                                                                                 █ 
-                                     - **NotFoundError**: Used when a requested resource doesn't exist                                          █ 
+                                   - **NotFoundError**: Used when a requested resource doesn't exist                                            █ 
                                                                                                                                                 █ 
-                                     This enables more specific catch blocks and better error messages.                                         █ 
+                                   This enables more specific catch blocks and better error messages.                                           █ 
                                                                                                                                                 █ 
         #1 src/errors/index.ts +6-0                                                                                                             █ 
         1 + export class NotFoundError extends Error {                                                                                          █ 
@@ -438,15 +438,15 @@ describe("ReviewAppView", () => {
         6 + }                                                                                                                                   █ 
                                                                                                                                                 █ 
                                                                                                                                                 █ 
-                                     User API Improvements                                                                                      █ 
+                                   ## User API Improvements                                                                                     █ 
                                                                                                                                                 █ 
-                                     ### Error Handling                                                                                         █ 
-                                     The getUser function now properly handles missing users by throwing a                                      █ 
-                                     NotFoundError.                                                                                             █ 
+                                   ### Error Handling                                                                                           █ 
+                                   The getUser function now properly handles missing users by throwing a                                        █ 
+                                   NotFoundError.                                                                                               █ 
                                                                                                                                                 █ 
-                                     ### Security                                                                                               █ 
-                                     User data is now sanitized before being returned to prevent leaking sensitive                              █ 
-                                     fields.                                                                                                    █ 
+                                   ### Security                                                                                                 █ 
+                                   User data is now sanitized before being returned to prevent leaking sensitive                                █ 
+                                   fields.                                                                                                      █ 
                                                                                                                                                 █ 
         #2 src/api/users.ts +5-2                                                                                                                █ 
         15   export async function getUser(id: string) {                     15   export async function getUser(id: string) {                   █ 
@@ -458,13 +458,13 @@ describe("ReviewAppView", () => {
         18   }                                                               21   }                                                               
                                                                                                                                                   
                                                                                                                                                   
-                                     Environment-based Configuration                                                                              
+                                   ## Environment-based Configuration                                                                             
                                                                                                                                                   
-                                     Database configuration now reads from environment variables:                                                 
+                                   Database configuration now reads from environment variables:                                                   
                                                                                                                                                   
-                                     - **DB_HOST**: Database hostname (default: localhost)                                                        
-                                     - **DB_PORT**: Database port (default: 5432)                                                                 
-                                     - **SSL**: Automatically enabled in production                                                               
+                                   - **DB_HOST**: Database hostname (default: localhost)                                                          
+                                   - **DB_PORT**: Database port (default: 5432)                                                                   
+                                   - **SSL**: Automatically enabled in production                                                                 
                                                                                                                                                   
         #3 src/config/database.ts +3-2                                                                                                            
         1   export const dbConfig = {                                        1   export const dbConfig = {                                        
@@ -523,9 +523,9 @@ Added validation at handler start.`,
     // Should only show lines 1-7 of the hunk, not the full thing
     expect(frame).toMatchInlineSnapshot(`
       "                                                                                                    
-                 Input Validation                                                                       █ 
+               ## Input Validation                                                                      █ 
                                                                                                         █ 
-                 Added validation at handler start.                                                     █ 
+               Added validation at handler start.                                                       █ 
                                                                                                         █ 
         #1 src/api/handlers.ts +5-1                                                                     █ 
         10   export async function handleRequest(req:    10   export async function handleRequest(req:  █ 
@@ -572,11 +572,11 @@ Added validation at handler start.`,
     // Should show two sections: validation (lines 1-7) then processing (lines 8-16)
     expect(frame).toMatchInlineSnapshot(`
       "                                                                                                                        
-                           Input Validation                                                                                 █ 
+                         ## Input Validation                                                                                █ 
                                                                                                                             █ 
-                           Added proper input validation at the start of the handler:                                       █ 
-                           - Check for missing request body                                                                 █ 
-                           - Validate input before processing                                                               █ 
+                         Added proper input validation at the start of the handler:                                         █ 
+                         - Check for missing request body                                                                   █ 
+                         - Validate input before processing                                                                 █ 
                                                                                                                             █ 
         #1 src/api/handlers.ts +5-1                                                                                         █ 
         10   export async function handleRequest(req: Request) {   10   export async function handleRequest(req: Request) { █ 
@@ -588,11 +588,11 @@ Added validation at handler start.`,
                                                                    15 +   const data = validateInput(req.body)              █ 
                                                                                                                             █ 
                                                                                                                             █ 
-                           Async Processing and Logging                                                                     █ 
+                         ## Async Processing and Logging                                                                    █ 
                                                                                                                             █ 
-                           Improved the processing logic:                                                                   █ 
-                           - Made process call async for better performance                                                 █ 
-                           - Added request logging for debugging                                                            █ 
+                         Improved the processing logic:                                                                     █ 
+                         - Made process call async for better performance                                                   █ 
+                         - Added request logging for debugging                                                              █ 
                                                                                                                             █ 
         #1 src/api/handlers.ts +4-1                                                                                         █ 
         12                                                         16                                                         
@@ -646,18 +646,18 @@ Added validation at handler start.`,
     // Should show: full hunk #3, then partial of largeHunk (lines 1-7)
     expect(frame).toMatchInlineSnapshot(`
       "                                                                                                    
-                 Import changes                                                                         █ 
+               ## Import changes                                                                        █ 
                                                                                                         █ 
-                 Added logger import.                                                                   █ 
+               Added logger import.                                                                     █ 
                                                                                                         █ 
         #3 src/index.ts +1-0                                                                            █ 
         1   import { main } from './utils'                                                              █ 
         2 + import { logger } from './logger'                                                           █ 
                                                                                                         █ 
                                                                                                         █ 
-                 Validation                                                                             █ 
+               ## Validation                                                                            █ 
                                                                                                         █ 
-                 Input validation logic.                                                                █ 
+               Input validation logic.                                                                  █ 
                                                                                                         █ 
         #1 src/api/handlers.ts +5-1                                                                     █ 
         10   export async function handleRequest(req:    10   export async function handleRequest(req:  █ 
@@ -713,9 +713,9 @@ This uses hunkId instead of hunkIds but shows full hunk.`,
     // Should show full hunk #1
     expect(frame).toMatchInlineSnapshot(`
       "                                                                                                    
-                 Full hunk via hunkId                                                                   █ 
+               ## Full hunk via hunkId                                                                  █ 
                                                                                                         █ 
-                 This uses hunkId instead of hunkIds but shows full hunk.                               █ 
+               This uses hunkId instead of hunkIds but shows full hunk.                                 █ 
                                                                                                         █ 
         #1 src/utils.ts +3-1                                                                            █ 
         10   function helper() {                         10   function helper() {                       █ 

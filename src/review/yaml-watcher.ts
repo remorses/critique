@@ -100,30 +100,37 @@ function parsePartialYaml(content: string): ReviewYaml | null {
       return null
     }
 
-    // Validate structure
+    // Validate structure - hunks must be a non-empty array
+    if (!Array.isArray(parsed.hunks) || parsed.hunks.length === 0) {
+      return null
+    }
+
     const result: ReviewYaml = { hunks: [] }
 
-    if (Array.isArray(parsed.hunks)) {
-      for (const item of parsed.hunks) {
-        if (isValidReviewGroup(item)) {
-          const group: ReviewGroup = {
-            markdownDescription: dedentDescription(String(item.markdownDescription || "")),
-          }
-          
-          // Support both formats
-          if (item.hunkIds) {
-            group.hunkIds = item.hunkIds
-          }
-          if (item.hunkId !== undefined) {
-            group.hunkId = item.hunkId
-          }
-          if (item.lineRange) {
-            group.lineRange = item.lineRange
-          }
-          
-          result.hunks.push(group)
+    for (const item of parsed.hunks) {
+      if (isValidReviewGroup(item)) {
+        const group: ReviewGroup = {
+          markdownDescription: dedentDescription(String(item.markdownDescription || "")),
         }
+        
+        // Support both formats
+        if (item.hunkIds) {
+          group.hunkIds = item.hunkIds
+        }
+        if (item.hunkId !== undefined) {
+          group.hunkId = item.hunkId
+        }
+        if (item.lineRange) {
+          group.lineRange = item.lineRange
+        }
+        
+        result.hunks.push(group)
       }
+    }
+
+    // Only return if we have at least one valid group
+    if (result.hunks.length === 0) {
+      return null
     }
 
     return result
@@ -203,4 +210,19 @@ export function readReviewYaml(path: string): ReviewYaml | null {
   } catch {
     return null
   }
+}
+
+/**
+ * Wait for the first valid group to appear in the YAML file
+ * Returns a promise that resolves when hunks array has at least one valid item
+ */
+export function waitForFirstValidGroup(path: string): Promise<ReviewYaml> {
+  return new Promise((resolve) => {
+    const stop = watchReviewYaml(path, (yaml) => {
+      if (yaml.hunks.length > 0) {
+        stop()
+        resolve(yaml)
+      }
+    })
+  })
 }

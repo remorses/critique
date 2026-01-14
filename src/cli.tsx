@@ -79,10 +79,23 @@ function savePersistedState(state: PersistedState): void {
 
 const persistedState = loadPersistedState();
 
+// Web options for review mode
+interface ReviewWebOptions {
+  web: boolean;
+  open?: boolean;
+}
+
 // Review mode handler
-async function runReviewMode(gitCommand: string, agent: string) {
+async function runReviewMode(
+  gitCommand: string,
+  agent: string,
+  sessionIds?: string[],
+  webOptions?: ReviewWebOptions
+) {
   const { tmpdir } = await import("os");
   const { join } = await import("path");
+  const pc = await import("picocolors");
+  const clack = await import("@clack/prompts");
 
   logger.info("Starting review mode", { gitCommand, agent });
 
@@ -105,6 +118,7 @@ async function runReviewMode(gitCommand: string, agent: string) {
     createAcpClient,
     sessionsToContextXml,
     compressSession,
+    waitForFirstValidGroup,
   } = await import("./review/index.ts");
   const { ReviewApp } = await import("./review/review-app.tsx");
 
@@ -126,66 +140,292 @@ async function runReviewMode(gitCommand: string, agent: string) {
 
   // Connect to ACP
   let acpClient: Awaited<ReturnType<typeof createAcpClient>> | null = null;
-  let isGenerating = true;
-
-  // Store notifications for streaming display with subscriber pattern
-  // Only collect notifications for the review session (not loading old sessions)
-  const notifications: import("@agentclientprotocol/sdk").SessionNotification[] = [];
-  type NotificationCallback = (notifications: import("@agentclientprotocol/sdk").SessionNotification[]) => void;
-  let subscriber: NotificationCallback | null = null;
   let reviewSessionId: string | null = null;
-  
-  const subscribeToNotifications = (callback: NotificationCallback) => {
-    subscriber = callback;
-    // Immediately send any accumulated notifications
-    if (notifications.length > 0) {
-      callback([...notifications]);
+
+  // Console streaming state
+  let lastThinking = false;
+  let currentMessage = "";
+  const seenToolCalls = new Set<string>();
+  let generatingShown = false;
+  let dotPhase = 0;
+  let generatingInterval: ReturnType<typeof setInterval> | null = null;
+
+  const clearGenerating = () => {
+    if (generatingInterval) {
+      clearInterval(generatingInterval);
+      generatingInterval = null;
     }
-    return () => { subscriber = null; };
+    if (generatingShown) {
+      process.stdout.write("\x1b[1A\x1b[2K");
+      generatingShown = false;
+    }
+  };
+
+  const showGenerating = () => {
+    if (generatingShown) return;
+
+    const render = () => {
+      const dots = ".".repeat(dotPhase).padEnd(3, " ");
+      process.stdout.write("\x1b[1A\x1b[2K");
+      console.log(pc.default.gray(`┣ ${dots}generating`));
+      dotPhase = (dotPhase + 1) % 4;
+    };
+
+    console.log(pc.default.gray("┣    generating"));
+    generatingShown = true;
+    dotPhase = 1;
+
+    generatingInterval = setInterval(render, 300);
+  };
+
+  const printLine = (text: string) => {
+    clearGenerating();
+    console.log(text);
+    showGenerating();
+  };
+
+  const printNotification = (notification: import("@agentclientprotocol/sdk").SessionNotification) => {
+    const update = notification.update;
+    
+    if (update.sessionUpdate === "agent_thought_chunk") {
+      if (!lastThinking) {
+        printLine(pc.default.gray("┣ thinking"));
+        lastThinking = true;
+      }
+      if (currentMessage) {
+        printLine(pc.default.white("⬥ " + currentMessage.split("\n")[0]));
+        currentMessage = "";
+      }
+      return;
+    }
+
+    if (update.sessionUpdate === "agent_message_chunk") {
+      lastThinking = false;
+      const content = (update as { content?: { text?: string } }).content;
+      if (content?.text) currentMessage += content.text;
+      return;
+    }
+
+    if (update.sessionUpdate === "tool_call" || update.sessionUpdate === "tool_call_update") {
+      lastThinking = false;
+      if (currentMessage) {
+        printLine(pc.default.white("⬥ " + currentMessage.split("\n")[0]));
+        currentMessage = "";
+      }
+
+      const tool = update as {
+        toolCallId?: string;
+        kind?: string;
+        title?: string;
+        locations?: { path: string }[];
+        additions?: number;
+        deletions?: number;
+      };
+
+      const toolId = tool.toolCallId || "";
+      if (seenToolCalls.has(toolId)) return;
+      seenToolCalls.add(toolId);
+
+      const kind = tool.kind || "";
+      const isEdit = kind.toLowerCase().includes("edit") || kind.toLowerCase().includes("write");
+      const isWrite = kind.toLowerCase().includes("write");
+      const file = tool.locations?.[0]?.path?.split("/").pop() || "";
+      
+      let line = isWrite && file ? `write ${file}` : isEdit && file ? `edit  ${file}` : (tool.title || kind || "tool") + (file ? ` ${file}` : "");
+      if (isEdit && (tool.additions !== undefined || tool.deletions !== undefined)) {
+        line += ` (+${tool.additions || 0}-${tool.deletions || 0})`;
+      }
+
+      printLine((isEdit ? pc.default.green : pc.default.gray)(`${isEdit ? "◼︎" : "┣"} ${line}`));
+    }
   };
 
   try {
     acpClient = await createAcpClient((notification) => {
-      // Only collect notifications for the review session
       if (reviewSessionId && notification.sessionId === reviewSessionId) {
-        notifications.push(notification);
-        // Notify subscriber immediately
-        if (subscriber) {
-          subscriber([...notifications]);
-        }
+        printNotification(notification);
       }
     });
 
-    // List sessions (will return empty for now since opencode doesn't support it)
     const cwd = process.cwd();
     const sessions = await acpClient.listSessions(cwd);
 
-    // Build session context (empty for now)
+    // Build session context
     let sessionsContext = "";
+    let selectedSessionIds: string[] = [];
+
     if (sessions.length > 0) {
-      // Load and compress sessions
-      const compressedSessions: Awaited<ReturnType<typeof compressSession>>[] = [];
-      for (const sessionInfo of sessions.slice(0, 3)) {
-        // Load max 3 recent sessions
-        try {
-          const content = await acpClient.loadSessionContent(sessionInfo.sessionId, cwd);
-          compressedSessions.push(compressSession(content));
-        } catch {
-          // Skip sessions that fail to load
+      // If session IDs provided via --session, use those
+      if (sessionIds && sessionIds.length > 0) {
+        selectedSessionIds = sessionIds;
+        console.log(`Using ${selectedSessionIds.length} specified session(s) for context`);
+      } else {
+        // Show multiselect prompt to pick sessions
+        const formatTimeAgo = (timestamp: number) => {
+          const seconds = Math.floor((Date.now() - timestamp) / 1000);
+          if (seconds < 60) return "just now";
+          const minutes = Math.floor(seconds / 60);
+          if (minutes < 60) return `${minutes}m ago`;
+          const hours = Math.floor(minutes / 60);
+          if (hours < 24) return `${hours}h ago`;
+          const days = Math.floor(hours / 24);
+          return `${days}d ago`;
+        };
+
+        // Filter out ACP sessions and limit to first 10
+        const filteredSessions = sessions
+          .filter((s) => !s.title?.toLowerCase().includes("acp session"))
+          .slice(0, 10);
+
+        if (filteredSessions.length === 0) {
+          console.log("No sessions available for context");
+        }
+
+        const selected = filteredSessions.length > 0
+          ? await clack.multiselect({
+              message: "Select sessions to include as context (space to toggle, enter to confirm)",
+              options: filteredSessions.map((s) => ({
+                value: s.sessionId,
+                label: s.title || `Session ${s.sessionId.slice(0, 8)}`,
+                hint: s.updatedAt ? formatTimeAgo(s.updatedAt) : undefined,
+              })),
+              required: false,
+            })
+          : [];
+
+        if (clack.isCancel(selected)) {
+          clack.cancel("Operation cancelled");
+          process.exit(0);
+        }
+
+        selectedSessionIds = selected as string[];
+        if (selectedSessionIds.length > 0) {
+          console.log(`Selected ${selectedSessionIds.length} session(s) for context`);
+        } else {
+          console.log("No sessions selected, proceeding without session context");
         }
       }
-      sessionsContext = sessionsToContextXml(compressedSessions);
+
+      // Load selected sessions
+      if (selectedSessionIds.length > 0) {
+        const compressedSessions: Awaited<ReturnType<typeof compressSession>>[] = [];
+        const sessionsToLoad = sessions.filter((s) => selectedSessionIds.includes(s.sessionId));
+        
+        for (const sessionInfo of sessionsToLoad) {
+          try {
+            const content = await acpClient.loadSessionContent(sessionInfo.sessionId, cwd);
+            compressedSessions.push(compressSession(content));
+          } catch {
+            // Skip sessions that fail to load
+          }
+        }
+        sessionsContext = sessionsToContextXml(compressedSessions);
+      }
     }
 
-    // Build hunks context
     const hunksContext = hunksToContextXml(hunks);
+    console.log("Starting review analysis...\n");
+    showGenerating();
 
-    console.log("Starting review analysis...");
+    // Start the review session (don't await - let it run in background)
+    logger.info("Creating review session", { yamlPath });
+    const sessionPromise = acpClient.createReviewSession(
+      cwd,
+      hunksContext,
+      sessionsContext,
+      yamlPath,
+      (sessionId) => {
+        reviewSessionId = sessionId;
+        logger.info("Review session started", { sessionId });
+      },
+    );
 
-    // Start the TUI
+    // Web mode: wait for full generation, then render to HTML
+    if (webOptions?.web) {
+      // Wait for generation to complete
+      try {
+        await sessionPromise;
+        clearGenerating();
+        if (currentMessage) {
+          console.log(pc.default.white("⬥ " + currentMessage.split("\n")[0]));
+        }
+        logger.info("Review generation completed, generating web preview");
+        console.log("\nGenerating web preview...");
+      } catch (error) {
+        clearGenerating();
+        logger.error("Review session error", error);
+        console.error("Review generation failed:", error);
+        if (acpClient) await acpClient.close();
+        try { fs.unlinkSync(yamlPath); } catch {}
+        process.exit(1);
+      }
+
+      // Import web utilities
+      const {
+        captureResponsiveHtml,
+        uploadHtml,
+        openInBrowser,
+        writeTempFile,
+        cleanupTempFile,
+      } = await import("./web-utils.ts");
+
+      // Write hunks to temp file for the render command
+      const hunksFile = writeTempFile(JSON.stringify(hunks), "critique-hunks", ".json");
+      const themeName = persistedState.themeName ?? defaultThemeName;
+
+      // Calculate rows needed based on hunks
+      const totalLines = hunks.reduce((sum, h) => sum + h.lines.length, 0);
+      const baseRows = Math.max(200, totalLines * 2 + 100);
+
+      const renderCommand = [
+        process.argv[1]!,
+        "explain-web-render",
+        yamlPath,
+        hunksFile,
+        "--theme",
+        themeName,
+      ];
+
+      try {
+        const { htmlDesktop, htmlMobile } = await captureResponsiveHtml(
+          renderCommand,
+          { desktopCols: 240, mobileCols: 100, baseRows, themeName }
+        );
+
+        // Clean up temp files
+        cleanupTempFile(hunksFile);
+        cleanupTempFile(yamlPath);
+        if (acpClient) await acpClient.close();
+
+        console.log("Uploading to worker...");
+        const result = await uploadHtml(htmlDesktop, htmlMobile);
+        console.log(`\nPreview URL: ${result.url}`);
+        console.log(`(expires in 7 days)`);
+
+        if (webOptions.open) {
+          await openInBrowser(result.url);
+        }
+        process.exit(0);
+      } catch (error: any) {
+        cleanupTempFile(hunksFile);
+        cleanupTempFile(yamlPath);
+        if (acpClient) await acpClient.close();
+        console.error("Failed to generate web preview:", error.message);
+        process.exit(1);
+      }
+    }
+
+    // TUI mode: wait for first valid group, then start interactive UI
+    await waitForFirstValidGroup(yamlPath);
+    clearGenerating();
+    if (currentMessage) {
+      console.log(pc.default.white("⬥ " + currentMessage.split("\n")[0]));
+    }
+    logger.info("First valid group appeared, starting TUI");
+
+    // Start TUI immediately with isGenerating: true
     const renderer = await createCliRenderer({
       onDestroy() {
-        // Clean up ACP client and temp file
         if (acpClient) {
           acpClient.close();
         }
@@ -199,44 +439,37 @@ async function runReviewMode(gitCommand: string, agent: string) {
       exitOnCtrlC: true,
     });
 
-    // Create the review session in background
-    logger.info("Creating review session in background", { yamlPath });
-    const reviewPromise = acpClient.createReviewSession(
-      cwd,
-      hunksContext,
-      sessionsContext,
-      yamlPath,
-      (sessionId) => {
-        // Start collecting notifications for this session
-        reviewSessionId = sessionId;
-        logger.info("Review session started, collecting notifications", { sessionId });
-      },
-    ).then(() => {
-      logger.info("Review generation completed");
-      isGenerating = false;
-    }).catch((error) => {
-      logger.error("Review generation failed", error);
-      console.error("Review generation failed:", error);
-      isGenerating = false;
-    });
+    const root = createRoot(renderer);
+    
+    // Helper to render with current isGenerating state
+    const renderApp = (isGenerating: boolean) => {
+      root.render(
+        React.createElement(
+          ErrorBoundary,
+          null,
+          React.createElement(ReviewApp, {
+            hunks,
+            yamlPath,
+            themeName: persistedState.themeName ?? defaultThemeName,
+            isGenerating,
+          }),
+        ),
+      );
+    };
 
-    // Render the review app
-    createRoot(renderer).render(
-      React.createElement(
-        ErrorBoundary,
-        null,
-        React.createElement(ReviewApp, {
-          hunks,
-          yamlPath,
-          themeName: persistedState.themeName ?? defaultThemeName,
-          isGenerating,
-          subscribeToNotifications,
-        }),
-      ),
-    );
+    // Start with isGenerating: true
+    renderApp(true);
 
-    // Wait for review to complete (TUI will handle user interaction)
-    await reviewPromise;
+    // When session completes, re-render with isGenerating: false
+    sessionPromise
+      .then(() => {
+        logger.info("Review generation completed");
+        renderApp(false);
+      })
+      .catch((error) => {
+        logger.error("Review session error", error);
+        renderApp(false);
+      });
   } catch (error) {
     logger.error("Review mode error", error);
     console.error("Review mode error:", error);
@@ -498,6 +731,9 @@ function App({ parsedFiles }: AppProps) {
               backgroundColor: bgColor,
               border: false,
             },
+            contentOptions: {
+              minHeight: 0,
+            },
           }}
         >
           <DiffView
@@ -578,6 +814,9 @@ function App({ parsedFiles }: AppProps) {
           rootOptions: {
             backgroundColor: bgColor,
             border: false,
+          },
+          contentOptions: {
+            minHeight: 0,
           },
           scrollbarOptions: {
             showArrows: false,
@@ -786,6 +1025,9 @@ cli
   .option("--commit <ref>", "Explain changes from a specific commit")
   .option("--context <lines>", "Number of context lines (default: 3)")
   .option("--filter <pattern>", "Filter files by glob pattern")
+  .option("--session <id>", "Session ID(s) to include as context (can be repeated)")
+  .option("--web", "Generate web preview instead of TUI")
+  .option("--open", "Open web preview in browser (with --web)")
   .action(async (base, head, options) => {
     try {
       if (options.agent !== "opencode") {
@@ -803,7 +1045,13 @@ cli
         positionalFilters: options['--'],
       });
 
-      await runReviewMode(gitCommand, options.agent);
+      // Normalize session option to array (cac returns string for single, array for multiple)
+      const sessionIds = options.session
+        ? Array.isArray(options.session) ? options.session : [options.session]
+        : undefined;
+
+      const webOptions = options.web ? { web: true, open: options.open } : undefined;
+      await runReviewMode(gitCommand, options.agent, sessionIds, webOptions);
     } catch (error) {
       console.error("Error running explain:", error);
       process.exit(1);
@@ -1073,10 +1321,6 @@ cli
     }
   });
 
-// Worker URL for uploading HTML previews
-const WORKER_URL =
-  process.env.CRITIQUE_WORKER_URL || "https://critique.work";
-
 cli
   .command("web [base] [head]", "Generate web preview of diff")
   .option("--staged", "Show staged changes")
@@ -1098,8 +1342,13 @@ cli
   .option("--filter <pattern>", "Filter files by glob pattern (can be used multiple times)")
   .option("--title <title>", "HTML document title")
   .action(async (base, head, options) => {
-    const pty = await import("@xmorse/bun-pty");
-    const { ansiToHtmlDocument } = await import("./ansi-html.ts");
+    const {
+      captureResponsiveHtml,
+      uploadHtml,
+      openInBrowser,
+      writeTempFile,
+      cleanupTempFile,
+    } = await import("./web-utils.ts");
 
     const gitCommand = buildGitCommand({
       staged: options.staged,
@@ -1113,8 +1362,9 @@ cli
 
     const desktopCols = parseInt(options.cols) || 240;
     const mobileCols = parseInt(options.mobileCols) || 100;
-    const customTheme = options.theme && themeNames.includes(options.theme);
-    const themeName = customTheme ? options.theme : defaultThemeName;
+    const themeName = options.theme && themeNames.includes(options.theme)
+      ? options.theme
+      : defaultThemeName;
 
     console.log("Capturing diff output...");
 
@@ -1131,154 +1381,65 @@ cli
     // Calculate required rows from diff content
     const { parsePatch } = await import("diff");
     const files = parsePatch(gitDiff);
-    const baseRenderRows = files.reduce((sum, file) => {
+    const baseRows = files.reduce((sum, file) => {
       const diffLines = file.hunks.reduce((h, hunk) => h + hunk.lines.length, 0);
       return sum + diffLines + 5; // header + margin per file
     }, 100); // base padding
 
     // Write diff to temp file
-    const diffFile = join(tmpdir(), `critique-web-diff-${Date.now()}.patch`);
-    fs.writeFileSync(diffFile, gitDiff);
+    const diffFile = writeTempFile(gitDiff, "critique-web-diff", ".patch");
 
-    // Helper function to capture PTY output for a given column width
-    async function captureHtml(cols: number, renderRows: number): Promise<string> {
-      let ansiOutput = "";
-      const ptyProcess = pty.spawn(
-        "bun",
-        [
-          process.argv[1]!, // path to cli.tsx
-          "web-render",
-          diffFile,
-          "--cols",
-          String(cols),
-          "--rows",
-          String(renderRows),
-          "--theme",
-          themeName,
-        ],
-        {
-          name: "xterm-256color",
-          cols: cols,
-          rows: renderRows,
-          cwd: process.cwd(),
-          env: { ...process.env, TERM: "xterm-256color" } as Record<
-            string,
-            string
-          >,
-        },
-      );
-
-      ptyProcess.onData((data: string) => {
-        ansiOutput += data;
-      });
-
-      await new Promise<void>((resolve) => {
-        ptyProcess.onExit(() => {
-          resolve();
-        });
-      });
-
-      if (!ansiOutput.trim()) {
-        throw new Error("No output captured");
-      }
-
-      // Strip terminal cleanup sequences that clear the screen
-      const clearIdx = ansiOutput.lastIndexOf("\x1b[H\x1b[J");
-      if (clearIdx > 0) {
-        ansiOutput = ansiOutput.slice(0, clearIdx);
-      }
-
-      // Get theme colors for HTML output
-      const theme = getResolvedTheme(themeName);
-      const backgroundColor = rgbaToHex(theme.background);
-      const textColor = rgbaToHex(theme.text);
-
-      return ansiToHtmlDocument(ansiOutput, { cols, rows: renderRows, backgroundColor, textColor, autoTheme: !customTheme, title: options.title });
-    }
-
-    // Generate desktop and mobile versions in parallel
-    // Mobile needs more rows since lines wrap more with fewer columns
-    const mobileRenderRows = Math.ceil(baseRenderRows * (desktopCols / mobileCols));
-    console.log("Generating desktop and mobile versions in parallel...");
-    const [htmlDesktop, htmlMobile] = await Promise.all([
-      captureHtml(desktopCols, baseRenderRows),
-      captureHtml(mobileCols, mobileRenderRows),
-    ]);
-
-    // Clean up temp file
-    fs.unlinkSync(diffFile);
+    // Build render command
+    const renderCommand = [
+      process.argv[1]!, // path to cli.tsx
+      "web-render",
+      diffFile,
+      "--theme",
+      themeName,
+    ];
 
     console.log("Converting to HTML...");
 
-    if (options.local) {
-      // Save locally
-      const timestamp = Date.now();
-      const htmlFileDesktop = join(tmpdir(), `critique-${timestamp}-desktop.html`);
-      const htmlFileMobile = join(tmpdir(), `critique-${timestamp}-mobile.html`);
-      fs.writeFileSync(htmlFileDesktop, htmlDesktop);
-      fs.writeFileSync(htmlFileMobile, htmlMobile);
-      console.log(`Saved desktop to: ${htmlFileDesktop}`);
-      console.log(`Saved mobile to: ${htmlFileMobile}`);
-
-      // Open in browser if requested
-      if (options.open) {
-        const openCmd =
-          process.platform === "darwin"
-            ? "open"
-            : process.platform === "win32"
-              ? "start"
-              : "xdg-open";
-        try {
-          await execAsync(`${openCmd} "${htmlFileDesktop}"`);
-        } catch {
-          console.log("Could not open browser automatically");
-        }
-      }
-      process.exit(0);
-    }
-
-    console.log("Uploading to worker...");
-
     try {
-      const response = await fetch(`${WORKER_URL}/upload`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ html: htmlDesktop, htmlMobile }),
-      });
+      const { htmlDesktop, htmlMobile } = await captureResponsiveHtml(
+        renderCommand,
+        { desktopCols, mobileCols, baseRows, themeName, title: options.title }
+      );
 
-      if (!response.ok) {
-        const error = await response.text();
-        throw new Error(`Upload failed: ${error}`);
+      // Clean up temp file
+      cleanupTempFile(diffFile);
+
+      if (options.local) {
+        // Save locally
+        const desktopFile = writeTempFile(htmlDesktop, "critique-desktop", ".html");
+        const mobileFile = writeTempFile(htmlMobile, "critique-mobile", ".html");
+        console.log(`Saved desktop to: ${desktopFile}`);
+        console.log(`Saved mobile to: ${mobileFile}`);
+
+        if (options.open) {
+          await openInBrowser(desktopFile);
+        }
+        process.exit(0);
       }
 
-      const result = (await response.json()) as { id: string; url: string };
+      console.log("Uploading to worker...");
 
+      const result = await uploadHtml(htmlDesktop, htmlMobile);
       console.log(`\nPreview URL: ${result.url}`);
       console.log(`(expires in 7 days)`);
 
-      // Open in browser if requested
       if (options.open) {
-        const openCmd =
-          process.platform === "darwin"
-            ? "open"
-            : process.platform === "win32"
-              ? "start"
-              : "xdg-open";
-        try {
-          await execAsync(`${openCmd} "${result.url}"`);
-        } catch {
-          // Silent fail - user can copy URL
-        }
+        await openInBrowser(result.url);
       }
     } catch (error: any) {
-      console.error("Failed to upload:", error.message);
+      cleanupTempFile(diffFile);
+      console.error("Failed to generate web preview:", error.message);
 
-      // Fallback to local file
-      const htmlFile = join(tmpdir(), `critique-${Date.now()}.html`);
-      fs.writeFileSync(htmlFile, htmlDesktop);
-      console.log(`\nFallback: Saved locally to ${htmlFile}`);
+      // Fallback to local file on upload failure
+      if (!options.local) {
+        const htmlFile = writeTempFile("", "critique-fallback", ".html");
+        console.log(`\nFallback: Saved locally to ${htmlFile}`);
+      }
       process.exit(1);
     }
   });
@@ -1393,6 +1554,71 @@ cli
 
     createRoot(renderer).render(
       React.createElement(ErrorBoundary, null, React.createElement(WebApp)),
+    );
+  });
+
+// Internal command for explain web rendering (captures output to PTY)
+cli
+  .command("explain-web-render <yamlPath> <hunksFile>", "Internal: Render review for web capture", {
+    allowUnknownOptions: true,
+  })
+  .option("--cols <cols>", "Terminal columns", { default: 240 })
+  .option("--rows <rows>", "Terminal rows", { default: 500 })
+  .option("--theme <name>", "Theme to use for rendering")
+  .action(async (yamlPath: string, hunksFile: string, options) => {
+    const cols = parseInt(options.cols) || 240;
+    const rows = parseInt(options.rows) || 500;
+    const themeName = options.theme && themeNames.includes(options.theme)
+      ? options.theme
+      : defaultThemeName;
+
+    // Load hunks and review data
+    const hunks = JSON.parse(fs.readFileSync(hunksFile, "utf-8"));
+    const { readReviewYaml } = await import("./review/yaml-watcher.ts");
+    const reviewData = readReviewYaml(yamlPath);
+
+    if (!reviewData) {
+      console.log("No review data found");
+      process.exit(1);
+    }
+
+    // Override terminal size
+    process.stdout.columns = cols;
+    process.stdout.rows = rows;
+
+    const renderer = await createCliRenderer({
+      exitOnCtrlC: false,
+      useAlternateScreen: false,
+    });
+
+    // Wait for syntax highlighting to complete
+    let exitTimeout: ReturnType<typeof setTimeout> | undefined;
+    const originalRequestRender = renderer.root.requestRender.bind(renderer.root);
+    renderer.root.requestRender = function () {
+      originalRequestRender();
+      if (exitTimeout) clearTimeout(exitTimeout);
+      exitTimeout = setTimeout(() => {
+        renderer.destroy();
+        process.exit(0);
+      }, 1000);
+    };
+
+    // Import ReviewAppView for static rendering
+    const { ReviewAppView } = await import("./review/review-app.tsx");
+
+    function ExplainWebApp() {
+      return React.createElement(ReviewAppView, {
+        hunks,
+        reviewData,
+        isGenerating: false,
+        themeName,
+        width: cols,
+        showFooter: false, // hide keyboard shortcuts in web mode
+      });
+    }
+
+    createRoot(renderer).render(
+      React.createElement(ErrorBoundary, null, React.createElement(ExplainWebApp)),
     );
   });
 

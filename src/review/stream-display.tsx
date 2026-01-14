@@ -65,6 +65,9 @@ export function StreamDisplay({
           backgroundColor: bgColor,
           border: false,
         },
+        contentOptions: {
+          minHeight: 0,
+        },
         scrollbarOptions: {
           showArrows: false,
           trackOptions: {
