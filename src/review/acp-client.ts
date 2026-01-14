@@ -163,6 +163,7 @@ export class AcpClient {
         created: number
         projectId: string
         directory: string
+        _meta?: { [key: string]: unknown } | null
       }>
 
       // Filter sessions to only those matching the cwd
@@ -173,6 +174,7 @@ export class AcpClient {
           cwd: s.directory,
           title: s.title || undefined,
           updatedAt: s.updated,
+          _meta: s._meta,
         }))
     } catch (e) {
       logger.debug("Failed to parse opencode sessions", { error: e })
@@ -296,10 +298,11 @@ export class AcpClient {
 
     logger.info("Creating new ACP session...", { cwd, outputPath })
 
-    // Create new session
+    // Create new session with _meta to mark it as a critique session
     const { sessionId } = await this.client.newSession({
       cwd,
       mcpServers: [],
+      _meta: { critique: true },
     })
     logger.info("Session created", { sessionId })
 
@@ -432,24 +435,24 @@ SPLITTING RULES
 Lines use cat -n format (1-based). Use lineRange to reference specific portions.
 
 ═══════════════════════════════════════════════════════════════════════════════
-SKIPPING FILES
+AUTO-GENERATED CODE - NEVER INCLUDE
 ═══════════════════════════════════════════════════════════════════════════════
 
-You MAY skip files that add noise without insight:
+NEVER include these in your review - they are pre-filtered but if any slip through, skip them:
 
-- Lock files (package-lock.json, bun.lockb, yarn.lock)
-- Auto-generated code (*.generated.ts, *.d.ts from codegen)
-- Build artifacts, minified files, source maps
-- Large machine-generated diffs (migrations with timestamps, etc.)
+Files to skip entirely:
+- Lock files (package-lock.json, bun.lockb, yarn.lock, pnpm-lock.yaml, Cargo.lock, etc.)
+- Auto-generated code (*.generated.ts, *.g.ts, *.d.ts)
+- Build artifacts, minified files (*.min.js, *.bundle.js), source maps (*.map)
+- Machine-generated diffs (migrations with timestamps, snapshots, etc.)
+- Any file with "auto-generated" or "do not edit" comments at the top
 
-When skipping, add ONE entry at the end:
+Hunks to skip (even in otherwise relevant files):
+- Test snapshots (toMatchInlineSnapshot values, .snap content) - no explanation needed
+- Generated code blocks within files (GraphQL codegen, Prisma output, etc.)
+- Large data literals (JSON fixtures, mock data arrays)
 
-\`\`\`yaml
-- hunkIds: [45, 46, 47]
-  markdownDescription: |
-    ## Skipped: Auto-generated files
-    Lock files and generated types - no manual changes.
-\`\`\`
+These add noise without insight. Do NOT waste the reader's time explaining them.
 
 ═══════════════════════════════════════════════════════════════════════════════
 OUTPUT FORMAT
@@ -486,7 +489,7 @@ Context from coding sessions that may have created these changes:
 ${sessionsContext}
 </session-context>` : ""}
 
-Write the review to ${outputPath}. Cover ALL hunks. Use diagrams liberally.`
+Write the review to ${outputPath}. Cover all hunks (lockfiles and auto-generated files are already filtered out). Use diagrams liberally.`
 }
 
 /**

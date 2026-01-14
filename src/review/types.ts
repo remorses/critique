@@ -95,6 +95,7 @@ export interface SessionInfo {
   cwd: string
   title?: string
   updatedAt?: number
+  _meta?: { [key: string]: unknown } | null
 }
 
 /**

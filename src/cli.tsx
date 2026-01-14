@@ -272,9 +272,18 @@ async function runReviewMode(
           return `${days}d ago`;
         };
 
-        // Filter out ACP sessions and limit to first 10
+        // Filter out critique-generated sessions and ACP sessions, limit to first 10
         const filteredSessions = sessions
-          .filter((s) => !s.title?.toLowerCase().includes("acp session"))
+          .filter((s) => {
+            // Filter by _meta if the agent supports it
+            if (s._meta?.critique === true) return false
+            // Filter by title patterns
+            const title = s.title?.toLowerCase() || ""
+            if (title.includes("acp session")) return false
+            if (title.includes("reviewing a git diff")) return false
+            if (title.includes("review a git diff")) return false
+            return true
+          })
           .slice(0, 10);
 
         if (filteredSessions.length === 0) {

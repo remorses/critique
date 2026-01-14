@@ -1,3 +1,9 @@
+# 0.1.19
+
+- `review` command:
+  - Pass `_meta: { critique: true }` when creating review sessions for future filtering support
+  - Filter out critique-generated sessions from context selection (by `_meta` or title pattern)
+
 # 0.1.18
 
 - Replace `@xmorse/bun-pty` with `bun-pty` (official package)

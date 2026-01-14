@@ -1,6 +1,51 @@
 // Parse git diff into indexed hunks for AI review
 
 import type { IndexedHunk, HunkCoverage, ReviewCoverage, UncoveredPortion, ReviewGroup } from "./types.ts"
+import { IGNORED_FILES } from "../diff-utils.ts"
+
+/**
+ * Additional patterns for auto-generated files that should be skipped in reviews
+ * These are files that provide no value in code review
+ */
+const AUTO_GENERATED_PATTERNS = [
+  // Common generated file markers
+  /\.generated\.(ts|js|tsx|jsx)$/,
+  /\.g\.(ts|js)$/,
+  // Build outputs and compiled files
+  /\.min\.(js|css)$/,
+  /\.bundle\.(js|css)$/,
+  // Source maps
+  /\.map$/,
+  // Type declarations that are generated
+  /\.d\.ts$/,  // Often auto-generated, skip by default
+  // Database migrations with timestamps (auto-generated structure)
+  /migrations\/\d{10,}.*\.(sql|ts|js)$/,
+  // Snapshot files (test artifacts)
+  /__snapshots__\//,
+  /\.snap$/,
+]
+
+/**
+ * Check if a file should be skipped in review
+ * Returns true for lock files and auto-generated files
+ */
+function shouldSkipFile(filename: string): boolean {
+  const baseName = filename.split("/").pop() || ""
+  
+  // Check against ignored files list (lockfiles)
+  if (IGNORED_FILES.includes(baseName) || baseName.endsWith(".lock")) {
+    return true
+  }
+  
+  // Check auto-generated patterns
+  for (const pattern of AUTO_GENERATED_PATTERNS) {
+    if (pattern.test(filename)) {
+      return true
+    }
+  }
+  
+  return false
+}
 
 /**
  * Parse a git diff string into an array of indexed hunks
@@ -16,6 +61,11 @@ export async function parseHunksWithIds(gitDiff: string): Promise<IndexedHunk[]>
     const filename = file.newFileName && file.newFileName !== "/dev/null"
       ? file.newFileName
       : file.oldFileName || "unknown"
+
+    // Skip lockfiles and auto-generated files - they add noise without insight
+    if (shouldSkipFile(filename)) {
+      continue
+    }
 
     for (let hunkIndex = 0; hunkIndex < file.hunks.length; hunkIndex++) {
       const hunk = file.hunks[hunkIndex]!
