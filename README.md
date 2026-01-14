@@ -74,9 +74,17 @@ Then use:
 git difftool HEAD~1
 ```
 
-### AI-Powered Review
+### AI-Powered Diff Explanation
 
-Get AI-powered code review of your changes using [OpenCode](https://opencode.ai) or [Claude Code](https://www.anthropic.com/claude-code) as the backend agent.
+Generate AI-powered explanations of code changes using [OpenCode](https://opencode.ai) or [Claude Code](https://www.anthropic.com/claude-code) as the backend agent.
+
+**What it does:**
+- Orders hunks in logical reading order (types before implementation, etc.)
+- Splits large hunks into digestible chunks with focused explanations
+- Explains each change with diagrams, tables, and markdown
+- Groups related changes across files
+
+**Best for reviewing AI-generated changes:** Pass `--session` to include the coding session context, so the AI understands *why* changes were made and can explain them better.
 
 ```bash
 # Review unstaged changes (uses OpenCode by default)
@@ -88,15 +96,21 @@ critique review --agent claude
 # Review staged changes
 critique review --staged
 
+# Review the last commit
+critique review HEAD
+
 # Review a specific commit
-critique review --commit HEAD
+critique review --commit HEAD~1
 critique review --commit abc1234
 
-# Review commit range (like a PR)
-critique review main HEAD
+# Review commit range (like a PR): critique review <base> <head>
+# Shows what <head> added since diverging from <base>
+critique review main HEAD          # what current branch added vs main
+critique review main feature-branch
 
-# Include session context
-critique review --session <session-id>
+# Include session context (from opencode or claude sessions)
+critique review --agent opencode --session <session-id>
+critique review --agent claude --session <session-id>
 
 # Generate web preview instead of TUI
 critique review --web
