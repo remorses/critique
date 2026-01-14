@@ -3,17 +3,18 @@
 import * as React from "react"
 import { useKeyboard, useRenderer, useTerminalDimensions } from "@opentui/react"
 import { MacOSScrollAccel, SyntaxStyle } from "@opentui/core"
-import { getResolvedTheme, getSyntaxTheme, defaultThemeName, rgbaToHex } from "../themes.ts"
+import { getResolvedTheme, getSyntaxTheme, defaultThemeName, themeNames, rgbaToHex } from "../themes.ts"
 import { detectFiletype, countChanges, getViewMode } from "../diff-utils.ts"
 import { DiffView } from "../components/diff-view.tsx"
 import { watchReviewYaml } from "./yaml-watcher.ts"
 import { createSubHunk } from "./hunk-parser.ts"
+import { useAppStore } from "../store.ts"
+import Dropdown from "../dropdown.tsx"
 import type { IndexedHunk, ReviewYaml, ReviewGroup } from "./types.ts"
 
 export interface ReviewAppProps {
   hunks: IndexedHunk[]
   yamlPath: string
-  themeName?: string
   isGenerating: boolean
 }
 
@@ -37,12 +38,18 @@ class ScrollAcceleration {
 export function ReviewApp({
   hunks,
   yamlPath,
-  themeName = defaultThemeName,
   isGenerating,
 }: ReviewAppProps) {
   const { width } = useTerminalDimensions()
   const renderer = useRenderer()
   const [reviewData, setReviewData] = React.useState<ReviewYaml | null>(null)
+  const [showThemePicker, setShowThemePicker] = React.useState(false)
+  const [previewTheme, setPreviewTheme] = React.useState<string | null>(null)
+  
+  // Get theme from store
+  const themeName = useAppStore((s) => s.themeName)
+  // Use preview theme if hovering, otherwise use selected theme
+  const activeTheme = previewTheme ?? themeName
 
   // Watch YAML file for updates
   React.useEffect(() => {
@@ -58,20 +65,100 @@ export function ReviewApp({
     return cleanup
   }, [yamlPath])
 
-  // Keyboard navigation - just quit, scrollbox handles scrolling
+  // Keyboard navigation
   useKeyboard((key) => {
+    if (showThemePicker) {
+      if (key.name === "escape") {
+        setShowThemePicker(false)
+        setPreviewTheme(null)
+      }
+      return
+    }
+
     if (key.name === "escape" || key.name === "q") {
       renderer.destroy()
       return
     }
+
+    if (key.name === "t") {
+      setShowThemePicker(true)
+      return
+    }
   })
+
+  const themeOptions = themeNames.map((name) => ({
+    title: name,
+    value: name,
+  }))
+
+  const handleThemeSelect = (value: string) => {
+    useAppStore.setState({ themeName: value })
+    setShowThemePicker(false)
+    setPreviewTheme(null)
+  }
+
+  const handleThemeFocus = (value: string) => {
+    setPreviewTheme(value)
+  }
+
+  const resolvedTheme = getResolvedTheme(activeTheme)
+  const bgColor = resolvedTheme.background
+
+  // Theme picker mode
+  if (showThemePicker) {
+    return (
+      <box
+        style={{
+          flexDirection: "column",
+          height: "100%",
+          padding: 1,
+          backgroundColor: bgColor,
+        }}
+      >
+        <box style={{ flexShrink: 0, maxHeight: 15 }}>
+          <Dropdown
+            tooltip="Select theme"
+            options={themeOptions}
+            selectedValues={[themeName]}
+            onChange={handleThemeSelect}
+            onFocus={handleThemeFocus}
+            placeholder="Search themes..."
+            itemsPerPage={6}
+            theme={resolvedTheme}
+            focused
+          />
+        </box>
+        <scrollbox
+          style={{
+            flexGrow: 1,
+            rootOptions: {
+              backgroundColor: bgColor,
+              border: false,
+            },
+            contentOptions: {
+              minHeight: 0,
+            },
+          }}
+        >
+          <ReviewAppView
+            hunks={hunks}
+            reviewData={reviewData}
+            isGenerating={isGenerating}
+            themeName={activeTheme}
+            width={width}
+            showFooter={false}
+          />
+        </scrollbox>
+      </box>
+    )
+  }
 
   return (
     <ReviewAppView
       hunks={hunks}
       reviewData={reviewData}
       isGenerating={isGenerating}
-      themeName={themeName}
+      themeName={activeTheme}
       width={width}
     />
   )
@@ -187,7 +274,7 @@ export function ReviewAppView({
           scrollbarOptions: {
             showArrows: false,
             trackOptions: {
-              foregroundColor: "#4a4a4a",
+              foregroundColor: rgbaToHex(resolvedTheme.textMuted),
               backgroundColor: bgColor,
             },
           },
@@ -238,13 +325,16 @@ export function ReviewAppView({
           }}
         >
           <box flexGrow={1} />
-          <text fg="#ffffff">q</text>
-          <text fg="#666666"> quit  </text>
-          <text fg="#ffffff">j/k</text>
-          <text fg="#666666"> scroll  </text>
-          <text fg="#666666">
+          <text fg={rgbaToHex(resolvedTheme.text)}>q</text>
+          <text fg={rgbaToHex(resolvedTheme.textMuted)}> quit  </text>
+          <text fg={rgbaToHex(resolvedTheme.text)}>j/k</text>
+          <text fg={rgbaToHex(resolvedTheme.textMuted)}> scroll  </text>
+          <text fg={rgbaToHex(resolvedTheme.textMuted)}>
             ({groups.length} section{groups.length !== 1 ? "s" : ""})
           </text>
+          <text fg={rgbaToHex(resolvedTheme.textMuted)}>  </text>
+          <text fg={rgbaToHex(resolvedTheme.text)}>t</text>
+          <text fg={rgbaToHex(resolvedTheme.textMuted)}> theme</text>
           <box flexGrow={1} />
         </box>
       )}
@@ -364,11 +454,11 @@ export function HunkView({ hunk, themeName, width, isLast }: HunkViewProps) {
           alignItems: "center",
         }}
       >
-        <text fg="#888888">#{hunk.id}</text>
-        <text fg="#666666"> </text>
+        <text fg={rgbaToHex(resolvedTheme.textMuted)}>#{hunk.id}</text>
+        <text fg={rgbaToHex(resolvedTheme.textMuted)}> </text>
         <text fg={rgbaToHex(resolvedTheme.text)}>{hunk.filename}</text>
-        <text fg="#00ff00"> +{additions}</text>
-        <text fg="#ff0000">-{deletions}</text>
+        <text fg={rgbaToHex(resolvedTheme.syntaxString)}> +{additions}</text>
+        <text fg={rgbaToHex(resolvedTheme.syntaxVariable)}>-{deletions}</text>
       </box>
 
       {/* Diff view - uses shared component */}

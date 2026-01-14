@@ -258,7 +258,7 @@ describe("ReviewAppView", () => {
                                                                                                           
                                                                                                           
                                                                                                           
-                                        q quit  j/k scroll  (2 sections)                                  
+                                   q quit  j/k scroll  (2 sections)  t theme                              
                                                                                                           
       "
     `)
@@ -395,7 +395,7 @@ describe("ReviewAppView", () => {
                                                                                                                                                   
                                                                                                                                                   
                                                                                                                                                   
-                                                            q quit  j/k scroll  (2 sections)                                                      
+                                                       q quit  j/k scroll  (2 sections)  t theme                                                  
                                                                                                                                                   
       "
     `)
@@ -488,7 +488,7 @@ describe("ReviewAppView", () => {
                                                                                                                                                   
                                                                                                                                                   
                                                                                                                                                   
-                                                            q quit  j/k scroll  (3 sections)                                                      
+                                                       q quit  j/k scroll  (3 sections)  t theme                                                  
                                                                                                                                                   
       "
     `)
@@ -545,7 +545,7 @@ Added validation at handler start.`,
                                                                                                           
                                                                                                           
                                                                                                           
-                                        q quit  j/k scroll  (1 section)                                   
+                                    q quit  j/k scroll  (1 section)  t theme                              
                                                                                                           
       "
     `)
@@ -619,7 +619,7 @@ Added validation at handler start.`,
                                                                                                                               
                                                                                                                               
                                                                                                                               
-                                                  q quit  j/k scroll  (2 sections)                                            
+                                             q quit  j/k scroll  (2 sections)  t theme                                        
                                                                                                                               
       "
     `)
@@ -678,7 +678,7 @@ Added validation at handler start.`,
                                                                                                           
                                                                                                           
                                                                                                           
-                                        q quit  j/k scroll  (2 sections)                                  
+                                   q quit  j/k scroll  (2 sections)  t theme                              
                                                                                                           
       "
     `)
@@ -735,7 +735,7 @@ This uses hunkId instead of hunkIds but shows full hunk.`,
                                                                                                           
                                                                                                           
                                                                                                           
-                                        q quit  j/k scroll  (1 section)                                   
+                                    q quit  j/k scroll  (1 section)  t theme                              
                                                                                                           
       "
     `)

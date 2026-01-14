@@ -15,7 +15,7 @@ import {
   MacOSScrollAccel,
 } from "@opentui/core";
 import fs from "fs";
-import { tmpdir, homedir } from "os";
+import { tmpdir } from "os";
 import { join } from "path";
 import { create } from "zustand";
 import Dropdown from "./dropdown.tsx";
@@ -48,36 +48,11 @@ import {
   defaultThemeName,
   rgbaToHex,
 } from "./themes.ts";
-
-// State persistence
-const STATE_DIR = join(homedir(), ".critique");
-const STATE_FILE = join(STATE_DIR, "state.json");
-
-interface PersistedState {
-  themeName?: string;
-}
-
-function loadPersistedState(): PersistedState {
-  try {
-    const data = fs.readFileSync(STATE_FILE, "utf-8");
-    return JSON.parse(data);
-  } catch {
-    return {};
-  }
-}
-
-function savePersistedState(state: PersistedState): void {
-  try {
-    if (!fs.existsSync(STATE_DIR)) {
-      fs.mkdirSync(STATE_DIR, { recursive: true });
-    }
-    fs.writeFileSync(STATE_FILE, JSON.stringify(state));
-  } catch {
-    // Ignore write errors
-  }
-}
-
-const persistedState = loadPersistedState();
+import {
+  useAppStore,
+  persistedState,
+  savePersistedState,
+} from "./store.ts";
 
 // Web options for review mode
 interface ReviewWebOptions {
@@ -462,7 +437,6 @@ async function runReviewMode(
           React.createElement(ReviewApp, {
             hunks,
             yamlPath,
-            themeName: persistedState.themeName ?? defaultThemeName,
             isGenerating,
           }),
         ),
@@ -493,29 +467,34 @@ async function runReviewMode(
 }
 
 // Error boundary component
-class ErrorBoundary extends React.Component<
-  { children: React.ReactNode },
-  { hasError: boolean; error: Error | null }
-> {
-  constructor(props: { children: React.ReactNode }) {
+interface ErrorBoundaryProps {
+  children: React.ReactNode;
+}
+
+interface ErrorBoundaryState {
+  hasError: boolean;
+  error: Error | null;
+}
+
+class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  state: ErrorBoundaryState = { hasError: false, error: null };
+  declare props: ErrorBoundaryProps;
+
+  constructor(props: ErrorBoundaryProps) {
     super(props);
-    this.state = { hasError: false, error: null };
     this.componentDidCatch = this.componentDidCatch.bind(this);
   }
 
-  static getDerivedStateFromError(error: Error): {
-    hasError: boolean;
-    error: Error;
-  } {
+  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
     return { hasError: true, error };
   }
 
-  override componentDidCatch(error: Error, errorInfo: React.ErrorInfo): void {
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo): void {
     console.error("Error caught by boundary:", error);
     console.error("Component stack:", errorInfo.componentStack);
   }
 
-  override render(): any {
+  render(): React.ReactNode {
     if (this.state.hasError && this.state.error) {
       return (
         <box style={{ flexDirection: "column", padding: 2 }}>
@@ -564,23 +543,6 @@ class ScrollAcceleration {
   }
 }
 
-interface DiffState {
-  currentFileIndex: number;
-  themeName: string;
-}
-
-const useDiffStore = create<DiffState>(() => ({
-  currentFileIndex: 0,
-  themeName: persistedState.themeName ?? defaultThemeName,
-}));
-
-// Subscribe to persist state changes
-useDiffStore.subscribe((state) => {
-  savePersistedState({ themeName: state.themeName });
-});
-
-
-
 interface AppProps {
   parsedFiles: ParsedFile[];
 }
@@ -589,8 +551,8 @@ function App({ parsedFiles }: AppProps) {
   const { width: initialWidth } = useTerminalDimensions();
   const [width, setWidth] = React.useState(initialWidth);
   const [scrollAcceleration] = React.useState(() => new ScrollAcceleration());
-  const currentFileIndex = useDiffStore((s) => s.currentFileIndex);
-  const themeName = useDiffStore((s) => s.themeName);
+  const currentFileIndex = useAppStore((s) => s.currentFileIndex);
+  const themeName = useAppStore((s) => s.themeName);
   const [showDropdown, setShowDropdown] = React.useState(false);
   const [showThemePicker, setShowThemePicker] = React.useState(false);
   const [previewTheme, setPreviewTheme] = React.useState<string | null>(null);
@@ -641,12 +603,12 @@ function App({ parsedFiles }: AppProps) {
       }
     }
     if (key.name === "left") {
-      useDiffStore.setState((state) => ({
+      useAppStore.setState((state) => ({
         currentFileIndex: Math.max(0, state.currentFileIndex - 1),
       }));
     }
     if (key.name === "right") {
-      useDiffStore.setState((state) => ({
+      useAppStore.setState((state) => ({
         currentFileIndex: Math.min(
           parsedFiles.length - 1,
           state.currentFileIndex + 1,
@@ -695,7 +657,7 @@ function App({ parsedFiles }: AppProps) {
 
   const handleFileSelect = (value: string) => {
     const index = parseInt(value, 10);
-    useDiffStore.setState({ currentFileIndex: index });
+    useAppStore.setState({ currentFileIndex: index });
     setShowDropdown(false);
   };
 
@@ -705,7 +667,7 @@ function App({ parsedFiles }: AppProps) {
   }));
 
   const handleThemeSelect = (value: string) => {
-    useDiffStore.setState({ themeName: value });
+    useAppStore.setState({ themeName: value });
     setShowThemePicker(false);
     setPreviewTheme(null);
   };
@@ -985,9 +947,9 @@ cli
         // Ensure currentFileIndex stays valid when files change
         React.useEffect(() => {
           if (parsedFiles && parsedFiles.length > 0) {
-            const currentIndex = useDiffStore.getState().currentFileIndex;
+            const currentIndex = useAppStore.getState().currentFileIndex;
             if (currentIndex >= parsedFiles.length) {
-              useDiffStore.setState({
+              useAppStore.setState({
                 currentFileIndex: parsedFiles.length - 1,
               });
             }
@@ -995,7 +957,7 @@ cli
         }, [parsedFiles]);
 
         const defaultBg = getResolvedTheme(
-          useDiffStore.getState().themeName,
+          useAppStore.getState().themeName,
         ).background;
 
         if (parsedFiles === null) {
@@ -1210,7 +1172,7 @@ cli
                 Array.from(state.selectedFiles).filter((f) => f !== value),
               ),
               appliedFiles: new Map(
-                Array.from(state.appliedFiles).filter(([k]) => k !== value),
+                Array.from(state.appliedFiles.entries()).filter(([k]) => k !== value),
               ),
             }));
           } else {

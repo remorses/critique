@@ -1,3 +1,25 @@
+# 0.1.20
+
+- Add theme picker to `review` command:
+  - Press `t` to open theme picker with live preview
+  - Theme selection persisted and shared with main diff view
+- Extract zustand store to `src/store.ts`:
+  - Shared state between main diff view and review view
+  - Theme changes auto-persist to `~/.critique/state.json`
+- Fix diff background colors:
+  - Wrap diff component in box with theme background color
+  - Ensures no black/transparent gaps in diff view
+- Fix theme reactivity in DiffView:
+  - Memoize resolved theme and syntax style properly
+- Fix Dropdown component:
+  - Add `focused` prop for proper focus management
+  - Fix stale closure issue in move/onFocus callbacks
+  - Separate useEffect for selection changes to fix theme preview reactivity
+- Fix hardcoded colors in review UI:
+  - Scrollbar, footer, and hunk headers now use theme colors
+- Add `scripts/preview-review.tsx` for standalone review component testing
+- Simplify generating indicator (show only animated dots)
+
 # 0.1.19
 
 - `review` command:
