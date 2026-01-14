@@ -74,6 +74,43 @@ Then use:
 git difftool HEAD~1
 ```
 
+### AI-Powered Review
+
+Get AI-powered code review of your changes using [OpenCode](https://opencode.ai) as the backend agent.
+
+```bash
+# Review unstaged changes
+critique review
+
+# Review staged changes
+critique review --staged
+
+# Review a specific commit
+critique review --commit HEAD
+critique review --commit abc1234
+
+# Review commit range (like a PR)
+critique review main HEAD
+
+# Include session context from OpenCode
+critique review --session <session-id>
+
+# Generate web preview instead of TUI
+critique review --web
+critique review --web --open
+```
+
+**Options:**
+
+| Flag | Description |
+|------|-------------|
+| `--staged` | Review staged changes |
+| `--commit <ref>` | Review changes from a specific commit |
+| `--session <id>` | Include OpenCode session(s) as context (can be repeated) |
+| `--web` | Generate web preview instead of TUI |
+| `--open` | Open web preview in browser (with --web) |
+| `--filter <pattern>` | Filter files by glob pattern |
+
 ### Pick Files from Another Branch
 
 Selectively apply changes from another branch to your current HEAD:

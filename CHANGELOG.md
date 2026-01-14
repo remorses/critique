@@ -1,3 +1,10 @@
+# 0.1.17
+
+- Rename `explain` command to `review`
+- `web` command:
+  - Use Fira Code font from Google Fonts for better box drawing character rendering
+- Update `ghostty-opentui` to v1.3.12
+
 # 0.1.16
 
 - `explain` command:

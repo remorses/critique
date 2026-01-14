@@ -379,7 +379,7 @@ async function runReviewMode(
 
       const renderCommand = [
         process.argv[1]!,
-        "explain-web-render",
+        "review-web-render",
         yamlPath,
         hunksFile,
         "--theme",
@@ -1019,10 +1019,10 @@ cli
   });
 
 cli
-  .command("explain [base] [head]", "AI-powered diff explanation and review")
+  .command("review [base] [head]", "AI-powered diff review")
   .option("--agent <name>", "AI agent to use (default: opencode)", { default: "opencode" })
-  .option("--staged", "Explain staged changes")
-  .option("--commit <ref>", "Explain changes from a specific commit")
+  .option("--staged", "Review staged changes")
+  .option("--commit <ref>", "Review changes from a specific commit")
   .option("--context <lines>", "Number of context lines (default: 3)")
   .option("--filter <pattern>", "Filter files by glob pattern")
   .option("--session <id>", "Session ID(s) to include as context (can be repeated)")
@@ -1053,7 +1053,7 @@ cli
       const webOptions = options.web ? { web: true, open: options.open } : undefined;
       await runReviewMode(gitCommand, options.agent, sessionIds, webOptions);
     } catch (error) {
-      console.error("Error running explain:", error);
+      console.error("Error running review:", error);
       process.exit(1);
     }
   });
@@ -1557,9 +1557,9 @@ cli
     );
   });
 
-// Internal command for explain web rendering (captures output to PTY)
+// Internal command for review web rendering (captures output to PTY)
 cli
-  .command("explain-web-render <yamlPath> <hunksFile>", "Internal: Render review for web capture", {
+  .command("review-web-render <yamlPath> <hunksFile>", "Internal: Render review for web capture", {
     allowUnknownOptions: true,
   })
   .option("--cols <cols>", "Terminal columns", { default: 240 })
@@ -1606,7 +1606,7 @@ cli
     // Import ReviewAppView for static rendering
     const { ReviewAppView } = await import("./review/review-app.tsx");
 
-    function ExplainWebApp() {
+    function ReviewWebApp() {
       return React.createElement(ReviewAppView, {
         hunks,
         reviewData,
@@ -1618,7 +1618,7 @@ cli
     }
 
     createRoot(renderer).render(
-      React.createElement(ErrorBoundary, null, React.createElement(ExplainWebApp)),
+      React.createElement(ErrorBoundary, null, React.createElement(ReviewWebApp)),
     );
   });
 
