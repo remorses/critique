@@ -261,6 +261,7 @@ function App({ parsedFiles }: AppProps) {
   const [showDropdown, setShowDropdown] = React.useState(false);
   const [showThemePicker, setShowThemePicker] = React.useState(false);
   const [previewTheme, setPreviewTheme] = React.useState<string | null>(null);
+  const scrollboxRef = React.useRef<any>(null);
 
   useOnResize(
     React.useCallback((newWidth: number) => {
@@ -300,12 +301,44 @@ function App({ parsedFiles }: AppProps) {
       renderer.console.toggle();
     }
     if (key.option) {
-      console.log(key);
       if (key.eventType === "release") {
         scrollAcceleration.multiplier = 1;
       } else {
         scrollAcceleration.multiplier = 10;
       }
+    }
+    // Vim-style navigation: n = next file, p = previous file
+    if (key.name === "n") {
+      useDiffStore.setState((state) => ({
+        currentFileIndex: Math.min(
+          parsedFiles.length - 1,
+          state.currentFileIndex + 1,
+        ),
+      }));
+      return;
+    }
+    if (key.name === "p") {
+      useDiffStore.setState((state) => ({
+        currentFileIndex: Math.max(0, state.currentFileIndex - 1),
+      }));
+      return;
+    }
+    // Vim-style scrolling: C-d = half-page down, C-u = half-page up
+    if ((key.name === "d" || key.name === "down") && key.ctrl) {
+      if (scrollboxRef.current) {
+        const viewportHeight = scrollboxRef.current.viewport?.height ?? 20;
+        const halfPage = Math.max(5, Math.floor(viewportHeight / 2));
+        scrollboxRef.current.scrollBy(halfPage, "absolute");
+      }
+      return;
+    }
+    if ((key.name === "u" || key.name === "up") && key.ctrl) {
+      if (scrollboxRef.current) {
+        const viewportHeight = scrollboxRef.current.viewport?.height ?? 20;
+        const halfPage = Math.max(5, Math.floor(viewportHeight / 2));
+        scrollboxRef.current.scrollBy(-halfPage, "absolute");
+      }
+      return;
     }
     if (key.name === "left") {
       useDiffStore.setState((state) => ({
@@ -496,6 +529,7 @@ function App({ parsedFiles }: AppProps) {
       </box>
 
       <scrollbox
+        ref={scrollboxRef}
         scrollAcceleration={scrollAcceleration}
         style={{
           flexGrow: 1,

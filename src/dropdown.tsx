@@ -128,10 +128,10 @@ const Dropdown = (props: DropdownProps) => {
 
   // Handle keyboard navigation
   useKeyboard((evt) => {
-    if (evt.name === "up") {
+    if (evt.name === "up" || (evt.ctrl && evt.name === "p")) {
       move(-1);
     }
-    if (evt.name === "down") {
+    if (evt.name === "down" || (evt.ctrl && evt.name === "n")) {
       move(1);
     }
     if (evt.name === "return") {

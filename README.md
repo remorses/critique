@@ -53,8 +53,9 @@ critique --filter "src/**/*.ts" --filter "lib/**/*.js"
 
 | Key | Action |
 |-----|--------|
-| `←` / `→` | Navigate between files |
-| `↑` / `↓` | Scroll up/down |
+| `←` / `→` / `n` / `p` | Navigate between files |
+| `↑` / `↓` / `C-n` / `C-p` | Scroll up/down in diff |
+| `C-d` / `C-u` | Scroll half-page down/up |
 | `Ctrl+P` | Open file selector dropdown |
 | `Option` (hold) | Fast scroll (10x) |
 | `Esc` | Close dropdown |

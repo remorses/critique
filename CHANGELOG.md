@@ -1,4 +1,10 @@
-# 0.1.13
+# 0.1.14
+
+- Navigation:
+  - Add Vim-style keybindings for navigation
+  - `n` / `p` - Navigate between files (next/previous)
+  - `C-d` / `C-u` - Scroll half-page down/up
+  - `C-n` / `C-p` - Navigate menus (dropdowns)
 
 - Docs:
   - Enhance web preview section in README
