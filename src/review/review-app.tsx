@@ -23,7 +23,7 @@ class ScrollAcceleration {
   public multiplier: number = 1
   private macosAccel: MacOSScrollAccel
   constructor() {
-    this.macosAccel = new MacOSScrollAccel()
+    this.macosAccel = new MacOSScrollAccel({ A: 1.5, maxMultiplier: 10 })
   }
   tick(delta: number) {
     return this.macosAccel.tick(delta) * this.multiplier
@@ -435,7 +435,7 @@ function MarkdownBlock({ content, themeName, width, renderer }: MarkdownBlockPro
   )
 
   // Max width for prose, code blocks and tables can use full width
-  const maxProseWidth = 80
+  const maxProseWidth = Math.min(80, width)
   const fullWidth = Math.max(width - 4, maxProseWidth)
 
   // Custom renderNode to wrap all elements in centered boxes
@@ -526,8 +526,6 @@ export function HunkView({ hunk, themeName, width, isLast }: HunkViewProps) {
           marginBottom: 1,
         }}
       >
-        <text fg={rgbaToHex(resolvedTheme.textMuted)}>#{hunk.id}</text>
-        <text fg={rgbaToHex(resolvedTheme.textMuted)}> </text>
         <text fg={rgbaToHex(resolvedTheme.text)}><b>{hunk.filename}</b></text>
         <text fg={rgbaToHex(resolvedTheme.syntaxString)}> +{additions}</text>
         <text fg={rgbaToHex(resolvedTheme.syntaxVariable)}>-{deletions}</text>

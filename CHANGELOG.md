@@ -1,3 +1,8 @@
+# 0.1.27
+
+- GitHub theme:
+  - Reduce intensity of diff added/removed background colors for softer appearance
+
 # 0.1.26
 
 - `review` command:
