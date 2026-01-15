@@ -27,32 +27,46 @@ export interface UploadResult {
 
 /**
  * Capture PTY output from a render command and convert to HTML
+ *
+ * Uses Bun.Terminal (built-in since Bun 1.3.5) for real PTY support.
+ * This ensures apps that check isTTY work correctly and receive proper
+ * terminal dimensions. We use TextDecoder with streaming mode to handle
+ * UTF-8 properly across chunk boundaries.
  */
 export async function captureToHtml(
   renderCommand: string[],
   options: CaptureOptions
 ): Promise<string> {
-  const pty = await import("bun-pty")
   const { ansiToHtmlDocument } = await import("./ansi-html.ts")
 
+  // TextDecoder with streaming mode to handle UTF-8 across chunk boundaries
+  // Without this, multi-byte characters (like box-drawing ─) that span chunks become �
+  const decoder = new TextDecoder()
   let ansiOutput = ""
-  const ptyProcess = pty.spawn("bun", renderCommand, {
-    name: "xterm-256color",
-    cols: options.cols,
-    rows: options.rows,
+
+  // Use Bun.Terminal for real PTY support (available since Bun 1.3.5)
+  const proc = Bun.spawn(["bun", ...renderCommand], {
     cwd: process.cwd(),
-    env: { ...process.env, TERM: "xterm-256color" } as Record<string, string>,
+    env: {
+      ...process.env,
+      TERM: "xterm-256color",
+    },
+    terminal: {
+      cols: options.cols,
+      rows: options.rows,
+      // data callback receives raw Uint8Array bytes
+      data(terminal, data) {
+        // Use streaming mode to buffer incomplete UTF-8 sequences
+        ansiOutput += decoder.decode(data, { stream: true })
+      },
+    },
   })
 
-  ptyProcess.onData((data: string) => {
-    ansiOutput += data
-  })
+  await proc.exited
 
-  await new Promise<void>((resolve) => {
-    ptyProcess.onExit(() => {
-      resolve()
-    })
-  })
+  // Close the terminal and flush any remaining bytes in the decoder
+  proc.terminal?.close()
+  ansiOutput += decoder.decode()
 
   if (!ansiOutput.trim()) {
     throw new Error("No output captured")
