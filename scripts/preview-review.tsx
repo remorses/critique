@@ -7,9 +7,29 @@ import { createCliRenderer } from "@opentui/core"
 import { createRoot } from "@opentui/react"
 import * as React from "react"
 import { ReviewApp, ReviewAppView } from "../src/review/review-app.tsx"
+
+// Simple error boundary for capture mode
+class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean; error?: Error }> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props)
+    this.state = { hasError: false }
+  }
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error }
+  }
+  componentDidCatch(error: Error) {
+    console.error("ErrorBoundary caught:", error)
+  }
+  render() {
+    if (this.state.hasError) {
+      return React.createElement("text", null, `Error: ${this.state.error?.message || "Unknown"}`)
+    }
+    return this.props.children
+  }
+}
 import { createHunk } from "../src/review/hunk-parser.ts"
 import type { ReviewYaml } from "../src/review/types.ts"
-import { captureResponsiveHtml, uploadHtml, openInBrowser } from "../src/web-utils.ts"
+import { captureResponsiveHtml, uploadHtml } from "../src/web-utils.ts"
 import fs from "fs"
 import { tmpdir } from "os"
 import { join } from "path"
@@ -18,6 +38,17 @@ import { join } from "path"
 const args = process.argv.slice(2)
 const webMode = args.includes("--web")
 const captureMode = args.includes("--capture") // Internal flag for PTY capture
+
+// Parse --cols and --rows passed by captureResponsiveHtml
+function getArg(name: string): number | undefined {
+  const idx = args.indexOf(name)
+  if (idx >= 0 && args[idx + 1]) {
+    return parseInt(args[idx + 1])
+  }
+  return undefined
+}
+const argCols = getArg("--cols")
+const argRows = getArg("--rows")
 
 // Example hunks with realistic diff content
 const exampleHunks = [
@@ -221,8 +252,6 @@ async function main() {
     const result = await uploadHtml(htmlDesktop, htmlMobile)
     console.log(`\nPreview URL: ${result.url}`)
     console.log("(expires in 7 days)")
-
-    await openInBrowser(result.url)
     return
   }
 
@@ -239,31 +268,45 @@ ${group.markdownDescription.split('\n').map(line => `      ${line}`).join('\n')}
 
   // Capture mode: render once and exit (used internally by --web)
   if (captureMode) {
+    // Use args from captureResponsiveHtml, or PTY dimensions, or fallback
+    const termCols = argCols || process.stdout.columns || 140
+    const termRows = argRows || process.stdout.rows || 80
+    
+    // Override terminal dimensions
+    process.stdout.columns = termCols
+    process.stdout.rows = termRows
+
     const renderer = await createCliRenderer({
       useAlternateScreen: false,
-      onDestroy() {
-        try { fs.unlinkSync(yamlPath) } catch {}
-        process.exit(0)
-      },
+      exitOnCtrlC: false,
     })
 
-    const width = process.stdout.columns || 140
+    // Wait for render to settle before exiting (debounced)
+    let exitTimeout: ReturnType<typeof setTimeout> | undefined
+    const originalRequestRender = renderer.root.requestRender.bind(renderer.root)
+    renderer.root.requestRender = function () {
+      originalRequestRender()
+      if (exitTimeout) clearTimeout(exitTimeout)
+      exitTimeout = setTimeout(() => {
+        try { fs.unlinkSync(yamlPath) } catch {}
+        renderer.destroy()
+      }, 1000)
+    }
 
-    const root = createRoot(renderer as any)
-    root.render(
-      React.createElement(ReviewAppView, {
+    function PreviewApp() {
+      return React.createElement(ReviewAppView, {
         hunks: exampleHunks,
         reviewData: exampleReviewData,
         isGenerating: false,
         themeName: "github",
-        width,
+        width: termCols,
         showFooter: false,
-        renderer: renderer as any,
       })
-    )
+    }
 
-    await new Promise(resolve => setTimeout(resolve, 100))
-    renderer.destroy()
+    createRoot(renderer as any).render(
+      React.createElement(ErrorBoundary, null, React.createElement(PreviewApp))
+    )
     return
   }
 

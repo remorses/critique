@@ -36,5 +36,10 @@
     "picocolors": "^1.1.1",
     "react": "^19.2.0",
     "zustand": "^5.0.8"
+  },
+  "overrides": {
+    "@opentui/core": "https://pkg.pr.new/anomalyco/opentui/@opentui/core@433",
+    "@opentui/react": "https://pkg.pr.new/anomalyco/opentui/@opentui/react@433",
+    "@opentui/core-darwin-arm64": "https://pkg.pr.new/anomalyco/opentui/@opentui/core-darwin-arm64@433"
   }
 }
