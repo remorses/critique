@@ -364,7 +364,7 @@ export function ReviewAppView({
           <text fg={rgbaToHex(resolvedTheme.textMuted)}> theme</text>
           <box flexGrow={1} />
           <text fg={rgbaToHex(resolvedTheme.textMuted)}>run with </text>
-          <text fg={rgbaToHex(resolvedTheme.text)}>--web</text>
+          <text fg={rgbaToHex(resolvedTheme.text)}><b>--web</b></text>
           <text fg={rgbaToHex(resolvedTheme.textMuted)}> to share & collaborate</text>
         </box>
       )}

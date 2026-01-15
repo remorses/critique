@@ -766,7 +766,7 @@ function App({ parsedFiles }: AppProps) {
       return;
     }
 
-    if (key.name === "p" && key.ctrl) {
+    if (key.name === "p") {
       setShowDropdown(true);
       return;
     }
@@ -968,13 +968,13 @@ function App({ parsedFiles }: AppProps) {
             alignItems: "center",
           }}
         >
-          <text fg={textColor}>ctrl p</text>
+          <text fg={textColor}>p</text>
           <text fg={mutedColor}> files ({parsedFiles.length})  </text>
           <text fg={textColor}>t</text>
           <text fg={mutedColor}> theme</text>
           <box flexGrow={1} />
           <text fg={mutedColor}>run with </text>
-          <text fg={textColor}>--web</text>
+          <text fg={textColor}><b>--web</b></text>
           <text fg={mutedColor}> to share & collaborate</text>
         </box>
       )}

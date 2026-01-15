@@ -1,3 +1,11 @@
+# 0.1.25
+
+- Default command:
+  - Change file picker shortcut from `ctrl p` to plain `p`
+  - Make `--web` bold in footer for better visibility
+- `review` command:
+  - Make `--web` bold in footer for better visibility
+
 # 0.1.24
 
 - Default command:
