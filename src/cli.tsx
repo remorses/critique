@@ -997,10 +997,40 @@ cli
   .option("--open", "Open in browser (with --web)")
   .option("--cols <cols>", "Desktop columns for web render", { default: 240 })
   .option("--mobile-cols <cols>", "Mobile columns for web render", { default: 100 })
+  .option("--stdin", "Read diff from stdin (for use as a pager)")
   .action(async (base, head, options) => {
     // Apply theme if specified (zustand subscription auto-persists)
     if (options.theme && themeNames.includes(options.theme)) {
       useAppStore.setState({ themeName: options.theme });
+    }
+
+    // Handle stdin mode (for lazygit pager integration)
+    if (options.stdin) {
+      let gitDiff = "";
+      for await (const chunk of process.stdin) {
+        gitDiff += chunk;
+      }
+
+      const [diffModule, renderer] = await Promise.all([
+        import("diff"),
+        createCliRenderer({
+          onDestroy() {
+            process.exit(0);
+          },
+          exitOnCtrlC: true,
+        }),
+      ]);
+
+      const parsedFiles = gitDiff.trim()
+        ? processFiles(diffModule.parsePatch(gitDiff), diffModule.formatPatch)
+        : [];
+
+      createRoot(renderer).render(
+        <ErrorBoundary>
+          <App parsedFiles={parsedFiles} />
+        </ErrorBoundary>
+      );
+      return;
     }
 
     // If --web flag, delegate to web generation logic

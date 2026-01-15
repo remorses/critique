@@ -74,6 +74,19 @@ Then use:
 git difftool HEAD~1
 ```
 
+### Lazygit Integration
+
+Use critique as a custom pager in [lazygit](https://github.com/jesseduffield/lazygit):
+
+```yaml
+# ~/.config/lazygit/config.yml
+git:
+  paging:
+    pager: critique --stdin
+```
+
+For more details, see [lazygit's Custom Pagers documentation](https://github.com/jesseduffield/lazygit/blob/master/docs/Custom_Pagers.md).
+
 ### AI-Powered Diff Explanation
 
 Generate AI-powered explanations of code changes using [OpenCode](https://opencode.ai) or [Claude Code](https://www.anthropic.com/claude-code) as the backend agent.

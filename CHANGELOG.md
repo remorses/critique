@@ -1,3 +1,17 @@
+# 0.1.28
+
+- Default command:
+  - Add `--stdin` option to read diff from stdin (for lazygit pager integration)
+  - Faster scroll acceleration (`A: 1.5`, `maxMultiplier: 10`)
+- `review` command:
+  - Remove hunk ID prefix (`#1`, `#2`) from hunk headers
+  - Faster scroll acceleration (`A: 1.5`, `maxMultiplier: 10`)
+  - Code blocks now use `wrapMode: "none"` to prevent word-wrapping (content truncates at viewport edge instead)
+  - Prose max width now respects terminal width: `Math.min(80, width)`
+  - Code blocks use full terminal width minus padding
+- Tests:
+  - Added test for code block wrapMode behavior with renderer
+
 # 0.1.27
 
 - GitHub theme:
