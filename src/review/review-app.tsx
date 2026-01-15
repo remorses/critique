@@ -197,6 +197,7 @@ export interface ReviewAppViewProps {
   width: number
   showFooter?: boolean // defaults to true, set false for web rendering
   renderer?: any // Optional renderer for variable-width markdown
+  gap?: number // Gap between markdown descriptions and hunks (default: 2)
 }
 
 /**
@@ -211,6 +212,7 @@ export function ReviewAppView({
   width,
   showFooter = true,
   renderer,
+  gap = 2,
 }: ReviewAppViewProps) {
   const [scrollAcceleration] = React.useState(() => new ScrollAcceleration())
 
@@ -311,14 +313,16 @@ export function ReviewAppView({
             const groupHunks = resolveGroupHunks(group, hunkMap)
 
             return (
-              <box key={groupIdx} style={{ flexDirection: "column", marginBottom: groupIdx < groups.length - 1 ? 2 : 0 }}>
+              <box key={groupIdx} style={{ flexDirection: "column", marginBottom: gap }}>
                 {/* Markdown description */}
-                <MarkdownBlock
-                  content={group.markdownDescription}
-                  themeName={themeName}
-                  width={width}
-                  renderer={renderer}
-                />
+                <box style={{ marginBottom: gap }}>
+                  <MarkdownBlock
+                    content={group.markdownDescription}
+                    themeName={themeName}
+                    width={width}
+                    renderer={renderer}
+                  />
+                </box>
 
                 {/* Hunks */}
                 {groupHunks.map((hunk, idx) => (
@@ -483,7 +487,6 @@ function MarkdownBlock({ content, themeName, width, renderer }: MarkdownBlockPro
         flexDirection: "column",
         width: "100%",
         alignItems: "center",
-        paddingBottom: 1,
       }}
     >
       <markdown
