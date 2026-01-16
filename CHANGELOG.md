@@ -1,3 +1,8 @@
+# 0.1.30
+
+- Dependencies:
+  - Update @opentui/core-darwin-arm64 to 0.1.73
+
 # 0.1.29
 
 - Web preview:

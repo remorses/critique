@@ -2,7 +2,7 @@
   "name": "critique",
   "module": "src/diff.tsx",
   "type": "module",
-  "version": "0.1.29",
+  "version": "0.1.30",
   "private": false,
   "bin": "./src/cli.tsx",
   "scripts": {
@@ -25,6 +25,7 @@
     "@agentclientprotocol/sdk": "^0.12.0",
     "@clack/prompts": "1.0.0-alpha.9",
     "@opentui/core": "https://pkg.pr.new/anomalyco/opentui/@opentui/core@433",
+    "@opentui/core-darwin-arm64": "0.1.73",
     "@opentui/react": "https://pkg.pr.new/anomalyco/opentui/@opentui/react@433",
     "@parcel/watcher": "^2.5.1",
     "bun-pty": "^0.4.7",
