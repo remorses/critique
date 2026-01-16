@@ -37,6 +37,7 @@ export interface ResolvedTheme {
   // Text colors
   text: RGBA;
   textMuted: RGBA;
+  conceal: RGBA;
   // Diff colors
   diffAddedBg: RGBA;
   diffRemovedBg: RGBA;
@@ -122,12 +123,12 @@ function loadTheme(name: string): ThemeJson {
   if (themeCache[name]) {
     return themeCache[name];
   }
-  
+
   const fileName = THEME_FILES[name];
   if (!fileName) {
     return github; // Fallback to default
   }
-  
+
   try {
     // Use dynamic import with synchronous pattern for JSON
     // This works because JSON imports are resolved at bundle time by Bun
@@ -174,7 +175,7 @@ function resolveTheme(
   const fallbackText: ColorValue = "#d4d4d4";
 
   const text = resolveColor(t.text ?? fallbackText);
-  
+
   return {
     primary: resolveColor(t.primary ?? t.syntaxFunction ?? fallbackGray),
     syntaxComment: resolveColor(t.syntaxComment ?? fallbackGray),
@@ -188,6 +189,7 @@ function resolveTheme(
     syntaxPunctuation: resolveColor(t.syntaxPunctuation ?? fallbackGray),
     text,
     textMuted: resolveColor(t.textMuted ?? fallbackGray),
+    conceal: resolveColor(t.conceal ?? t.textMuted ?? fallbackGray),
     diffAddedBg: resolveColor(t.diffAddedBg ?? "#1e3a1e"),
     diffRemovedBg: resolveColor(t.diffRemovedBg ?? "#3a1e1e"),
     diffContextBg: resolveColor(t.diffContextBg ?? fallbackBg),
@@ -233,7 +235,7 @@ export function getSyntaxTheme(
   return {
     // Default text style
     default: { fg: resolved.text },
-    
+
     // Code syntax styles
     keyword: { fg: resolved.syntaxKeyword, italic: true },
     "keyword.import": { fg: resolved.syntaxKeyword },
@@ -271,7 +273,7 @@ export function getSyntaxTheme(
     "punctuation.bracket": { fg: resolved.syntaxPunctuation },
     "punctuation.delimiter": { fg: resolved.syntaxOperator },
     "punctuation.special": { fg: resolved.syntaxOperator },
-    
+
     // Markdown styles - these are the Tree-sitter scope names for markdown
     "markup.heading": { fg: resolved.markdownHeading, bold: true },
     "markup.heading.1": { fg: resolved.markdownHeading, bold: true },
@@ -294,7 +296,7 @@ export function getSyntaxTheme(
     label: { fg: resolved.markdownLinkText },
     spell: { fg: resolved.text },
     nospell: { fg: resolved.text },
-    conceal: { fg: resolved.textMuted },
+    conceal: { fg: resolved.conceal || resolved.textMuted },
     "string.special": { fg: resolved.markdownLink, underline: true },
     "string.special.url": { fg: resolved.markdownLink, underline: true },
   };
