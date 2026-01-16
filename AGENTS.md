@@ -6,6 +6,21 @@ IMPORTANT! before starting every task ALWAYS read opentui docs with `curl -s htt
 
 ALWAYS!
 
+### using unreleased opentui versions
+
+to use a pkg.pr.new preview URL for opentui, get the last commit hash (first 7 chars) from PR https://github.com/anomalyco/opentui/pull/536:
+
+```bash
+gh pr view 536 -R anomalyco/opentui --json commits --jq '.commits[-1].oid[:7]'
+```
+
+then use it in package.json:
+
+```
+https://pkg.pr.new/anomalyco/opentui/@opentui/core@<hash>
+https://pkg.pr.new/anomalyco/opentui/@opentui/react@<hash>
+```
+
 ## bun
 
 NEVER run the interactive TUI (e.g. `bun run src/cli.tsx` without arguments). It will hang. Instead ask the user to run it.

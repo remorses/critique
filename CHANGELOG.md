@@ -1,3 +1,10 @@
+# 0.1.32
+
+- Dependencies:
+  - Update opentui to `070b0cd` (improved word highlights algorithm, GitHub Desktop-style)
+- Docs:
+  - Add instructions for using pkg.pr.new preview URLs with commit hashes
+
 # 0.1.31
 
 - Diff view:
