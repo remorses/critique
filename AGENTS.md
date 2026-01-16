@@ -21,7 +21,9 @@ https://pkg.pr.new/anomalyco/opentui/@opentui/core@<hash>
 https://pkg.pr.new/anomalyco/opentui/@opentui/react@<hash>
 ```
 
-YOU MUST use the commit hash long 40 characters! not the pr number! ALWAYS
+YOU MUST ALWAYS use the commit hash 40 characters long when changing the pkg.pr.new url! not the pr number! 
+
+if the commit hash url does not work it means it is still building. ignore the pkg.pr.new comment with the pr number in the install script. you MUST use the url with the commit hash.
 
 ## bun
 
