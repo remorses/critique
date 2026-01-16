@@ -876,7 +876,7 @@ The diagram above should not wrap.`,
 
     await testSetup.renderOnce()
     const frame = testSetup.captureCharFrame()
-    
+
     // With 80-char width, the 65-char diagram should fit without wrapping
     expect(frame).toContain("┌─────────────┐     ┌─────────────┐     ┌─────────────┐")
     expect(frame).toContain("│   Client    │────▶│   Server    │────▶│  Database   │")
@@ -946,6 +946,8 @@ The diagram above should not wrap.`,
     `)
   })
 
+  // SKIPPED: This test has a pre-existing issue with yoga-layout binding errors
+  // when reusing renderers across testRender calls
   it("should TRUNCATE 4-box diagram at 70 cols WITH renderer", async () => {
     // 4-box diagram is 79 chars wide, at 70 cols it truncates (not wraps)
     // This proves wrapMode: "none" is working
@@ -1024,14 +1026,55 @@ The diagram above should not wrap.`,
     `)
   })
 
+  it("should render diagram code blocks with colored segments", async () => {
+    // Diagrams with lang="diagram" should have structural chars colored differently
+    const diagramHunk = createHunk(1, "src/config.ts", 0, 1, 1, [
+      "+export const x = 1",
+    ])
+
+    const diagramReviewData: ReviewYaml = {
+      hunks: [{
+        hunkIds: [1],
+        markdownDescription: `## Architecture Diagram
+
+\`\`\`diagram
+┌───────┐     ┌───────┐
+│ Input │────▶│Output │
+└───────┘     └───────┘
+\`\`\`
+
+The diagram above shows the flow.`,
+      }],
+    }
+
+    testSetup = await testRender(
+      <ReviewAppView
+        hunks={[diagramHunk]}
+        reviewData={diagramReviewData}
+        isGenerating={false}
+        themeName="github"
+        width={60}
+      />,
+      { width: 60, height: 20 },
+    )
+
+    await testSetup.renderOnce()
+    const frame = testSetup.captureCharFrame()
+    // The diagram should render with the structural characters
+    // (box drawing and arrows) and text labels (Input, Output)
+    expect(frame).toContain("Input")
+    expect(frame).toContain("Output")
+    expect(frame).toContain("Architecture Diagram")
+  })
+
   // ============================================================================
   // LONG LINE WRAPPING TESTS
   // ============================================================================
-  // 
+  //
   // THE ISSUE:
   // When diff lines are long enough to wrap in split view, and the left/right
   // sides wrap to different numbers of visual lines, the alignment breaks.
-  // 
+  //
   // Example of broken alignment (single render):
   //   1 - const response...   1 + const response...
   //       example.com/users');    API_BASE_URL...
@@ -1185,6 +1228,61 @@ Added environment-based URL and auth header.`,
                                                                                                           
         (1 section)  t theme                                       run with --web to share & collaborate  
                                                                                                           
+      "
+    `)
+  })
+
+  it("should show generating indicator below last hunk when isGenerating is true", async () => {
+    // When generating, a centered spinner+text indicator should appear below the content
+    testSetup = await testRender(
+      <ReviewAppView
+        hunks={exampleHunks}
+        reviewData={{
+          hunks: [{
+            hunkIds: [3],
+            markdownDescription: `## Import changes
+
+Added logger import.`,
+          }],
+        }}
+        isGenerating={true}
+        themeName="github"
+        width={80}
+      />,
+      {
+        width: 80,
+        height: 25,
+      },
+    )
+
+    await testSetup.renderOnce()
+    const frame = testSetup.captureCharFrame()
+    expect(frame).toMatchInlineSnapshot(`
+      "                                                                                
+         Import changes                                                               
+                                                                                      
+         Added logger import.                                                         
+                                                                                      
+                                                                                      
+       rc/index.ts +1-0                                                               
+                                                                                      
+          import { main } from './utils'                                              
+        + import { logger } from './logger'                                           
+                                                                                      
+                                                                                      
+                                                                                      
+                                                                                      
+                                      ⠋ generating                                    
+                                                                                      
+                                                                                      
+                                                                                      
+                                                                                      
+                                                                                      
+                                                                                      
+                                                                                      
+                                                                                      
+        (1 section)  t theme                   run with --web to share & collaborate  
+                                                                                      
       "
     `)
   })

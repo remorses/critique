@@ -174,23 +174,26 @@ export function ReviewApp({
 }
 
 /**
- * Spinning braille indicator
+ * Inline generating indicator with spinner and animated dots
  */
-function GeneratingIndicatorSpinner({ color }: { color: string }) {
+function GeneratingIndicatorInline({ color }: { color: string }) {
   const [phase, setPhase] = React.useState(0)
 
   React.useEffect(() => {
     const interval = setInterval(() => {
-      setPhase((p) => (p + 1) % 8)
+      setPhase((p) => (p + 1) % 12)
     }, 100)
     return () => clearInterval(interval)
   }, [])
 
-  // Braille spinner pattern
+  // Braille spinner pattern (cycles every 8 phases)
   const spinnerChars = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧"]
-  const spinner = spinnerChars[phase]
+  const spinner = spinnerChars[phase % 8]
+  // Dots cycle every 4 phases (so they change ~3x slower than spinner)
+  const dotCount = Math.floor(phase / 3) % 4
+  const dots = ".".repeat(dotCount).padEnd(3, " ")
 
-  return <text fg={color}>{spinner}</text>
+  return <text fg={color}>{spinner} generating{dots}</text>
 }
 
 /**
@@ -206,10 +209,7 @@ function GeneratingIndicator({ color, bgColor }: { color: string; bgColor: strin
         backgroundColor: bgColor,
       }}
     >
-      <box style={{ flexDirection: "column", alignItems: "center" }}>
-        <GeneratingIndicatorSpinner color={color} />
-        <text fg={color}>generating...</text>
-      </box>
+      <GeneratingIndicatorInline color={color} />
     </box>
   )
 }
@@ -374,10 +374,7 @@ export function ReviewAppView({
           {/* Generating indicator - shown below last hunk */}
           {isGenerating && (
             <box style={{ alignItems: "center", justifyContent: "center", marginTop: gap, marginBottom: gap }}>
-              <box style={{ flexDirection: "column", alignItems: "center" }}>
-                <GeneratingIndicatorSpinner color={rgbaToHex(resolvedTheme.textMuted)} />
-                <text fg={rgbaToHex(resolvedTheme.textMuted)}>generating...</text>
-              </box>
+              <GeneratingIndicatorInline color={rgbaToHex(resolvedTheme.textMuted)} />
             </box>
           )}
         </box>
