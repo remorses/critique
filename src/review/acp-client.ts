@@ -494,9 +494,9 @@ HOW TO EXPLAIN - Diagrams First, Text Last
 ═══════════════════════════════════════════════════════════════════════════════
 
 PREFER ASCII DIAGRAMS - they explain better than words.
-ALWAYS wrap diagrams in \`\`\` code blocks - never render them as plain text:
+ALWAYS wrap diagrams in \`\`\`diagram code blocks - never render them as plain text:
 
-\`\`\`
+\`\`\`diagram
 ┌─────────────┐      ┌─────────────┐      ┌────────────┐
 │   Request   │ ───> │   Router    │ ───> │   Handler  │
 └─────────────┘      └──────┬──────┘      └──────┬─────┘
@@ -507,7 +507,7 @@ ALWAYS wrap diagrams in \`\`\` code blocks - never render them as plain text:
                     └─────────────┘      └─────────────┘
 \`\`\`
 
-\`\`\`
+\`\`\`diagram
                     ┌──────────────────┐
                     │     Initial      │
                     └────────┬─────────┘
