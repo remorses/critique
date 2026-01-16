@@ -121,7 +121,7 @@ This improves both security and developer experience when working with the API.
 
 The new request flow with error handling:
 
-\`\`\`
+\`\`\`diagram
 ┌─────────────┐     ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
 │   Client    │────▶│   Router    │────▶│  Handler    │────▶│  Database   │
 └─────────────┘     └─────────────┘     └─────────────┘     └─────────────┘
@@ -182,7 +182,7 @@ Added test case for the new error handling behavior, ensuring that:
 
 ### Test Flow Diagram
 
-\`\`\`
+\`\`\`diagram
                                     ┌──────────────────────────────────────────────────────────────────┐
                                     │                         Test Suite                               │
                                     └──────────────────────────────────────────────────────────────────┘
