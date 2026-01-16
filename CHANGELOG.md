@@ -1,3 +1,8 @@
+# 0.1.35
+
+- Dependencies:
+  - Update opentui to `302acd5f`
+
 # 0.1.34
 
 - `review` command:
