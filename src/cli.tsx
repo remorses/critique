@@ -332,11 +332,13 @@ async function runReviewMode(
           const selected = filteredSessions.length > 0
             ? await clack.multiselect({
                 message: "Select sessions to include as context (space to toggle, enter to confirm)",
-                options: filteredSessions.map((s) => ({
-                  value: s.sessionId,
-                  label: s.title || `Session ${s.sessionId.slice(0, 8)}`,
-                  hint: s.updatedAt ? formatTimeAgo(s.updatedAt) : undefined,
-                })),
+                options: filteredSessions.map((s) => {
+                  const title = s.title || `Session ${s.sessionId.slice(0, 8)}`;
+                  const timeAgo = s.updatedAt ? formatTimeAgo(s.updatedAt) : "";
+                  // Include time in label to prevent layout shift (hints only show on focus)
+                  const label = timeAgo ? `${title}  ${pc.default.dim(`(${timeAgo})`)}` : title;
+                  return { value: s.sessionId, label };
+                }),
                 required: false,
               })
             : [];
@@ -449,7 +451,7 @@ async function runReviewMode(
       try {
         const { htmlDesktop, htmlMobile } = await captureResponsiveHtml(
           renderCommand,
-          { desktopCols: 240, mobileCols: 100, baseRows, themeName }
+          { desktopCols: 230, mobileCols: 100, baseRows, themeName }
         );
 
         // Clean up temp files
@@ -581,7 +583,7 @@ async function runWebMode(
     positionalFilters: options['--'],
   });
 
-  const desktopCols = options.cols || 240;
+  const desktopCols = options.cols || 230;
   const mobileCols = options.mobileCols || 100;
   const themeName = options.theme && themeNames.includes(options.theme)
     ? options.theme
