@@ -32,7 +32,7 @@ function escapeHtml(text: string): string {
 
 /**
  * Convert a single span to HTML
- * Always wraps in a span element so flex layout works properly
+ * Always wraps in span for consistent inline-block sizing
  */
 function spanToHtml(span: TerminalSpan): string {
   const styles: string[] = []
@@ -63,7 +63,7 @@ function spanToHtml(span: TerminalSpan): string {
   
   const escapedText = escapeHtml(span.text)
   
-  // Always wrap in span for consistent flex behavior
+  // Always wrap in span for consistent inline-block sizing
   if (styles.length === 0) {
     return `<span>${escapedText}</span>`
   }
@@ -168,10 +168,7 @@ html, body {
   color: ${textColor};
   font-family: ${fontFamily};
   font-size: ${fontSize};
-  line-height: 1.5;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  text-rendering: optimizeLegibility;
+  line-height: 1.7;
 }
 body {
   overflow: auto;
@@ -183,15 +180,18 @@ body {
 }
 .line {
   white-space: pre;
-  display: flex;
+  display: block;
   content-visibility: auto;
-  contain-intrinsic-block-size: auto 1.5em;
+  contain-intrinsic-block-size: auto 1.7em;
   background-color: ${backgroundColor};
   transform: translateZ(0);
   backface-visibility: hidden;
 }
 .line span {
   white-space: pre;
+  display: inline-block;
+  line-height: 1.7;
+  vertical-align: top;
 }
 /* Disable content-visibility on iOS Safari where it can cause rendering issues */
 @supports (-webkit-touch-callout: none) {
@@ -229,8 +229,8 @@ ${content}
   function adjustFontSize() {
     const viewportWidth = window.innerWidth;
     const calculatedSize = (viewportWidth - padding) / (cols * charRatio);
-    // Round to nearest even integer to prevent subpixel rendering issues
-    // (with line-height: 1.5, even font-size always yields integer line-height)
+    // Round to nearest even integer to reduce subpixel rendering issues
+    // Note: with line-height 1.7, some subpixel values are unavoidable
     const clamped = Math.max(minFontSize, Math.min(maxFontSize, calculatedSize));
     const fontSize = Math.round(clamped / 2) * 2;
     document.body.style.fontSize = fontSize + 'px';
