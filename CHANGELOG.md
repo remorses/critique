@@ -1,3 +1,16 @@
+# 0.1.34
+
+- `review` command:
+  - Add diagram parser to extract and render diagrams from AI descriptions
+  - Show generating indicator below last hunk with animated spinner and dots
+  - Use "diagram" language in system prompt for code blocks
+- Web preview:
+  - Fix text selection by switching from flex to block layout for lines
+- UI:
+  - Fix layout shift in session multiselect by moving time ago to label
+- Themes:
+  - Add "conceal" color support
+
 # 0.1.33
 
 - Dependencies:
