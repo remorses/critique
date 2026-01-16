@@ -1,3 +1,8 @@
+# 0.1.33
+
+- Dependencies:
+  - Fix opentui package URLs to use full commit hashes for consistent resolution
+
 # 0.1.32
 
 - Dependencies:
