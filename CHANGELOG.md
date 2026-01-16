@@ -1,3 +1,11 @@
+# 0.1.30
+
+- Dependencies:
+  - Switch opentui packages from PR number (`@433`) to commit hash (`@203f75b8...`) to fix Yoga binding mismatch between `@opentui/core` and `@opentui/react`
+  - Remove `overrides` section from package.json (no longer needed with matching versions)
+- Web preview:
+  - Fix iOS Safari rendering issues by disabling `content-visibility` optimization via `@supports (-webkit-touch-callout: none)`
+
 # 0.1.29
 
 - Web preview:

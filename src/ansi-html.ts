@@ -193,6 +193,12 @@ body {
 .line span {
   white-space: pre;
 }
+/* Disable content-visibility on iOS Safari where it can cause rendering issues */
+@supports (-webkit-touch-callout: none) {
+  .line {
+    content-visibility: visible;
+  }
+}
 ${options.autoTheme ? `@media (prefers-color-scheme: light) {
   html {
     filter: invert(1) hue-rotate(180deg);
