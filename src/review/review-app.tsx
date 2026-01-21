@@ -18,6 +18,7 @@ export interface ReviewAppProps {
   hunks: IndexedHunk[]
   yamlPath: string
   isGenerating: boolean
+  initialReviewData?: ReviewYaml // For resume mode - skip YAML watching
 }
 
 class ScrollAcceleration {
@@ -41,10 +42,11 @@ export function ReviewApp({
   hunks,
   yamlPath,
   isGenerating,
+  initialReviewData,
 }: ReviewAppProps) {
   const { width } = useTerminalDimensions()
   const renderer = useRenderer()
-  const [reviewData, setReviewData] = React.useState<ReviewYaml | null>(null)
+  const [reviewData, setReviewData] = React.useState<ReviewYaml | null>(initialReviewData ?? null)
   const [showThemePicker, setShowThemePicker] = React.useState(false)
   const [previewTheme, setPreviewTheme] = React.useState<string | null>(null)
 
@@ -53,8 +55,10 @@ export function ReviewApp({
   // Use preview theme if hovering, otherwise use selected theme
   const activeTheme = previewTheme ?? themeName
 
-  // Watch YAML file for updates
+  // Watch YAML file for updates (skip if initialReviewData provided - resume mode)
   React.useEffect(() => {
+    if (initialReviewData) return // Resume mode - data already loaded
+
     const cleanup = watchReviewYaml(
       yamlPath,
       (yaml) => {
@@ -65,7 +69,7 @@ export function ReviewApp({
       },
     )
     return cleanup
-  }, [yamlPath])
+  }, [yamlPath, initialReviewData])
 
   // Keyboard navigation
   useKeyboard((key) => {

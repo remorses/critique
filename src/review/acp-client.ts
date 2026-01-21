@@ -562,15 +562,25 @@ USE TABLES for comparisons and summaries:
 TEXT IS LAST RESORT - max 3 lines, no filler, every word must add value.
 
 ═══════════════════════════════════════════════════════════════════════════════
-SPLITTING RULES
+SPLITTING RULES - NEVER SHOW MORE THAN 10 LINES AT ONCE
 ═══════════════════════════════════════════════════════════════════════════════
 
-- Each diff chunk: MAX 10 lines. Split aggressively to reduce cognitive load.
-- Use numbered headers for sequential parts: ## 1. Parse input  ## 2. Validate  ## 3. Execute
-- Split by logical boundaries (functions, concerns)
-- Every chunk needs a description, even just a few words
+CRITICAL: Never show hunks larger than 10 lines. This is the most important rule.
+Split aggressively to reduce cognitive load. Readers absorb small chunks better.
 
-Lines use cat -n format (1-based). Use lineRange to reference specific portions.
+For ADDED FILES (new files):
+- Split into logical parts: imports, types, then each function/method separately
+- Each function/class method gets its own chunk with a brief description
+- Describe what each function does and why it exists
+- Example: A 50-line new file becomes 5+ chunks of ~10 lines each
+
+For MODIFIED FILES:
+- Split by logical boundaries (functions, concerns, before/after)
+- Use numbered headers for sequential parts: ## 1. Parse input  ## 2. Validate  ## 3. Execute
+
+Every chunk MUST have a description explaining its purpose, even just one line.
+
+Lines use cat -n format (1-based). Use lineRange to reference specific portions of large hunks.
 
 ═══════════════════════════════════════════════════════════════════════════════
 AUTO-GENERATED CODE - NEVER INCLUDE
@@ -598,10 +608,12 @@ OUTPUT FORMAT
 
 Write YAML progressively (one item at a time so user sees progress):
 
-1. First Write tool: create file with just "hunks:"
+1. First Write tool: create file with title and hunks header
 2. Then Edit tool for EACH item (one at a time)
 
 \`\`\`yaml
+title: "Short summary of the overall change (50 chars max)"
+hunks:
 # Group related hunks
 - hunkIds: [1, 2]
   markdownDescription: |
@@ -615,6 +627,11 @@ Write YAML progressively (one item at a time so user sees progress):
     ## 1. First part
     What this section does...
 \`\`\`
+
+The \`title\` field should be a concise summary like:
+- "Add user authentication with OAuth"
+- "Fix race condition in session cleanup"  
+- "Refactor API routes to use middleware"
 
 </task>
 

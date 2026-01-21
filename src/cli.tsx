@@ -107,8 +107,11 @@ async function runReviewMode(
     sessionsToContextXml,
     compressSession,
     waitForFirstValidGroup,
+    readReviewYaml,
+    saveReview,
   } = await import("./review/index.ts");
   const { ReviewApp } = await import("./review/review-app.tsx");
+  type StoredReview = import("./review/index.ts").StoredReview;
 
   // Parse hunks with IDs
   const hunks = await parseHunksWithIds(gitDiff);
@@ -129,6 +132,39 @@ async function runReviewMode(
   // Connect to ACP
   let acpClient: ReturnType<typeof createAcpClient> | null = null;
   let reviewSessionId: string | null = null;
+
+  // Pending review - tracked in memory, saved on exit or completion
+  let pendingReview: StoredReview | null = null;
+  let reviewSaved = false;
+
+  // Save pending review (called on exit or completion)
+  const savePendingReview = (status: "in_progress" | "completed") => {
+    if (reviewSaved || !pendingReview) return;
+    
+    // Update with latest YAML content
+    const reviewYaml = readReviewYaml(yamlPath);
+    if (reviewYaml) {
+      pendingReview.reviewYaml = reviewYaml;
+      pendingReview.title = reviewYaml.title || "Untitled review";
+    }
+    
+    // Only save if there's actual content (at least one hunk group)
+    if (pendingReview.reviewYaml.hunks.length === 0) {
+      logger.debug("No content to save, skipping");
+      return;
+    }
+    
+    pendingReview.status = status;
+    pendingReview.updatedAt = Date.now();
+    
+    try {
+      saveReview(pendingReview);
+      reviewSaved = true;
+      logger.info("Review saved to history", { status, id: pendingReview.id });
+    } catch (e) {
+      logger.debug("Failed to save review to history", { error: e });
+    }
+  };
 
   // Streaming state for taskLog
   let analysisLog: ReturnType<typeof clack.taskLog> | null = null;
@@ -400,6 +436,22 @@ async function runReviewMode(
       (sessionId) => {
         reviewSessionId = sessionId;
         logger.info("Review session started", { sessionId });
+        
+        // Initialize pending review with ACP session ID
+        const now = Date.now();
+        pendingReview = {
+          id: sessionId,
+          createdAt: now,
+          updatedAt: now,
+          status: "in_progress",
+          cwd,
+          gitCommand,
+          agent: agent as "opencode" | "claude",
+          model,
+          title: "Untitled review",
+          hunks,
+          reviewYaml: { hunks: [] },
+        };
       },
       { model },
     );
@@ -416,6 +468,9 @@ async function runReviewMode(
         updateToolSpinner(0);
         log.success("Analysis complete");
         logger.info("Review generation completed, generating web preview");
+
+        // Save the review as completed
+        savePendingReview("completed");
       } catch (error) {
         // Stop any active spinners
         if (analysisSpinner) {
@@ -429,6 +484,8 @@ async function runReviewMode(
         clack.log.error(errorMessage);
         clack.outro("");
         
+        // Save partial progress
+        savePendingReview("in_progress");
         if (acpClient) await acpClient.close();
         try { fs.unlinkSync(yamlPath); } catch (e) { logger.debug("Failed to cleanup yaml file", { error: e }); }
         process.exit(1);
@@ -519,6 +576,9 @@ async function runReviewMode(
     // Start TUI immediately with isGenerating: true
     const renderer = await createCliRenderer({
       onDestroy() {
+        // Save review before exiting (will be in_progress if not completed)
+        savePendingReview("in_progress");
+        
         if (acpClient) {
           acpClient.close();
         }
@@ -546,15 +606,20 @@ async function runReviewMode(
     // Start with isGenerating: true
     renderApp(true);
 
-    // When session completes, re-render with isGenerating: false
+    // When session completes, re-render with isGenerating: false and save to history
     sessionPromise
       .then(() => {
         logger.info("Review generation completed");
         renderApp(false);
+
+        // Save the review as completed
+        savePendingReview("completed");
       })
       .catch((error) => {
         logger.error("Review session error", error);
         renderApp(false);
+        // Still save as in_progress on error (partial progress)
+        savePendingReview("in_progress");
       });
   } catch (error) {
     logger.error("Review mode error", error);
@@ -571,11 +636,193 @@ async function runReviewMode(
     clack.log.error(errorMessage);
     clack.outro("");
     
+    // Save partial progress
+    savePendingReview("in_progress");
+    
     if (acpClient) {
       await acpClient.close();
     }
     process.exit(1);
   }
+}
+
+// Resume mode options
+interface ResumeModeOptions {
+  reviewId?: string;
+  web?: boolean;
+  open?: boolean;
+}
+
+// Resume mode handler - display a previously saved review or restart an interrupted one
+async function runResumeMode(options: ResumeModeOptions) {
+  const pc = await import("picocolors");
+  const clack = await import("@clack/prompts");
+  const {
+    listReviews,
+    loadReview,
+    deleteReview,
+    formatTimeAgo,
+    truncatePath,
+  } = await import("./review/index.ts");
+  const { ReviewApp } = await import("./review/review-app.tsx");
+
+  clack.intro("critique review --resume");
+
+  let reviewId = options.reviewId;
+
+  // If no ID provided, show select
+  if (!reviewId) {
+    const reviews = listReviews();
+
+    if (reviews.length === 0) {
+      clack.log.warn("No saved reviews found");
+      clack.outro("");
+      process.exit(0);
+    }
+
+    const selected = await clack.select({
+      message: "Select a review to display",
+      options: reviews.slice(0, 20).map((r) => {
+        // Show status indicator for in_progress reviews
+        const statusHint = r.status === "in_progress" ? pc.default.yellow("(in progress)  ") : "";
+        return {
+          value: r.id,
+          label: r.title,
+          hint: `${statusHint}${formatTimeAgo(r.updatedAt)}  ${truncatePath(r.cwd)}`,
+        };
+      }),
+    });
+
+    if (clack.isCancel(selected)) {
+      clack.cancel("Operation cancelled");
+      process.exit(0);
+    }
+
+    reviewId = selected as string;
+  }
+
+  // Load the review
+  const review = loadReview(reviewId);
+
+  if (!review) {
+    clack.log.error(`Review not found: ${reviewId}`);
+    clack.outro("");
+    process.exit(1);
+  }
+
+  // If review is in_progress, restart the generation
+  if (review.status === "in_progress") {
+    clack.log.info(`Restarting interrupted review: ${review.title}`);
+    clack.outro("");
+    
+    // Delete the old review (new one will be created with new session ID)
+    deleteReview(review.id);
+    
+    // Restart the review with the same parameters
+    const webOptions = options.web ? { web: true, open: options.open } : undefined;
+    await runReviewMode(review.gitCommand, review.agent, {
+      webOptions,
+      model: review.model,
+    });
+    return;
+  }
+
+  clack.log.info(`Loading: ${review.title}`);
+
+  // Web mode: generate HTML and upload
+  if (options.web) {
+    const {
+      captureResponsiveHtml,
+      uploadHtml,
+      openInBrowser,
+      writeTempFile,
+      cleanupTempFile,
+    } = await import("./web-utils.ts");
+
+    // Write hunks and YAML to temp files
+    const hunksFile = writeTempFile(JSON.stringify(review.hunks), "critique-hunks", ".json");
+    const yamlContent = `title: ${JSON.stringify(review.reviewYaml.title || review.title)}\nhunks:\n` +
+      review.reviewYaml.hunks.map((h) => {
+        const lines: string[] = [];
+        if (h.hunkIds) lines.push(`- hunkIds: [${h.hunkIds.join(", ")}]`);
+        else if (h.hunkId !== undefined) {
+          lines.push(`- hunkId: ${h.hunkId}`);
+          if (h.lineRange) lines.push(`  lineRange: [${h.lineRange[0]}, ${h.lineRange[1]}]`);
+        }
+        lines.push(`  markdownDescription: |`);
+        lines.push(...h.markdownDescription.split("\n").map((l) => `    ${l}`));
+        return lines.join("\n");
+      }).join("\n");
+    const yamlFile = writeTempFile(yamlContent, "critique-review", ".yaml");
+
+    const themeName = persistedState.themeName ?? defaultThemeName;
+    const totalLines = review.hunks.reduce((sum, h) => sum + h.lines.length, 0);
+    const baseRows = Math.max(200, totalLines * 2 + 100);
+
+    const renderCommand = [
+      process.argv[1]!,
+      "review-web-render",
+      yamlFile,
+      hunksFile,
+      "--theme",
+      themeName,
+    ];
+
+    const webSpinner = clack.spinner();
+    webSpinner.start("Generating web preview...");
+
+    try {
+      const { htmlDesktop, htmlMobile } = await captureResponsiveHtml(
+        renderCommand,
+        { desktopCols: 230, mobileCols: 100, baseRows, themeName }
+      );
+
+      cleanupTempFile(hunksFile);
+      cleanupTempFile(yamlFile);
+
+      webSpinner.message("Uploading...");
+      const result = await uploadHtml(htmlDesktop, htmlMobile);
+      webSpinner.stop("Uploaded");
+
+      clack.log.success(`Preview URL: ${result.url}`);
+      clack.log.info("(expires in 7 days)");
+      clack.outro("");
+
+      if (options.open) {
+        await openInBrowser(result.url);
+      }
+      process.exit(0);
+    } catch (error: any) {
+      webSpinner.stop("Failed");
+      cleanupTempFile(hunksFile);
+      cleanupTempFile(yamlFile);
+      clack.log.error(`Failed to generate web preview: ${error.message}`);
+      clack.outro("");
+      process.exit(1);
+    }
+  }
+
+  // TUI mode: render directly
+  clack.outro("");
+
+  const renderer = await createCliRenderer({
+    onDestroy() {
+      process.exit(0);
+    },
+    exitOnCtrlC: true,
+  });
+
+  const root = createRoot(renderer);
+  root.render(
+    <ErrorBoundary>
+      <ReviewApp
+        hunks={review.hunks}
+        yamlPath="" // Not used in resume mode - we pass reviewData directly
+        isGenerating={false}
+        initialReviewData={review.reviewYaml}
+      />
+    </ErrorBoundary>
+  );
 }
 
 // Web mode handler
@@ -1221,8 +1468,19 @@ cli
   .option("--session <id>", "Session ID(s) to include as context (can be repeated)")
   .option("--web", "Generate web preview instead of TUI")
   .option("--open", "Open web preview in browser (with --web)")
+  .option("--resume [id]", "Resume a previous review (shows select if no ID provided)")
   .action(async (base, head, options) => {
     try {
+      // Handle resume mode
+      if (options.resume !== undefined) {
+        await runResumeMode({
+          reviewId: typeof options.resume === "string" ? options.resume : undefined,
+          web: options.web,
+          open: options.open,
+        });
+        return;
+      }
+
       if (options.agent !== "opencode" && options.agent !== "claude") {
         console.error(`Unknown agent: ${options.agent}. Supported: opencode, claude`);
         process.exit(1);

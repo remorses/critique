@@ -136,10 +136,8 @@ export function ansiToHtmlDocument(input: string | Buffer, options: AnsiToHtmlOp
 
   const content = ansiToHtml(input, options)
 
-  // Character width ratio for monospace fonts (ch unit / font-size)
-  // Most monospace fonts have a ratio around 0.6
-  const charWidthRatio = 0.6
-  const padding = 32 // 16px padding on each side
+  // Padding: 16px on each side = 32px total
+  const padding = 32
 
   return `<!DOCTYPE html>
 <html>
@@ -162,27 +160,37 @@ html {
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
 }
+:root {
+  --cols: ${cols};
+  --padding: ${padding}px;
+  --char-ratio: 0.6;
+  --min-font: 4px;
+  --max-font: 14px;
+}
 html, body {
   min-height: 100%;
   background-color: ${backgroundColor};
   color: ${textColor};
   font-family: ${fontFamily};
-  font-size: ${fontSize};
+  font-size: clamp(var(--min-font), calc((100vw - var(--padding)) / (var(--cols) * var(--char-ratio))), var(--max-font));
   line-height: 1.7;
 }
 body {
-  overflow: auto;
+  overflow-x: clip;
+  overflow-y: auto;
+  max-width: 100vw;
 }
 #content {
   padding: 16px;
   width: fit-content;
+  max-width: calc(100vw - var(--padding));
   margin: 0 auto;
 }
 .line {
   white-space: pre;
   display: block;
   content-visibility: auto;
-  contain-intrinsic-block-size: auto 1.7em;
+  contain-intrinsic-block-size: auto round(down, 1.7em, 1px);
   background-color: ${backgroundColor};
   transform: translateZ(0);
   backface-visibility: hidden;
@@ -208,15 +216,8 @@ ${options.autoTheme ? `@media (prefers-color-scheme: light) {
 ${content}
 </div>
 <script>
+// Redirect mobile devices to ?v=mobile for optimized view
 (function() {
-  const cols = ${cols};
-  const charRatio = ${charWidthRatio};
-  const padding = ${padding};
-  const minFontSize = 4;
-  const maxFontSize = 14;
-
-  // Redirect mobile devices to ?v=mobile for optimized view
-  // Only redirect if not already on a forced version
   const params = new URLSearchParams(window.location.search);
   if (!params.has('v')) {
     const isMobile = /Mobile|iP(hone|od|ad)|Android|BlackBerry|IEMobile|Kindle|Opera M(obi|ini)|Windows Phone|webOS/i.test(navigator.userAgent);
@@ -225,27 +226,6 @@ ${content}
       window.location.replace(window.location.pathname + '?' + params.toString());
     }
   }
-
-  function adjustFontSize() {
-    const viewportWidth = window.innerWidth;
-    const calculatedSize = (viewportWidth - padding) / (cols * charRatio);
-    // Round to nearest even integer to reduce subpixel rendering issues
-    // Note: with line-height 1.7, some subpixel values are unavoidable
-    const clamped = Math.max(minFontSize, Math.min(maxFontSize, calculatedSize));
-    const fontSize = Math.round(clamped / 2) * 2;
-    document.body.style.fontSize = fontSize + 'px';
-  }
-
-  function debounce(fn, ms) {
-    let timeout;
-    return function() {
-      clearTimeout(timeout);
-      timeout = setTimeout(fn, ms);
-    };
-  }
-
-  adjustFontSize();
-  window.addEventListener('resize', debounce(adjustFontSize, 100));
 })();
 </script>
 </body>

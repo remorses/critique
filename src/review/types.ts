@@ -21,6 +21,7 @@ export interface IndexedHunk {
  * The YAML output structure from the AI review
  */
 export interface ReviewYaml {
+  title?: string // AI-generated title summarizing the changes
   hunks: ReviewGroup[]
 }
 

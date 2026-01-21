@@ -1,3 +1,25 @@
+# 0.1.39
+
+- `review` command:
+  - Enhanced splitting rules in system prompt: never show hunks larger than 10 lines
+  - Added files must be split into parts with descriptions for each function/method
+  - More aggressive chunk splitting for reduced cognitive load
+  - Track review status: `in_progress` (interrupted) or `completed`
+  - Interrupted reviews saved on Ctrl+C/exit and can be restarted via `--resume`
+  - Use ACP session ID as review ID
+  - Show status indicator in review picker (yellow for in progress)
+  - JSON file only written on exit/completion to prevent concurrent access issues
+
+# 0.1.38
+
+- `review` command:
+  - Add `--resume` flag to view previously saved reviews
+  - Reviews are automatically saved to `~/.critique/reviews/` on completion
+  - Select from recent reviews with interactive picker (ordered by creation time)
+  - Resume supports `--web` flag to generate shareable URL
+  - AI now generates a `title` field in YAML for better review summaries
+  - Keeps last 50 reviews, auto-cleans older ones
+
 # 0.1.37
 
 - `review` command:

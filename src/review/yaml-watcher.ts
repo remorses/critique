@@ -107,6 +107,11 @@ function parsePartialYaml(content: string): ReviewYaml | null {
 
     const result: ReviewYaml = { hunks: [] }
 
+    // Extract title if present
+    if (typeof parsed.title === "string" && parsed.title.trim()) {
+      result.title = parsed.title.trim()
+    }
+
     for (const item of parsed.hunks) {
       if (isValidReviewGroup(item)) {
         const group: ReviewGroup = {

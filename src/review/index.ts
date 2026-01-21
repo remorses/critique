@@ -33,3 +33,12 @@ export type {
   SessionInfo,
   SessionContent,
 } from "./types.ts"
+export {
+  saveReview,
+  listReviews,
+  loadReview,
+  deleteReview,
+  formatTimeAgo,
+  truncatePath,
+} from "./storage.ts"
+export type { StoredReview, ReviewMetadata, ReviewStatus } from "./storage.ts"
