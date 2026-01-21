@@ -698,12 +698,13 @@ async function runResumeMode(options: ResumeModeOptions) {
     const selected = await clack.select({
       message: "Select a review to display",
       options: reviews.slice(0, 20).map((r) => {
-        // Show status indicator for in_progress reviews
-        const statusHint = r.status === "in_progress" ? pc.default.yellow("(in progress)  ") : "";
+        // Show status and time in label to avoid layout shifts (hints only show on focus)
+        const status = r.status === "in_progress" ? pc.default.yellow(" (in progress)") : "";
+        const time = formatTimeAgo(r.updatedAt);
+        const timeStr = time ? pc.default.dim(`  ${time}`) : "";
         return {
           value: r.id,
-          label: r.title,
-          hint: `${statusHint}${formatTimeAgo(r.updatedAt)}  ${truncatePath(r.cwd)}`,
+          label: `${r.title}${status}${timeStr}`,
         };
       }),
     });
