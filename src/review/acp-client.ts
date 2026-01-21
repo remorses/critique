@@ -1,4 +1,6 @@
-// ACP client for connecting to AI agents (opencode or claude)
+// ACP (Agent Client Protocol) client for communicating with AI coding assistants.
+// Supports OpenCode and Claude Code agents for session listing, content loading,
+// and creating AI-powered review sessions with streaming updates.
 
 import {
   ClientSideConnection,
@@ -157,100 +159,69 @@ export class AcpClient {
 
   /**
    * List sessions for the given working directory
-   * Uses CLI command for opencode, parses JSONL files for claude
+   * Uses ACP unstable_listSessions for opencode, parses JSONL files for claude
+   * @param cwd - Working directory to filter sessions by
+   * @param limit - Maximum number of sessions to return (default: 10)
    */
-  async listSessions(cwd: string): Promise<SessionInfo[]> {
+  async listSessions(cwd: string, limit = 10): Promise<SessionInfo[]> {
     if (this.agent === "opencode") {
-      return this.listOpencodeSessions(cwd)
+      return this.listOpencodeSessions(cwd, limit)
     } else {
-      return this.listClaudeSessions(cwd)
+      return this.listClaudeSessions(cwd, limit)
     }
   }
 
   /**
-   * List OpenCode sessions by reading directly from storage
-   * Storage location: ~/.local/share/opencode/storage/
+   * List OpenCode sessions using ACP unstable_listSessions
+   * @param cwd - Working directory to filter sessions by
+   * @param limit - Maximum number of sessions to return
    */
-  private async listOpencodeSessions(cwd: string): Promise<SessionInfo[]> {
-    const storageDir = path.join(os.homedir(), ".local", "share", "opencode", "storage")
-    const projectsDir = path.join(storageDir, "project")
-    const sessionsDir = path.join(storageDir, "session")
-
-    if (!fs.existsSync(projectsDir)) {
-      return []
+  private async listOpencodeSessions(cwd: string, limit: number): Promise<SessionInfo[]> {
+    await this.ensureConnected()
+    if (!this.client) {
+      throw new Error("Client connection failed")
     }
 
-    // Find ALL project IDs for the given cwd (there can be multiple)
-    const projectIds: string[] = []
-    try {
-      const projectFiles = fs.readdirSync(projectsDir).filter(f => f.endsWith(".json"))
-      for (const file of projectFiles) {
-        try {
-          const content = fs.readFileSync(path.join(projectsDir, file), "utf-8")
-          const project = JSON.parse(content) as { id: string; worktree: string }
-          if (project.worktree === cwd) {
-            projectIds.push(project.id)
-          }
-        } catch {
-          // Skip invalid project files
-        }
-      }
-    } catch (e) {
-      logger.debug("Failed to scan opencode projects", { error: e })
-      return []
-    }
-
-    if (projectIds.length === 0) {
-      return []
-    }
-
-    // Read sessions from ALL matching projects
     const sessions: SessionInfo[] = []
-    for (const projectId of projectIds) {
-      const projectSessionsDir = path.join(sessionsDir, projectId)
-      if (!fs.existsSync(projectSessionsDir)) {
-        continue
+    let cursor: string | undefined
+
+    // Paginate until we have enough sessions or no more results
+    while (sessions.length < limit) {
+      const response = await this.client.unstable_listSessions({
+        cwd,
+        cursor,
+      })
+
+      // Convert ACP SessionInfo to our local type
+      for (const acpSession of response.sessions) {
+        if (sessions.length >= limit) break
+
+        sessions.push({
+          sessionId: acpSession.sessionId,
+          cwd: acpSession.cwd,
+          title: acpSession.title ?? undefined,
+          // Convert ISO 8601 string to timestamp (milliseconds)
+          updatedAt: acpSession.updatedAt ? new Date(acpSession.updatedAt).getTime() : undefined,
+          _meta: acpSession._meta,
+        })
       }
 
-      try {
-        const sessionFiles = fs.readdirSync(projectSessionsDir).filter(f => f.endsWith(".json"))
-        for (const file of sessionFiles) {
-          try {
-            const content = fs.readFileSync(path.join(projectSessionsDir, file), "utf-8")
-            const session = JSON.parse(content) as {
-              id: string
-              title?: string
-              directory: string
-              time: { created: number; updated: number }
-              _meta?: { [key: string]: unknown } | null
-            }
-            sessions.push({
-              sessionId: session.id,
-              cwd: session.directory,
-              title: session.title,
-              updatedAt: session.time.updated,
-              _meta: session._meta,
-            })
-          } catch {
-            // Skip invalid session files
-          }
-        }
-      } catch (e) {
-        logger.debug("Failed to read opencode sessions for project", { projectId, error: e })
-      }
+      // Check if there are more pages
+      if (!response.nextCursor) break
+      cursor = response.nextCursor
     }
 
-    // Filter to exact cwd match and sort by updatedAt descending
-    return sessions
-      .filter(s => s.cwd === cwd)
-      .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
+    // Sessions should already be sorted by the server, but ensure descending order
+    return sessions.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
   }
 
   /**
    * List Claude Code sessions by parsing JSONL files
    * Sessions are stored in ~/.claude/projects/<path-encoded>/
+   * @param cwd - Working directory to filter sessions by
+   * @param limit - Maximum number of sessions to return
    */
-  private async listClaudeSessions(cwd: string): Promise<SessionInfo[]> {
+  private async listClaudeSessions(cwd: string, limit: number): Promise<SessionInfo[]> {
     // Claude stores sessions in ~/.claude/projects/ with path encoded (/ -> -)
     const claudeDir = path.join(os.homedir(), ".claude", "projects")
     const encodedPath = cwd.replace(/\//g, "-")
@@ -313,8 +284,10 @@ export class AcpClient {
       return []
     }
 
-    // Sort by updatedAt descending (most recent first)
-    return sessions.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
+    // Sort by updatedAt descending (most recent first) and apply limit
+    return sessions
+      .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
+      .slice(0, limit)
   }
 
   /**
@@ -552,7 +525,8 @@ HOW TO EXPLAIN - Diagrams First, Text Last
 ═══════════════════════════════════════════════════════════════════════════════
 
 PREFER ASCII DIAGRAMS - they explain better than words.
-ALWAYS wrap diagrams in \`\`\`diagram code blocks - never render them as plain text:
+ALWAYS wrap diagrams in \`\`\`diagram code blocks - never render them as plain text.
+CRITICAL: Always close each code block with \`\`\` before any new text or heading. Never leave code blocks unclosed.
 
 \`\`\`diagram
 ┌─────────────┐      ┌─────────────┐      ┌────────────┐
