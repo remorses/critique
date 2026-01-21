@@ -1,3 +1,9 @@
+# 0.1.36
+
+- `review` command:
+  - Use Unicode filled arrows (`▶`, `◀`, `▼`) in diagram examples for proper parsing
+  - Use `secondary` theme color for diagram text (purple in github theme)
+
 # 0.1.35
 
 - Dependencies:
