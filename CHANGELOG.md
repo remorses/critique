@@ -1,3 +1,11 @@
+# 0.1.41
+
+- `review` command:
+  - Filter `--resume` reviews by current working directory (only shows reviews from cwd or subdirectories)
+  - Use ACP `unstable_listSessions` for OpenCode instead of parsing JSON files directly
+  - Falls back to file-based parsing for Claude Code when ACP method unavailable
+  - Add instruction to always close code blocks before new text (fixes unclosed diagram blocks)
+
 # 0.1.40
 
 - `review` command:
