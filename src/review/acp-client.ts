@@ -462,16 +462,30 @@ IMPORTANT: Never use emojis or non-ASCII characters except for box-drawing chara
 READING ORDER - The Guiding Principle
 ═══════════════════════════════════════════════════════════════════════════════
 
-The reader reads top to bottom. You control their mental model. Order groups so each builds on the previous:
+THINK HARD BEFORE WRITING. Before you start editing the YAML file, carefully plan the full order of all hunks. Consider:
+- What is the main story of this change?
+- What should the reader understand first to make everything else click?
+- Which hunks are essential vs supporting details?
 
-1. Config/infrastructure (sets the stage)
-2. Types and interfaces (vocabulary)
-3. Core utilities (foundational pieces)
-4. Main implementation (reader now has context)
-5. Integration and usage (how it connects)
-6. Tests and docs (validation)
+The reader reads top to bottom. You control their mental model. 
 
-Show "what" before "how". Show data structures before code that uses them.
+ORDER BY CODE FLOW - Follow how the code actually executes in the app:
+- Start with entry points (what gets called first)
+- Then show what those call (the next layer down)
+- Continue down to the dependencies
+
+This creates an intuitive progression: dependants before dependencies. The reader follows the same path the code takes at runtime.
+
+Practical ordering:
+1. Entry points and main implementation (routes, handlers, commands - where execution starts)
+2. Business logic (what the entry points call)
+3. Types and interfaces (if needed to understand the above)
+4. Integration points (how it connects to external systems)
+5. Tests and docs (validation)
+6. Utilities and helpers (supporting functions - reader already saw them being used)
+7. Config/infrastructure (setup, boilerplate - least essential)
+
+Utils, infra, and config are supporting cast - put them last. The reader already saw them referenced above and can now understand their implementation.
 
 ═══════════════════════════════════════════════════════════════════════════════
 WHAT TO EXPLAIN - Why Over What
@@ -568,6 +582,12 @@ SPLITTING RULES - NEVER SHOW MORE THAN 10 LINES AT ONCE
 CRITICAL: Never show hunks larger than 10 lines. This is the most important rule.
 Split aggressively to reduce cognitive load. Readers absorb small chunks better.
 
+For HEAVY LOGIC - split even one or two lines at a time:
+- When code is dense or complex, show exactly what happens step by step
+- Follow the same order the code executes - reader builds the mental model progressively
+- You can interleave hunks from different files to follow the execution flow
+- Example: show a function call, then the function it calls, then back to the caller
+
 For ADDED FILES (new files):
 - Split into logical parts: imports, types, then each function/method separately
 - Each function/class method gets its own chunk with a brief description
@@ -577,6 +597,8 @@ For ADDED FILES (new files):
 For MODIFIED FILES:
 - Split by logical boundaries (functions, concerns, before/after)
 - Use numbered headers for sequential parts: ## 1. Parse input  ## 2. Validate  ## 3. Execute
+
+You control the order. Reorder and interleave hunks freely to tell the clearest story.
 
 Every chunk MUST have a description explaining its purpose, even just one line.
 
