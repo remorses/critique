@@ -504,7 +504,8 @@ async function runReviewMode(
 
       // Write hunks to temp file for the render command
       const hunksFile = writeTempFile(JSON.stringify(hunks), "critique-hunks", ".json");
-      const themeName = persistedState.themeName ?? defaultThemeName;
+      // For web, always use default theme (with auto dark/light inversion) unless explicitly overridden
+      const themeName = defaultThemeName;
 
       // Calculate rows needed based on hunks
       const totalLines = hunks.reduce((sum, h) => sum + h.lines.length, 0);
@@ -834,7 +835,8 @@ async function runResumeMode(options: ResumeModeOptions) {
       }).join("\n");
     const yamlFile = writeTempFile(yamlContent, "critique-review", ".yaml");
 
-    const themeName = persistedState.themeName ?? defaultThemeName;
+    // For web, always use default theme (with auto dark/light inversion) unless explicitly overridden
+    const themeName = defaultThemeName;
     const totalLines = review.hunks.reduce((sum, h) => sum + h.lines.length, 0);
     const baseRows = Math.max(200, totalLines * 2 + 100);
 
@@ -953,9 +955,10 @@ async function runWebMode(
 
   const desktopCols = options.cols || 230;
   const mobileCols = options.mobileCols || 100;
+  // For web, always use default theme (with auto dark/light inversion) unless explicitly overridden via --theme
   const themeName = options.theme && themeNames.includes(options.theme)
     ? options.theme
-    : persistedState.themeName ?? defaultThemeName;
+    : defaultThemeName;
 
   console.log("Capturing diff output...");
 
