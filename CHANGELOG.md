@@ -6,6 +6,11 @@
   - Uses takumi for high-performance image rendering
   - `@takumi-rs/core` and `@takumi-rs/helpers` added as optional dependencies
   - Library export: `import { renderTerminalToImages } from "critique/src/image.ts"`
+- Web output: Use default theme to enable dark/light mode switching based on system preference
+- `review` command:
+  - Improved AI prompt: order hunks by code flow, think upfront before writing, split heavy logic across sections
+- Dependencies:
+  - Update opentui to `367a9408`
 
 # 0.1.41
 
