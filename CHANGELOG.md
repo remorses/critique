@@ -1,3 +1,7 @@
+# 0.1.45
+
+- Support git range syntax in single argument: `critique origin/main...HEAD` or `critique main..feature`
+
 # 0.1.44
 
 - Fix parsing error with submodule status lines:

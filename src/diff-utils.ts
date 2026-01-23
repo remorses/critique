@@ -88,6 +88,22 @@ export function buildGitCommand(options: GitCommandOptions): string {
   if (options.base && options.head) {
     return `git diff ${options.base}...${options.head} --no-prefix ${submoduleArg} ${contextArg} ${filterArg}`.trim();
   }
+  // Detect range syntax in single base argument (e.g., "origin/main...HEAD" or "main..feature")
+  if (options.base && !options.head) {
+    // Three-dot syntax: A...B (merge-base to B, like GitHub PRs)
+    const threeDotsMatch = options.base.match(/^(.+)\.\.\.(.+)$/);
+    if (threeDotsMatch) {
+      const [, rangeBase, rangeHead] = threeDotsMatch;
+      return `git diff ${rangeBase}...${rangeHead} --no-prefix ${submoduleArg} ${contextArg} ${filterArg}`.trim();
+    }
+
+    // Two-dot syntax: A..B (commits in B not in A)
+    const twoDotsMatch = options.base.match(/^(.+)\.\.(.+)$/);
+    if (twoDotsMatch) {
+      const [, rangeBase, rangeHead] = twoDotsMatch;
+      return `git diff ${rangeBase}..${rangeHead} --no-prefix ${submoduleArg} ${contextArg} ${filterArg}`.trim();
+    }
+  }
   // Single ref: show that commit's changes
   if (options.base) {
     return `git show ${options.base} --no-prefix ${submoduleArg} ${contextArg} ${filterArg}`.trim();
