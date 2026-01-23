@@ -8,7 +8,8 @@ import { MacOSScrollAccel, SyntaxStyle, BoxRenderable, CodeRenderable, TextRende
 import type { Token } from "marked"
 import { getResolvedTheme, getSyntaxTheme, defaultThemeName, themeNames, rgbaToHex } from "../themes.ts"
 import { detectFiletype, countChanges, getViewMode } from "../diff-utils.ts"
-import { DiffView } from "../components/diff-view.tsx"
+import { DiffView, DirectoryTreeView } from "../components/index.ts"
+import type { TreeFileInfo } from "../directory-tree.ts"
 import { watchReviewYaml } from "./yaml-watcher.ts"
 import { createSubHunk } from "./hunk-parser.ts"
 import { parseDiagram } from "./diagram-parser.ts"
@@ -253,6 +254,43 @@ export function ReviewAppView({
   // Create a map of hunk ID to hunk for quick lookup
   const hunkMap = React.useMemo(() => new Map(hunks.map((h) => [h.id, h])), [hunks])
 
+  // Build tree data from all hunks, grouped by filename
+  // Aggregates additions/deletions per file
+  const treeFiles: TreeFileInfo[] = React.useMemo(() => {
+    const fileMap = new Map<string, { additions: number; deletions: number; firstIndex: number }>()
+    
+    for (let i = 0; i < hunks.length; i++) {
+      const hunk = hunks[i]!
+      const existing = fileMap.get(hunk.filename)
+      const { additions, deletions } = countChanges([{ lines: hunk.lines }])
+      
+      if (existing) {
+        existing.additions += additions
+        existing.deletions += deletions
+      } else {
+        fileMap.set(hunk.filename, { additions, deletions, firstIndex: i })
+      }
+    }
+    
+    // Determine status for each file (simplified: all are modified in review context)
+    // In practice, we could look at the hunk headers for more accurate status
+    const result: TreeFileInfo[] = []
+    for (const [filename, data] of fileMap) {
+      let status: "added" | "modified" | "deleted" = "modified"
+      if (data.deletions === 0 && data.additions > 0) status = "added"
+      else if (data.additions === 0 && data.deletions > 0) status = "deleted"
+      
+      result.push({
+        path: filename,
+        status,
+        additions: data.additions,
+        deletions: data.deletions,
+        fileIndex: data.firstIndex,
+      })
+    }
+    return result
+  }, [hunks])
+
   const resolvedTheme = getResolvedTheme(themeName)
   const bgColor = rgbaToHex(resolvedTheme.background)
 
@@ -347,6 +385,16 @@ export function ReviewAppView({
         focused
       >
         <box style={{ flexDirection: "column" }}>
+          {/* Directory tree at the top - updates as hunks arrive */}
+          {treeFiles.length > 0 && (
+            <box style={{ marginBottom: gap }}>
+              <DirectoryTreeView
+                files={treeFiles}
+                themeName={themeName}
+              />
+            </box>
+          )}
+
           {groups.map((group, groupIdx) => {
             // Resolve hunks from group - supports both hunkIds and hunkId with lineRange
             const groupHunks = resolveGroupHunks(group, hunkMap)

@@ -96,6 +96,24 @@ export function buildGitCommand(options: GitCommandOptions): string {
 }
 
 /**
+ * Get file status from parsed diff file based on /dev/null presence
+ * - added: oldFileName is /dev/null (new file)
+ * - deleted: newFileName is /dev/null (removed file)
+ * - modified: both files exist (changed file)
+ */
+export function getFileStatus(file: {
+  oldFileName?: string;
+  newFileName?: string;
+}): "added" | "modified" | "deleted" {
+  const oldName = file.oldFileName;
+  const newName = file.newFileName;
+
+  if (!oldName || oldName === "/dev/null") return "added";
+  if (!newName || newName === "/dev/null") return "deleted";
+  return "modified";
+}
+
+/**
  * Get filename from parsed diff file, handling /dev/null for new/deleted files
  */
 export function getFileName(file: {

@@ -27,11 +27,12 @@ import { join } from "path";
 import { create } from "zustand";
 import Dropdown from "./dropdown.tsx";
 import { debounce } from "./utils.ts";
-import { DiffView } from "./components/diff-view.tsx";
+import { DiffView, DirectoryTreeView } from "./components/index.ts";
 import { logger } from "./logger.ts";
 import {
   buildGitCommand,
   getFileName,
+  getFileStatus,
   countChanges,
   getViewMode,
   processFiles,
@@ -40,6 +41,7 @@ import {
   IGNORED_FILES,
   type ParsedFile,
 } from "./diff-utils.ts";
+import type { TreeFileInfo } from "./directory-tree.ts";
 
 // Lazy-load watcher only when --watch is used
 let watcherModule: typeof import("@parcel/watcher") | null = null;
@@ -1332,10 +1334,20 @@ function App({ parsedFiles }: AppProps) {
     };
   });
 
-  const handleFileSelect = (value: string) => {
-    const index = parseInt(value, 10);
-    
-    // Scroll to file (scrollbox is always mounted)
+  // Build tree data for directory tree view
+  const treeFiles: TreeFileInfo[] = parsedFiles.map((file, idx) => {
+    const { additions, deletions } = countChanges(file.hunks);
+    return {
+      path: getFileName(file),
+      status: getFileStatus(file),
+      additions,
+      deletions,
+      fileIndex: idx,
+    };
+  });
+
+  // Scroll to file by index
+  const scrollToFile = (index: number) => {
     const scrollbox = scrollboxRef.current;
     const fileRef = fileRefs.current.get(index);
     if (scrollbox && fileRef) {
@@ -1343,8 +1355,16 @@ function App({ parsedFiles }: AppProps) {
       const targetY = fileRef.y - contentY;
       scrollbox.scrollTo(Math.max(0, targetY));
     }
-    
+  };
+
+  const handleFileSelect = (value: string) => {
+    const index = parseInt(value, 10);
+    scrollToFile(index);
     setShowDropdown(false);
+  };
+
+  const handleTreeFileSelect = (fileIndex: number) => {
+    scrollToFile(fileIndex);
   };
 
   const themeOptions = themeNames.map((name) => ({
@@ -1365,6 +1385,15 @@ function App({ parsedFiles }: AppProps) {
   // Render all files content (used in both theme picker preview and main view)
   const renderAllFiles = () => (
     <box style={{ flexDirection: "column" }}>
+      {/* Directory tree at the top */}
+      <box style={{ marginBottom: 2 }}>
+        <DirectoryTreeView
+          files={treeFiles}
+          onFileSelect={handleTreeFileSelect}
+          themeName={activeTheme}
+        />
+      </box>
+
       {parsedFiles.map((file, idx) => {
         const fileName = getFileName(file);
         const filetype = detectFiletype(fileName);

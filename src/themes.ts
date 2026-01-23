@@ -25,6 +25,11 @@ interface ThemeJson {
 export interface ResolvedTheme {
   // UI colors
   primary: RGBA;
+  // Status colors
+  success: RGBA;
+  error: RGBA;
+  warning: RGBA;
+  info: RGBA;
   // Syntax colors
   syntaxComment: RGBA;
   syntaxKeyword: RGBA;
@@ -39,7 +44,10 @@ export interface ResolvedTheme {
   text: RGBA;
   textMuted: RGBA;
   conceal: RGBA;
-  // Diff colors
+  // Diff colors (foreground)
+  diffAdded: RGBA;
+  diffRemoved: RGBA;
+  // Diff colors (background)
   diffAddedBg: RGBA;
   diffRemovedBg: RGBA;
   diffContextBg: RGBA;
@@ -177,8 +185,20 @@ function resolveTheme(
 
   const text = resolveColor(t.text ?? fallbackText);
 
+  // Fallback colors for status (green, red, yellow, orange)
+  const fallbackGreen: ColorValue = "#3fb950";
+  const fallbackRed: ColorValue = "#f85149";
+  const fallbackYellow: ColorValue = "#e3b341";
+  const fallbackOrange: ColorValue = "#d29922";
+
   return {
     primary: resolveColor(t.primary ?? t.syntaxFunction ?? fallbackGray),
+    // Status colors
+    success: resolveColor(t.success ?? fallbackGreen),
+    error: resolveColor(t.error ?? fallbackRed),
+    warning: resolveColor(t.warning ?? fallbackYellow),
+    info: resolveColor(t.info ?? fallbackOrange),
+    // Syntax colors
     syntaxComment: resolveColor(t.syntaxComment ?? fallbackGray),
     syntaxKeyword: resolveColor(t.syntaxKeyword ?? fallbackGray),
     syntaxFunction: resolveColor(t.syntaxFunction ?? fallbackGray),
@@ -191,6 +211,10 @@ function resolveTheme(
     text,
     textMuted: resolveColor(t.textMuted ?? fallbackGray),
     conceal: resolveColor(t.conceal ?? t.textMuted ?? fallbackGray),
+    // Diff foreground colors
+    diffAdded: resolveColor(t.diffAdded ?? t.success ?? fallbackGreen),
+    diffRemoved: resolveColor(t.diffRemoved ?? t.error ?? fallbackRed),
+    // Diff background colors
     diffAddedBg: resolveColor(t.diffAddedBg ?? "#1e3a1e"),
     diffRemovedBg: resolveColor(t.diffRemovedBg ?? "#3a1e1e"),
     diffContextBg: resolveColor(t.diffContextBg ?? fallbackBg),
