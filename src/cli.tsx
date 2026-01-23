@@ -1641,6 +1641,15 @@ cli
           ParsedFile[] | null
         >(null);
 
+        const watchRenderer = useRenderer();
+
+        // Handle exit keys (Q, Escape) for loading and empty states
+        useKeyboard((key) => {
+          if (key.name === "escape" || key.name === "q") {
+            watchRenderer.destroy();
+          }
+        });
+
         React.useEffect(() => {
           const fetchDiff = async () => {
             try {

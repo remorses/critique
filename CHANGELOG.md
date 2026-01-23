@@ -3,6 +3,7 @@
 - Add directory tree view at top of diff TUIs (default, review, web commands)
 - Switch opentui packages to npm releases (from pkg.pr.new preview URLs)
 - Add missing `marked` dependency
+- Fix Q and Escape keys not working to exit when there are no changes to display (fixes #16)
 
 # 0.1.45
 
