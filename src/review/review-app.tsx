@@ -4,7 +4,7 @@
 
 import * as React from "react"
 import { useKeyboard, useRenderer, useTerminalDimensions } from "@opentui/react"
-import { MacOSScrollAccel, SyntaxStyle, BoxRenderable, CodeRenderable, TextRenderable } from "@opentui/core"
+import { MacOSScrollAccel, SyntaxStyle, BoxRenderable, CodeRenderable, TextRenderable, ScrollBoxRenderable } from "@opentui/core"
 import type { Token } from "marked"
 import { getResolvedTheme, getSyntaxTheme, defaultThemeName, themeNames, rgbaToHex } from "../themes.ts"
 import { detectFiletype, countChanges, getViewMode } from "../diff-utils.ts"
@@ -53,6 +53,10 @@ export function ReviewApp({
   const [showThemePicker, setShowThemePicker] = React.useState(false)
   const [previewTheme, setPreviewTheme] = React.useState<string | null>(null)
 
+  // Refs for vim-style scroll navigation
+  const scrollboxRef = React.useRef<ScrollBoxRenderable | null>(null)
+  const lastKeyRef = React.useRef<{ key: string; time: number } | null>(null)
+
   // Get theme from store
   const themeName = useAppStore((s) => s.themeName)
   // Use preview theme if hovering, otherwise use selected theme
@@ -76,8 +80,8 @@ export function ReviewApp({
 
   // Keyboard navigation
   useKeyboard((key) => {
-    // Ctrl+D toggles debug console
-    if (key.ctrl && key.name === "d") {
+    // Ctrl+Z toggles debug console
+    if (key.ctrl && key.name === "z") {
       renderer.console.toggle()
       return
     }
@@ -98,6 +102,40 @@ export function ReviewApp({
     if (key.name === "t") {
       setShowThemePicker(true)
       return
+    }
+
+    // Vim-style scroll navigation
+    const scrollbox = scrollboxRef.current
+    if (scrollbox) {
+      // G - go to bottom
+      if (key.name === "g" && key.shift) {
+        scrollbox.scrollBy(1, "content")
+        return
+      }
+
+      // gg - go to top (double-tap within 300ms)
+      if (key.name === "g" && !key.shift && !key.ctrl) {
+        const now = Date.now()
+        if (lastKeyRef.current?.key === "g" && now - lastKeyRef.current.time < 300) {
+          scrollbox.scrollTo(0)
+          lastKeyRef.current = null
+        } else {
+          lastKeyRef.current = { key: "g", time: now }
+        }
+        return
+      }
+
+      // Ctrl+D - half page down
+      if (key.ctrl && key.name === "d") {
+        scrollbox.scrollBy(0.5, "viewport")
+        return
+      }
+
+      // Ctrl+U - half page up
+      if (key.ctrl && key.name === "u") {
+        scrollbox.scrollBy(-0.5, "viewport")
+        return
+      }
     }
   })
 
@@ -176,6 +214,7 @@ export function ReviewApp({
       themeName={activeTheme}
       width={width}
       renderer={renderer}
+      scrollboxRef={scrollboxRef}
     />
   )
 }
@@ -233,6 +272,7 @@ export interface ReviewAppViewProps {
   showFooter?: boolean // defaults to true, set false for web rendering
   renderer?: any // Optional renderer for variable-width markdown
   gap?: number // Gap between markdown descriptions and hunks (default: 2)
+  scrollboxRef?: React.RefObject<ScrollBoxRenderable | null> // For vim-style navigation
 }
 
 /**
@@ -248,6 +288,7 @@ export function ReviewAppView({
   showFooter = true,
   renderer,
   gap = 2,
+  scrollboxRef,
 }: ReviewAppViewProps) {
   const [scrollAcceleration] = React.useState(() => new ScrollAcceleration())
 
@@ -363,6 +404,7 @@ export function ReviewAppView({
     >
       {/* Scrollable content - shows ALL groups */}
       <scrollbox
+        ref={scrollboxRef}
         scrollAcceleration={scrollAcceleration}
         style={{
           flexGrow: 1,
