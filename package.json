@@ -24,8 +24,8 @@
   "dependencies": {
     "@agentclientprotocol/sdk": "^0.13.1",
     "@clack/prompts": "1.0.0-alpha.9",
-    "@opentui/core": "^0",
-    "@opentui/react": "^0",
+    "@opentui/core": "https://pkg.pr.new/anomalyco/opentui/@opentui/core@950100c4b3ad7a45f42b9ce867abe2bab1efd625",
+    "@opentui/react": "https://pkg.pr.new/anomalyco/opentui/@opentui/react@950100c4b3ad7a45f42b9ce867abe2bab1efd625",
     "@parcel/watcher": "^2.5.6",
     "cac": "^6.7.14",
     "diff": "^8.0.2",
