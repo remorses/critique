@@ -3,6 +3,7 @@
 // and provides both UI colors and Tree-sitter compatible syntax styles.
 
 import { parseColor, RGBA } from "@opentui/core";
+import { fileURLToPath } from "url";
 
 // Only import the default theme statically for fast startup
 // Other themes are loaded on-demand when selected
@@ -141,8 +142,9 @@ function loadTheme(name: string): ThemeJson {
   try {
     // Use dynamic import with synchronous pattern for JSON
     // This works because JSON imports are resolved at bundle time by Bun
-    const themePath = new URL(`./themes/${fileName}`, import.meta.url).pathname;
+    const themeUrl = new URL(`./themes/${fileName}`, import.meta.url);
     // Read file synchronously using Node fs (works in Bun)
+    const themePath = fileURLToPath(themeUrl);
     const fs = require("fs");
     const content = fs.readFileSync(themePath, "utf-8");
     const themeJson = JSON.parse(content) as ThemeJson;
