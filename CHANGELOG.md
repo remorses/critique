@@ -1,3 +1,12 @@
+# 0.1.47
+
+- Add vim-style keyboard navigation:
+  - `G` (Shift+g) - scroll to bottom
+  - `gg` (double-tap g) - scroll to top
+  - `Ctrl+D` - half page down
+  - `Ctrl+U` - half page up
+- `review` command: change debug console toggle from `Ctrl+D` to `Ctrl+Z` (consistent with main viewer)
+
 # 0.1.46
 
 - Add directory tree view at top of diff TUIs (default, review, web commands)

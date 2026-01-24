@@ -1260,6 +1260,9 @@ function App({ parsedFiles }: AppProps) {
   const scrollboxRef = React.useRef<ScrollBoxRenderable | null>(null);
   const fileRefs = React.useRef<Map<number, BoxRenderable>>(new Map());
 
+  // Ref for double-tap detection (gg)
+  const lastKeyRef = React.useRef<{ key: string; time: number } | null>(null);
+
   useOnResize(
     React.useCallback((newWidth: number) => {
       setWidth(newWidth);
@@ -1295,7 +1298,43 @@ function App({ parsedFiles }: AppProps) {
 
     if (key.name === "z" && key.ctrl) {
       renderer.console.toggle();
+      return;
     }
+
+    // Vim-style scroll navigation
+    const scrollbox = scrollboxRef.current;
+    if (scrollbox) {
+      // G - go to bottom
+      if (key.name === "g" && key.shift) {
+        scrollbox.scrollBy(1, "content");
+        return;
+      }
+
+      // gg - go to top (double-tap within 300ms)
+      if (key.name === "g" && !key.shift && !key.ctrl) {
+        const now = Date.now();
+        if (lastKeyRef.current?.key === "g" && now - lastKeyRef.current.time < 300) {
+          scrollbox.scrollTo(0);
+          lastKeyRef.current = null;
+        } else {
+          lastKeyRef.current = { key: "g", time: now };
+        }
+        return;
+      }
+
+      // Ctrl+D - half page down
+      if (key.ctrl && key.name === "d") {
+        scrollbox.scrollBy(0.5, "viewport");
+        return;
+      }
+
+      // Ctrl+U - half page up
+      if (key.ctrl && key.name === "u") {
+        scrollbox.scrollBy(-0.5, "viewport");
+        return;
+      }
+    }
+
     if (key.option) {
       if (key.eventType === "release") {
         scrollAcceleration.multiplier = 1;
