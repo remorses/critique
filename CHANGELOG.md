@@ -1,3 +1,14 @@
+# 0.1.48
+
+- Web rendering improvements:
+  - Fix review height estimation to use same row multiplier as regular diff capture (prevents scrollbars)
+  - Fix diagram wrapping by passing `renderer` prop to enable custom `renderNode` with `wrapMode: "none"`
+  - Remove `ghostty-opentui` dependency, use opentui test renderer directly for HTML generation
+- `review` command:
+  - Diagram code blocks (`lang="diagram"`) now use `wrapMode: "none"` to prevent line wrapping
+  - Added `flexShrink: 0` and `overflow: "hidden"` to diagram line boxes
+- Internal: Remove `web-render` and `review-web-render` CLI subcommands (replaced by test renderer approach)
+
 # 0.1.47
 
 - Add vim-style keyboard navigation:

@@ -9,7 +9,7 @@ import * as React from "react"
 import { ReviewApp, ReviewAppView } from "../src/review/review-app.tsx"
 import { createHunk } from "../src/review/hunk-parser.ts"
 import type { ReviewYaml } from "../src/review/types.ts"
-import { captureResponsiveHtml, uploadHtml } from "../src/web-utils.ts"
+import { captureReviewResponsiveHtml, uploadHtml } from "../src/web-utils.ts"
 import fs from "fs"
 import { tmpdir } from "os"
 import { join } from "path"
@@ -210,21 +210,19 @@ All tests pass and coverage is at 95%.`,
 }
 
 async function main() {
-  // Web mode: capture and upload HTML, then open in browser
+  // Web mode: capture and upload HTML using test renderer
   if (webMode) {
     console.log("Capturing preview...")
     
-    const scriptPath = import.meta.path
-    const { htmlDesktop, htmlMobile } = await captureResponsiveHtml(
-      ["run", scriptPath, "--capture"],
-      {
-        desktopCols: 200,
-        mobileCols: 80,
-        baseRows: 200,
-        themeName: "github",
-        title: "Review Preview",
-      }
-    )
+    const { htmlDesktop, htmlMobile } = await captureReviewResponsiveHtml({
+      hunks: exampleHunks,
+      reviewData: exampleReviewData,
+      desktopCols: 200,
+      mobileCols: 80,
+      baseRows: 200,
+      themeName: "github",
+      title: "Review Preview",
+    })
 
     console.log("Uploading...")
     const result = await uploadHtml(htmlDesktop, htmlMobile)

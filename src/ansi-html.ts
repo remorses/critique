@@ -1,20 +1,17 @@
-// ANSI terminal output to HTML converter for web preview generation.
-// Uses ghostty-opentui to parse PTY output and generates responsive HTML documents
+// Terminal output to HTML converter for web preview generation.
+// Uses opentui's test renderer to capture structured span data and generates responsive HTML documents
 // with proper font scaling to fit terminal content within viewport width.
 
-import { ptyToJson, StyleFlags, type TerminalData, type TerminalLine, type TerminalSpan } from "ghostty-opentui"
+import { TextAttributes, rgbToHex, type RGBA } from "@opentui/core"
+import type { CapturedFrame, CapturedLine, CapturedSpan } from "@opentui/core"
 
-export interface AnsiToHtmlOptions {
-  cols?: number
-  rows?: number
+export interface ToHtmlOptions {
   /** Background color for the container */
   backgroundColor?: string
   /** Text color for the container */
   textColor?: string
   /** Font family for the output */
   fontFamily?: string
-  /** Font size for the output */
-  fontSize?: string
   /** Trim empty lines from the end */
   trimEmptyLines?: boolean
   /** Enable auto light/dark mode based on system preference */
@@ -35,33 +32,44 @@ function escapeHtml(text: string): string {
 }
 
 /**
+ * Convert RGBA to hex string, returning null for transparent colors
+ */
+function rgbaToHexOrNull(rgba: RGBA): string | null {
+  if (rgba.a === 0) return null
+  return rgbToHex(rgba)
+}
+
+/**
  * Convert a single span to HTML
  * Always wraps in span for consistent inline-block sizing
  */
-function spanToHtml(span: TerminalSpan): string {
+function spanToHtml(span: CapturedSpan): string {
   const styles: string[] = []
   
-  if (span.fg) {
-    styles.push(`color:${span.fg}`)
+  const fg = rgbaToHexOrNull(span.fg)
+  const bg = rgbaToHexOrNull(span.bg)
+  
+  if (fg) {
+    styles.push(`color:${fg}`)
   }
-  if (span.bg) {
-    styles.push(`background-color:${span.bg}`)
+  if (bg) {
+    styles.push(`background-color:${bg}`)
   }
   
-  // Handle style flags
-  if (span.flags & StyleFlags.BOLD) {
+  // Handle style flags using TextAttributes
+  if (span.attributes & TextAttributes.BOLD) {
     styles.push("font-weight:bold")
   }
-  if (span.flags & StyleFlags.ITALIC) {
+  if (span.attributes & TextAttributes.ITALIC) {
     styles.push("font-style:italic")
   }
-  if (span.flags & StyleFlags.UNDERLINE) {
+  if (span.attributes & TextAttributes.UNDERLINE) {
     styles.push("text-decoration:underline")
   }
-  if (span.flags & StyleFlags.STRIKETHROUGH) {
+  if (span.attributes & TextAttributes.STRIKETHROUGH) {
     styles.push("text-decoration:line-through")
   }
-  if (span.flags & StyleFlags.FAINT) {
+  if (span.attributes & TextAttributes.DIM) {
     styles.push("opacity:0.5")
   }
   
@@ -78,7 +86,7 @@ function spanToHtml(span: TerminalSpan): string {
 /**
  * Convert a single line to HTML
  */
-function lineToHtml(line: TerminalLine): string {
+function lineToHtml(line: CapturedLine): string {
   if (line.spans.length === 0) {
     return ""
   }
@@ -88,22 +96,20 @@ function lineToHtml(line: TerminalLine): string {
 /**
  * Check if a line is empty (no spans or only whitespace content)
  */
-function isLineEmpty(line: TerminalLine): boolean {
+function isLineEmpty(line: CapturedLine): boolean {
   if (line.spans.length === 0) return true
   // Check if all spans contain only whitespace
   return line.spans.every(span => span.text.trim() === "")
 }
 
 /**
- * Converts ANSI terminal output to styled HTML.
- * Uses ptyToJson for parsing and renders HTML line by line.
+ * Converts captured frame to styled HTML.
+ * Renders HTML line by line from the CapturedFrame structure.
  */
-export function ansiToHtml(input: string | Buffer, options: AnsiToHtmlOptions = {}): string {
-  const { cols = 500, rows = 256, trimEmptyLines = true } = options
+export function frameToHtml(frame: CapturedFrame, options: ToHtmlOptions = {}): string {
+  const { trimEmptyLines = true } = options
 
-  const data = ptyToJson(input, { cols, rows })
-
-  let lines = data.lines
+  let lines = frame.lines
 
   // Trim empty lines from the end
   if (trimEmptyLines) {
@@ -113,7 +119,7 @@ export function ansiToHtml(input: string | Buffer, options: AnsiToHtmlOptions = 
   }
 
   // Render each line as a div
-  const htmlLines = lines.map((line, idx) => {
+  const htmlLines = lines.map((line) => {
     const content = lineToHtml(line)
     // Use a div for each line to ensure proper line breaks
     // Empty lines get a span with nbsp for consistent flex behavior
@@ -124,21 +130,21 @@ export function ansiToHtml(input: string | Buffer, options: AnsiToHtmlOptions = 
 }
 
 /**
- * Generates a complete HTML document from ANSI input.
+ * Generates a complete HTML document from captured frame.
  * Includes proper styling for terminal output display.
  * Font size automatically adjusts to fit content within viewport.
  */
-export function ansiToHtmlDocument(input: string | Buffer, options: AnsiToHtmlOptions = {}): string {
+export function frameToHtmlDocument(frame: CapturedFrame, options: ToHtmlOptions = {}): string {
   const {
-    cols = 500,
     backgroundColor = "#ffffff",
     textColor = "#1a1a1a",
     fontFamily = "'JetBrains Mono Nerd', 'JetBrains Mono', 'Fira Code', Monaco, Menlo, 'Ubuntu Mono', Consolas, monospace",
-    fontSize = "14px",
     title = "Critique Diff",
   } = options
 
-  const content = ansiToHtml(input, options)
+  const cols = frame.cols
+
+  const content = frameToHtml(frame, options)
 
   return `<!DOCTYPE html>
 <html>
@@ -234,4 +240,4 @@ ${content}
 </html>`
 }
 
-export type { TerminalData }
+export type { CapturedFrame, CapturedLine, CapturedSpan }

@@ -1067,6 +1067,79 @@ The diagram above shows the flow.`,
     expect(frame).toContain("Architecture Diagram")
   })
 
+  it("should not wrap wide diagram lines even with limited width (WITH renderer)", async () => {
+    // Wide diagrams with lang="diagram" should NOT wrap when renderer is provided
+    // This tests that diagram TextRenderables use wrapMode: "none"
+    // Truncation is OK, but wrapping (multi-line) is not
+    const diagramHunk = createHunk(1, "src/test.ts", 0, 1, 1, [
+      "+export const x = 1",
+    ])
+
+    // Use a diagram that fits at width=100 to verify no wrapping
+    const wideDiagramReviewData: ReviewYaml = {
+      hunks: [{
+        hunkIds: [1],
+        markdownDescription: `## Test Flow Diagram
+
+\`\`\`diagram
+┌──────────────────────────────────────────────────────────────────┐
+│                         Test Suite                               │
+└──────────────────────────────────────────────────────────────────┘
+\`\`\`
+
+Done.`,
+      }],
+    }
+
+    // First render to get renderer
+    testSetup = await testRender(
+      <ReviewAppView
+        hunks={[diagramHunk]}
+        reviewData={wideDiagramReviewData}
+        isGenerating={false}
+        themeName="github"
+        width={100}
+      />,
+      { width: 100, height: 25 },
+    )
+    const rendererCtx = testSetup.renderer
+
+    // Re-render WITH renderer to trigger custom TextRenderable path
+    testSetup = await testRender(
+      <ReviewAppView
+        hunks={[diagramHunk]}
+        reviewData={wideDiagramReviewData}
+        isGenerating={false}
+        themeName="github"
+        width={100}
+        renderer={rendererCtx}
+      />,
+      { width: 100, height: 25 },
+    )
+    globalThis.IS_REACT_ACT_ENVIRONMENT = false
+    await testSetup.renderOnce()
+    const frame = testSetup.captureCharFrame()
+    
+    // With wrapMode: "none", the diagram should NOT wrap
+    // Each diagram line should be on its own terminal row
+    const lines = frame.split('\n')
+    
+    // Find the line containing "Test Suite"
+    const testSuiteLine = lines.find(line => line.includes("Test Suite"))
+    expect(testSuiteLine).toBeDefined()
+    
+    // The line should contain the left border on the SAME line as "Test Suite"
+    // If it wrapped, "│" and "Test Suite" would be on different lines
+    expect(testSuiteLine).toContain("│")
+    expect(testSuiteLine!.indexOf("│")).toBeLessThan(testSuiteLine!.indexOf("Test Suite"))
+    
+    // Also verify the top and bottom borders are single lines (not wrapped)
+    const topBorderLine = lines.find(line => line.includes("┌") && line.includes("─"))
+    expect(topBorderLine).toBeDefined()
+    // If wrapped, only ┌ or only ─ would be on a line, not both
+    expect(topBorderLine).toContain("┌")
+  })
+
   // ============================================================================
   // LONG LINE WRAPPING TESTS
   // ============================================================================

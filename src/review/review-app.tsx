@@ -609,7 +609,6 @@ function MarkdownBlock({ content, themeName, width, renderer }: MarkdownBlockPro
 
         // Special handling for diagram language - color structural chars as muted
         if (codeToken.lang === "diagram") {
-          console.log("[diagram-debug] MATCHED diagram lang, parsing...")
           const diagramWrapper = new BoxRenderable(renderer, {
             id: `diagram-${nodeCounter++}`,
             flexDirection: "column",
@@ -623,22 +622,27 @@ function MarkdownBlock({ content, themeName, width, renderer }: MarkdownBlockPro
                 id: `diagram-empty-${nodeCounter++}-${i}`,
                 content: " ",
                 fg: concealColor,
+                wrapMode: "none",
               })
               diagramWrapper.add(emptyLine)
               continue
             }
-            // Create a row box for each line
+            // Create a row box for each line - prevent wrapping with flexShrink: 0
             const lineBox = new BoxRenderable(renderer, {
               id: `diagram-line-${nodeCounter++}-${i}`,
               flexDirection: "row",
+              flexShrink: 0,
+              overflow: "hidden",
             })
             // Add each segment as a separate text renderable with appropriate color
+            // Use wrapMode: "none" to prevent diagram lines from wrapping
             for (let j = 0; j < line.segments.length; j++) {
               const segment = line.segments[j]!
               const segmentRenderable = new TextRenderable(renderer, {
                 id: `diagram-seg-${nodeCounter++}-${i}-${j}`,
                 content: segment.text,
                 fg: segment.type === "muted" ? concealColor : diagramTextColor,
+                wrapMode: "none",
               })
               lineBox.add(segmentRenderable)
             }

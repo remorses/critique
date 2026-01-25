@@ -506,15 +506,18 @@ async function runReviewMode(
 
       // Import web utilities
       const {
-        captureResponsiveHtml,
+        captureReviewResponsiveHtml,
         uploadHtml,
         openInBrowser,
-        writeTempFile,
         cleanupTempFile,
       } = await import("./web-utils.ts");
 
-      // Write hunks to temp file for the render command
-      const hunksFile = writeTempFile(JSON.stringify(hunks), "critique-hunks", ".json");
+      // Read review data from YAML
+      const reviewData = readReviewYaml(yamlPath);
+      if (!reviewData) {
+        throw new Error("No review data found");
+      }
+
       // For web, always use default theme (with auto dark/light inversion) unless explicitly overridden
       const themeName = defaultThemeName;
 
@@ -522,26 +525,20 @@ async function runReviewMode(
       const totalLines = hunks.reduce((sum, h) => sum + h.lines.length, 0);
       const baseRows = Math.max(200, totalLines * 2 + 100);
 
-      const renderCommand = [
-        process.argv[1]!,
-        "review-web-render",
-        yamlPath,
-        hunksFile,
-        "--theme",
-        themeName,
-      ];
-
       const webSpinner = clack.spinner(out);
       webSpinner.start("Generating web preview...");
       
       try {
-        const { htmlDesktop, htmlMobile } = await captureResponsiveHtml(
-          renderCommand,
-          { desktopCols: 230, mobileCols: 100, baseRows, themeName }
-        );
+        const { htmlDesktop, htmlMobile } = await captureReviewResponsiveHtml({
+          hunks,
+          reviewData,
+          desktopCols: 230,
+          mobileCols: 100,
+          baseRows,
+          themeName,
+        });
 
-        // Clean up temp files
-        cleanupTempFile(hunksFile);
+        // Clean up temp file
         cleanupTempFile(yamlPath);
         if (acpClient) await acpClient.close();
 
@@ -562,7 +559,6 @@ async function runReviewMode(
         process.exit(0);
       } catch (error: any) {
         webSpinner.stop("Failed");
-        cleanupTempFile(hunksFile);
         cleanupTempFile(yamlPath);
         if (acpClient) await acpClient.close();
         clack.log.error(`Failed to generate web preview: ${error.message}`, out);
@@ -827,54 +823,28 @@ async function runResumeMode(options: ResumeModeOptions) {
   // Web mode: generate HTML and upload
   if (options.web) {
     const {
-      captureResponsiveHtml,
+      captureReviewResponsiveHtml,
       uploadHtml,
       openInBrowser,
-      writeTempFile,
-      cleanupTempFile,
     } = await import("./web-utils.ts");
-
-    // Write hunks and YAML to temp files
-    const hunksFile = writeTempFile(JSON.stringify(review.hunks), "critique-hunks", ".json");
-    const yamlContent = `title: ${JSON.stringify(review.reviewYaml.title || review.title)}\nhunks:\n` +
-      review.reviewYaml.hunks.map((h) => {
-        const lines: string[] = [];
-        if (h.hunkIds) lines.push(`- hunkIds: [${h.hunkIds.join(", ")}]`);
-        else if (h.hunkId !== undefined) {
-          lines.push(`- hunkId: ${h.hunkId}`);
-          if (h.lineRange) lines.push(`  lineRange: [${h.lineRange[0]}, ${h.lineRange[1]}]`);
-        }
-        lines.push(`  markdownDescription: |`);
-        lines.push(...h.markdownDescription.split("\n").map((l) => `    ${l}`));
-        return lines.join("\n");
-      }).join("\n");
-    const yamlFile = writeTempFile(yamlContent, "critique-review", ".yaml");
 
     // For web, always use default theme (with auto dark/light inversion) unless explicitly overridden
     const themeName = defaultThemeName;
     const totalLines = review.hunks.reduce((sum, h) => sum + h.lines.length, 0);
     const baseRows = Math.max(200, totalLines * 2 + 100);
 
-    const renderCommand = [
-      process.argv[1]!,
-      "review-web-render",
-      yamlFile,
-      hunksFile,
-      "--theme",
-      themeName,
-    ];
-
     const webSpinner = clack.spinner();
     webSpinner.start("Generating web preview...");
 
     try {
-      const { htmlDesktop, htmlMobile } = await captureResponsiveHtml(
-        renderCommand,
-        { desktopCols: 230, mobileCols: 100, baseRows, themeName }
-      );
-
-      cleanupTempFile(hunksFile);
-      cleanupTempFile(yamlFile);
+      const { htmlDesktop, htmlMobile } = await captureReviewResponsiveHtml({
+        hunks: review.hunks,
+        reviewData: review.reviewYaml,
+        desktopCols: 230,
+        mobileCols: 100,
+        baseRows,
+        themeName,
+      });
 
       webSpinner.message("Uploading...");
       const result = await uploadHtml(htmlDesktop, htmlMobile);
@@ -890,8 +860,6 @@ async function runResumeMode(options: ResumeModeOptions) {
       process.exit(0);
     } catch (error: any) {
       webSpinner.stop("Failed");
-      cleanupTempFile(hunksFile);
-      cleanupTempFile(yamlFile);
       clack.log.error(`Failed to generate web preview: ${error.message}`);
       clack.outro("");
       process.exit(1);
@@ -945,8 +913,6 @@ async function runWebMode(
     captureResponsiveHtml,
     uploadHtml,
     openInBrowser,
-    writeTempFile,
-    cleanupTempFile,
   } = await import("./web-utils.ts");
 
   // Use stderr for progress when --json is set, stdout otherwise
@@ -995,28 +961,13 @@ async function runWebMode(
     return sum + diffLines + 5; // header + margin per file
   }, 100); // base padding
 
-  // Write cleaned diff to temp file (submodule headers already stripped)
-  const diffFile = writeTempFile(cleanedDiff, "critique-web-diff", ".patch");
-
-  // Build render command
-  const renderCommand = [
-    process.argv[1]!, // path to cli.tsx
-    "web-render",
-    diffFile,
-    "--theme",
-    themeName,
-  ];
-
   log("Converting to HTML...");
 
   try {
     const { htmlDesktop, htmlMobile } = await captureResponsiveHtml(
-      renderCommand,
+      cleanedDiff,
       { desktopCols, mobileCols, baseRows, themeName, title: options.title }
     );
-
-    // Clean up temp file
-    cleanupTempFile(diffFile);
 
     log("Uploading...");
 
@@ -1034,7 +985,6 @@ async function runWebMode(
     
     process.exit(0);
   } catch (error: unknown) {
-    cleanupTempFile(diffFile);
     const message = error instanceof Error ? error.message : String(error);
     console.error("Failed to generate web preview:", message);
     if (options.json) {
@@ -2001,191 +1951,6 @@ cli
       theme: options.theme,
       '--': options['--'],
     });
-  });
-
-// Internal command for web rendering (captures output to PTY)
-cli
-  .command("web-render <diffFile>", "Internal: Render diff for web capture", {
-    allowUnknownOptions: true,
-  })
-  .option("--cols <cols>", "Terminal columns", { default: 120 })
-  .option("--rows <rows>", "Terminal rows", { default: 1000 })
-  .option("--theme <name>", "Theme to use for rendering")
-  .action(async (diffFile: string, options) => {
-    const cols = parseInt(options.cols) || 120;
-    const rows = parseInt(options.rows) || 1000;
-    const themeName = options.theme && themeNames.includes(options.theme)
-      ? options.theme
-      : defaultThemeName;
-
-    const { parsePatch, formatPatch } = await import("diff");
-
-    const gitDiff = fs.readFileSync(diffFile, "utf-8");
-    // Strip submodule headers just in case the file came from external source
-    const files = parsePatch(stripSubmoduleHeaders(gitDiff));
-    const filesWithRawDiff = processFiles(files, formatPatch);
-
-    if (filesWithRawDiff.length === 0) {
-      console.log("No files to display");
-      process.exit(0);
-    }
-
-    // Override terminal size (rows calculated by caller from diff content)
-    process.stdout.columns = cols;
-    process.stdout.rows = rows;
-
-    const renderer = await createCliRenderer({
-      exitOnCtrlC: false,
-      useAlternateScreen: false,
-    });
-
-    // Wait for syntax highlighting to complete (it's async)
-    // Allow multiple renders, then exit after highlighting is ready
-    let renderCount = 0;
-    const originalRequestRender = renderer.root.requestRender.bind(
-      renderer.root,
-    );
-    let exitTimeout: ReturnType<typeof setTimeout> | undefined;
-    renderer.root.requestRender = function () {
-      renderCount++;
-      originalRequestRender();
-      // Reset timeout on each render - exit 1s after last render
-      // Tree-sitter highlighting is async and can take time for multiple files
-      if (exitTimeout) clearTimeout(exitTimeout);
-      exitTimeout = setTimeout(() => {
-        renderer.destroy();
-        process.exit(0);
-      }, 1000);
-    };
-
-    // Static component - no hooks that cause re-renders
-    const webTheme = getResolvedTheme(themeName);
-    const webBg = webTheme.background;
-    const webText = rgbaToHex(webTheme.text);
-    const webAddedColor = rgbaToHex(webTheme.diffAddedBg);
-    const webRemovedColor = rgbaToHex(webTheme.diffRemovedBg);
-    function WebApp() {
-      return (
-        <box
-          style={{
-            flexDirection: "column",
-            height: "100%",
-            backgroundColor: webBg,
-          }}
-        >
-          {filesWithRawDiff.map((file, idx) => {
-            const fileName = getFileName(file);
-            const filetype = detectFiletype(fileName);
-            const { additions, deletions } = countChanges(file.hunks);
-            // Use higher threshold (150) for web rendering vs TUI (100)
-            const viewMode = getViewMode(additions, deletions, cols, 150);
-
-            return (
-              <box
-                key={idx}
-                style={{ flexDirection: "column", marginBottom: 2 }}
-              >
-                <box
-                  style={{
-                    paddingBottom: 1,
-                    paddingLeft: 1,
-                    paddingRight: 1,
-                    flexShrink: 0,
-                    flexDirection: "row",
-                    alignItems: "center",
-                  }}
-                >
-                  <text fg={webText}>{fileName.trim()}</text>
-                  <text fg="#2d8a47"> +{additions}</text>
-                  <text fg="#c53b53">-{deletions}</text>
-                </box>
-                <DiffView
-                  diff={file.rawDiff || ""}
-                  view={viewMode}
-                  filetype={filetype}
-                  themeName={themeName}
-                />
-              </box>
-            );
-          })}
-        </box>
-      );
-    }
-
-    createRoot(renderer).render(
-      <ErrorBoundary>
-        <WebApp />
-      </ErrorBoundary>
-    );
-  });
-
-// Internal command for review web rendering (captures output to PTY)
-cli
-  .command("review-web-render <yamlPath> <hunksFile>", "Internal: Render review for web capture", {
-    allowUnknownOptions: true,
-  })
-  .option("--cols <cols>", "Terminal columns", { default: 240 })
-  .option("--rows <rows>", "Terminal rows", { default: 500 })
-  .option("--theme <name>", "Theme to use for rendering")
-  .action(async (yamlPath: string, hunksFile: string, options) => {
-    const cols = parseInt(options.cols) || 240;
-    const rows = parseInt(options.rows) || 500;
-    const themeName = options.theme && themeNames.includes(options.theme)
-      ? options.theme
-      : defaultThemeName;
-
-    // Load hunks and review data
-    const hunks = JSON.parse(fs.readFileSync(hunksFile, "utf-8"));
-    const { readReviewYaml } = await import("./review/yaml-watcher.ts");
-    const reviewData = readReviewYaml(yamlPath);
-
-    if (!reviewData) {
-      console.log("No review data found");
-      process.exit(1);
-    }
-
-    // Override terminal size
-    process.stdout.columns = cols;
-    process.stdout.rows = rows;
-
-    const renderer = await createCliRenderer({
-      exitOnCtrlC: false,
-      useAlternateScreen: false,
-    });
-
-    // Wait for syntax highlighting to complete
-    let exitTimeout: ReturnType<typeof setTimeout> | undefined;
-    const originalRequestRender = renderer.root.requestRender.bind(renderer.root);
-    renderer.root.requestRender = function () {
-      originalRequestRender();
-      if (exitTimeout) clearTimeout(exitTimeout);
-      exitTimeout = setTimeout(() => {
-        renderer.destroy();
-        process.exit(0);
-      }, 1000);
-    };
-
-    // Import ReviewAppView for static rendering
-    const { ReviewAppView } = await import("./review/review-app.tsx");
-
-    function ReviewWebApp() {
-      return (
-        <ReviewAppView
-          hunks={hunks}
-          reviewData={reviewData}
-          isGenerating={false}
-          themeName={themeName}
-          width={cols}
-          showFooter={false}
-        />
-      );
-    }
-
-    createRoot(renderer).render(
-      <ErrorBoundary>
-        <ReviewWebApp />
-      </ErrorBoundary>
-    );
   });
 
 cli.help();
