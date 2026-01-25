@@ -299,12 +299,12 @@ export function ReviewAppView({
   // Aggregates additions/deletions per file
   const treeFiles: TreeFileInfo[] = React.useMemo(() => {
     const fileMap = new Map<string, { additions: number; deletions: number; firstIndex: number }>()
-    
+
     for (let i = 0; i < hunks.length; i++) {
       const hunk = hunks[i]!
       const existing = fileMap.get(hunk.filename)
       const { additions, deletions } = countChanges([{ lines: hunk.lines }])
-      
+
       if (existing) {
         existing.additions += additions
         existing.deletions += deletions
@@ -312,7 +312,7 @@ export function ReviewAppView({
         fileMap.set(hunk.filename, { additions, deletions, firstIndex: i })
       }
     }
-    
+
     // Determine status for each file (simplified: all are modified in review context)
     // In practice, we could look at the hunk headers for more accurate status
     const result: TreeFileInfo[] = []
@@ -320,7 +320,7 @@ export function ReviewAppView({
       let status: "added" | "modified" | "deleted" = "modified"
       if (data.deletions === 0 && data.additions > 0) status = "added"
       else if (data.additions === 0 && data.deletions > 0) status = "deleted"
-      
+
       result.push({
         path: filename,
         status,
@@ -568,7 +568,7 @@ function MarkdownBlock({ content, themeName, width, renderer }: MarkdownBlockPro
   const resolvedTheme = getResolvedTheme(themeName)
   const textColor = rgbaToHex(resolvedTheme.text)
   const concealColor = rgbaToHex(resolvedTheme.conceal)
-  const diagramTextColor = rgbaToHex(resolvedTheme.markdownBlockQuote ?? resolvedTheme.text)
+  const diagramTextColor = rgbaToHex(resolvedTheme.markdownHeading ?? resolvedTheme.text)
 
   // Max width for prose (constrained), code blocks use full terminal width
   const maxProseWidth = Math.min(80, width)
@@ -670,8 +670,11 @@ function MarkdownBlock({ content, themeName, width, renderer }: MarkdownBlockPro
       if (token.type === "table") {
         const wrapper = new BoxRenderable(renderer, {
           id: `table-wrapper-${nodeCounter++}`,
+          border: false,
           alignSelf: "center",
         })
+
+        // defaultRenderable.border = false
         wrapper.add(defaultRenderable)
         return wrapper
       }
