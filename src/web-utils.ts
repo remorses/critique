@@ -190,7 +190,7 @@ export async function renderDiffToFrame(
             view: viewMode,
             filetype,
             themeName,
-            wrapMode: options.wrapMode,
+            ...(options.wrapMode && { wrapMode: options.wrapMode }),
           })
         )
       })
