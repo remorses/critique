@@ -337,11 +337,13 @@ export async function renderDiffToOgImage(
     cols,
     rows: 200,
     themeName,
+
   })
 
   // Convert frame to OG image
   return renderFrameToOgImage(frame, {
     ...options,
     themeName,
+
   })
 }

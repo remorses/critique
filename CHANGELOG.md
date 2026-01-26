@@ -1,3 +1,8 @@
+# 0.1.52
+
+- Tests (OG images):
+  - Write example OG image to `tmp/og-examples/og-example.png`
+
 # 0.1.51
 
 - New `--image` flag for diff command:
