@@ -9,6 +9,35 @@ import { TextAttributes, rgbToHex, type RGBA } from "@opentui/core"
 import type { CapturedFrame, CapturedLine, CapturedSpan } from "@opentui/core"
 import { getResolvedTheme, rgbaToHex } from "./themes.ts"
 
+// Cached renderer instance - initialized lazily and reused across all render calls
+let cachedRenderer: import("@takumi-rs/core").Renderer | null = null
+let rendererInitPromise: Promise<import("@takumi-rs/core").Renderer> | null = null
+
+/**
+ * Get or create a cached Renderer instance with fonts preloaded.
+ * Ensures consistent rendering by reusing the same renderer.
+ */
+async function getRenderer(): Promise<import("@takumi-rs/core").Renderer> {
+  if (cachedRenderer) {
+    return cachedRenderer
+  }
+
+  // Avoid race conditions - if already initializing, wait for that
+  if (rendererInitPromise) {
+    return rendererInitPromise
+  }
+
+  rendererInitPromise = (async () => {
+    const { Renderer } = await import("@takumi-rs/core")
+    const renderer = new Renderer()
+    await renderer.loadFontsAsync([])
+    cachedRenderer = renderer
+    return renderer
+  })()
+
+  return rendererInitPromise
+}
+
 export interface RenderToImagesOptions {
   /** Theme name for colors */
   themeName?: string
@@ -160,12 +189,10 @@ export async function renderFrameToImages(
   frame: CapturedFrame,
   options: RenderToImagesOptions = {}
 ): Promise<RenderResult> {
-  // Try to import takumi - it's an optional dependency
-  let takumiCore: typeof import("@takumi-rs/core")
+  // Try to import takumi helpers - it's an optional dependency
   let takumiHelpers: typeof import("@takumi-rs/helpers")
 
   try {
-    takumiCore = await import("@takumi-rs/core")
     takumiHelpers = await import("@takumi-rs/helpers")
   } catch {
     throw new Error(
@@ -173,7 +200,6 @@ export async function renderFrameToImages(
     )
   }
 
-  const { Renderer } = takumiCore
   const { container, text } = takumiHelpers
 
   const {
@@ -209,10 +235,8 @@ export async function renderFrameToImages(
     chunks.push(lines.slice(i, i + maxLinesPerImage))
   }
 
-  // Create renderer with bundled Geist font (included in takumi)
-  // Preload fonts to ensure consistent rendering
-  const renderer = new Renderer()
-  await renderer.loadFontsAsync([])
+  // Get cached renderer (fonts already loaded)
+  const renderer = await getRenderer()
 
   const images: Buffer[] = []
   const paths: string[] = []
@@ -457,12 +481,10 @@ export async function renderFrameToOgImage(
   frame: CapturedFrame,
   options: OgImageOptions = {}
 ): Promise<Buffer> {
-  // Try to import takumi - it's an optional dependency
-  let takumiCore: typeof import("@takumi-rs/core")
+  // Try to import takumi helpers - it's an optional dependency
   let takumiHelpers: typeof import("@takumi-rs/helpers")
 
   try {
-    takumiCore = await import("@takumi-rs/core")
     takumiHelpers = await import("@takumi-rs/helpers")
   } catch {
     throw new Error(
@@ -470,7 +492,6 @@ export async function renderFrameToOgImage(
     )
   }
 
-  const { Renderer } = takumiCore
   const { container, text } = takumiHelpers
 
   const {
@@ -507,9 +528,8 @@ export async function renderFrameToOgImage(
   const maxLines = Math.floor(availableHeight / effectiveLineHeight)
   const visibleLines = lines.slice(0, maxLines)
 
-  // Create renderer and preload fonts to ensure consistent rendering
-  const renderer = new Renderer()
-  await renderer.loadFontsAsync([])
+  // Get cached renderer (fonts already loaded)
+  const renderer = await getRenderer()
 
   // Calculate content width (image width minus padding)
   const contentWidth = width - paddingX * 2
