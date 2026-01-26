@@ -393,8 +393,8 @@ export async function renderFrameToOgImage(
     themeName = "tokyonight",
     width = 1200,
     height = 630,
-    fontSize: baseFontSize = 16,  // Base font size, may be scaled up
-    lineHeight = 1.5,  // Line height multiplier
+    fontSize = 16,
+    lineHeight = 1.5,
     format = "png",
     quality = 90,
   } = options
@@ -411,42 +411,16 @@ export async function renderFrameToOgImage(
   const backgroundColor = rgbaToHex(theme.background)
   const textColor = rgbaToHex(theme.text)
 
-  // Fixed padding
+  // Fixed padding and dimensions
   const paddingY = 20
   const paddingX = 24
-  const availableHeight = height - paddingY * 2
-
-  // Calculate effective line height factor: lineHeight - overlap
-  // overlap = (lineHeight - 1) * 0.5, so effective = lineHeight - (lineHeight - 1) * 0.5 = 0.5 * lineHeight + 0.5
-  const effectiveLineHeightFactor = 0.5 * lineHeight + 0.5  // e.g., 1.25 for lineHeight=1.5
-
-  // Calculate max lines at base font size
-  const baseEffectiveHeight = Math.round(baseFontSize * effectiveLineHeightFactor)
-  const maxLinesAtBaseFont = Math.floor(availableHeight / baseEffectiveHeight)
-
-  // Count content lines (non-empty)
-  const contentLineCount = lines.length
-
-  // Dynamic font sizing: if we have fewer lines than can fit, scale up font
-  // to fill the available height (up to a max of 24px for readability)
-  let fontSize = baseFontSize
-  const minFontSize = 14
-  const maxFontSize = 24
-
-  if (contentLineCount < maxLinesAtBaseFont) {
-    // Calculate font size that would make content fill the height
-    // availableHeight = contentLineCount * fontSize * effectiveLineHeightFactor
-    const idealFontSize = availableHeight / (contentLineCount * effectiveLineHeightFactor)
-    fontSize = Math.min(maxFontSize, Math.max(minFontSize, Math.round(idealFontSize)))
-  }
-
-  // Recalculate with actual font size
   const lineHeightPx = Math.round(fontSize * lineHeight)
   const gapOverlap = Math.round((lineHeight - 1) * fontSize * 0.5)
   const effectiveLineHeight = lineHeightPx - gapOverlap
-  const maxLines = Math.floor(availableHeight / effectiveLineHeight)
 
-  // Take only the first maxLines (use all available space)
+  // Calculate how many lines fit, take that many
+  const availableHeight = height - paddingY * 2
+  const maxLines = Math.floor(availableHeight / effectiveLineHeight)
   const visibleLines = lines.slice(0, maxLines)
 
   // Create renderer
