@@ -181,4 +181,135 @@ ${Array.from({ length: 100 }, (_, i) => `+line ${i + 1}: some content here`).joi
     expect(result).toBeInstanceOf(Buffer)
     expect(result.length).toBeGreaterThan(0)
   })
+
+  test("renderDiffToOgImage fills vertical space with content lines", async () => {
+    if (!takumiAvailable) {
+      console.log("Skipping: takumi not installed")
+      return
+    }
+
+    const { PNG } = await import("pngjs")
+    const { renderDiffToOgImage } = await import("./image.ts")
+
+    // Use a realistic diff that shows the bottom gap issue
+    // This diff has ~50 lines which should fill the OG image but leaves gaps
+    const longDiff = `diff --git a/auth.ts b/auth.ts
+index 846e706..ca0bb64 100644
+--- a/auth.ts
++++ b/auth.ts
+@@ -1,14 +1,46 @@
+-import { hash } from "bcrypt"
++import { hash, compare } from "bcrypt"
++import { sign, verify } from "jsonwebtoken"
++import { z } from "zod"
+ 
+-export async function createUser(email: string, password: string) {
+-  const hashedPassword = await hash(password, 10)
+-  return db.user.create({
+-    data: { email, password: hashedPassword }
++const userSchema = z.object({
++  email: z.string().email(),
++  password: z.string().min(8),
++  name: z.string().optional(),
++})
++
++export async function createUser(input: z.infer<typeof userSchema>) {
++  const validated = userSchema.parse(input)
++  const hashedPassword = await hash(validated.password, 12)
++  const user = await db.user.create({
++    data: {
++      email: validated.email,
++      password: hashedPassword,
++      name: validated.name,
++    }
+   })
++  return { id: user.id, email: user.email }
+ }
+ 
+-export async function login(email: string, password: string) {
+-  const user = await db.user.findUnique({ where: { email } })
++export async function login(email: string, password: string): Promise<string | null> {
++  const user = await db.user.findUnique({
++    where: { email },
++    select: { id: true, email: true, password: true }
++  })
+   if (!user) return null
+-  return user
++  const valid = await compare(password, user.password)
++  if (!valid) return null
++  const token = sign(
++    { userId: user.id, email: user.email },
++    process.env.JWT_SECRET!,
++    { expiresIn: "7d" }
++  )
++  return token
++}
++
++export async function verifyToken(token: string) {
++  try {
++    return verify(token, process.env.JWT_SECRET!)
++  } catch {
++    return null
++  }
+ }
+`
+
+    const height = 630
+    const expectedPadding = 20
+    const maxAllowedPadding = 25 // Allow small tolerance
+
+    const result = await renderDiffToOgImage(longDiff, {
+      themeName: "tokyonight",
+      height,
+      format: "png",
+    })
+
+    // Decode PNG to check pixel content
+    const png = PNG.sync.read(result)
+
+    // Tokyo Night background color is approximately #1a1b26 (26, 27, 38)
+    const bgColor = { r: 26, g: 27, b: 38 }
+    const tolerance = 10
+
+    function isBackgroundColor(r: number, g: number, b: number): boolean {
+      return (
+        Math.abs(r - bgColor.r) <= tolerance &&
+        Math.abs(g - bgColor.g) <= tolerance &&
+        Math.abs(b - bgColor.b) <= tolerance
+      )
+    }
+
+    // Scan from top to find where content starts
+    let contentStartY = 0
+    for (let y = 0; y < png.height; y++) {
+      const idx = (y * png.width + 300) * 4
+      const r = png.data[idx]!
+      const g = png.data[idx + 1]!
+      const b = png.data[idx + 2]!
+      if (!isBackgroundColor(r, g, b)) {
+        contentStartY = y
+        break
+      }
+    }
+
+    // Scan from bottom to find where content ends
+    let contentEndY = png.height - 1
+    for (let y = png.height - 1; y >= 0; y--) {
+      const idx = (y * png.width + 300) * 4
+      const r = png.data[idx]!
+      const g = png.data[idx + 1]!
+      const b = png.data[idx + 2]!
+      if (!isBackgroundColor(r, g, b)) {
+        contentEndY = y
+        break
+      }
+    }
+
+    const topPadding = contentStartY
+    const bottomPadding = png.height - 1 - contentEndY
+
+    // Content should fill the vertical space with minimal padding
+    // Currently fails: top ~60px (header + empty line), bottom ~50px (wasted space)
+    expect(topPadding + bottomPadding).toBeLessThanOrEqual(maxAllowedPadding * 2)
+  })
 })
