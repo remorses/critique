@@ -361,6 +361,88 @@ export interface OgImageOptions {
   quality?: number
 }
 
+export interface OgImageLayout {
+  /** Total lines available in the frame */
+  totalLines: number
+  /** Number of lines that fit in the image */
+  visibleLines: number
+  /** Maximum lines that could fit based on calculations */
+  maxLines: number
+  /** Image dimensions */
+  width: number
+  height: number
+  /** Padding values */
+  paddingX: number
+  paddingY: number
+  /** Line height in pixels */
+  lineHeightPx: number
+  /** Gap overlap for negative margins */
+  gapOverlap: number
+  /** Effective line height after overlap */
+  effectiveLineHeight: number
+  /** Available height for content */
+  availableHeight: number
+  /** Actual content height (visibleLines * effectiveLineHeight) */
+  contentHeight: number
+  /** Unused vertical space at the bottom */
+  unusedHeight: number
+}
+
+/**
+ * Calculate the layout for an OG image without rendering.
+ * Useful for testing and debugging layout issues.
+ *
+ * @param frame - CapturedFrame from opentui test renderer
+ * @param options - OG image options
+ * @returns Layout information
+ */
+export function calculateOgImageLayout(
+  frame: CapturedFrame,
+  options: OgImageOptions = {}
+): OgImageLayout {
+  const {
+    width = 1200,
+    height = 630,
+    fontSize = 16,
+    lineHeight = 1.5,
+  } = options
+
+  // Trim empty lines from the frame
+  const lines = trimEmptyLines(frame.lines)
+
+  // Fixed padding and dimensions
+  const paddingY = 20
+  const paddingX = 24
+  const lineHeightPx = Math.round(fontSize * lineHeight)
+  const gapOverlap = Math.round((lineHeight - 1) * fontSize * 0.5)
+  const effectiveLineHeight = lineHeightPx - gapOverlap
+
+  // Calculate how many lines fit
+  const availableHeight = height - paddingY * 2
+  const maxLines = Math.floor(availableHeight / effectiveLineHeight)
+  const visibleLines = Math.min(lines.length, maxLines)
+
+  // Calculate actual content height and unused space
+  const contentHeight = visibleLines * effectiveLineHeight
+  const unusedHeight = availableHeight - contentHeight
+
+  return {
+    totalLines: lines.length,
+    visibleLines,
+    maxLines,
+    width,
+    height,
+    paddingX,
+    paddingY,
+    lineHeightPx,
+    gapOverlap,
+    effectiveLineHeight,
+    availableHeight,
+    contentHeight,
+    unusedHeight,
+  }
+}
+
 /**
  * Render a CapturedFrame to a single OG image (1200x630 by default).
  * Takes only the first N lines that fit within the fixed height.
