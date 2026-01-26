@@ -513,15 +513,16 @@ export async function renderDiffToOgImage(
 ): Promise<Buffer> {
   const { renderDiffToFrame } = await import("./web-utils.ts")
 
-  const cols = options.cols ?? 115  // 1152px content width / ~10px per char
+  const cols = options.cols ?? 200  // Overestimate, wrapping is disabled
   const themeName = options.themeName ?? "tokyonight"
 
-  // Render diff to captured frame
-  // Use enough rows to get content, we'll slice later
+  // Render diff to captured frame with no line wrapping
+  // Use plenty of cols/rows - we'll slice to what fits in the image
   const frame = await renderDiffToFrame(diffContent, {
     cols,
-    rows: 100,
+    rows: 200,
     themeName,
+    wrapMode: "none",  // Don't wrap lines - just clip at image edge
   })
 
   // Convert frame to OG image

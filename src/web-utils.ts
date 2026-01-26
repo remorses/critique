@@ -91,6 +91,8 @@ export interface CaptureOptions {
   rows: number
   themeName: string
   title?: string
+  /** Wrap mode for long lines (default: "word") */
+  wrapMode?: "word" | "char" | "none"
 }
 
 export interface UploadResult {
@@ -188,6 +190,7 @@ export async function renderDiffToFrame(
             view: viewMode,
             filetype,
             themeName,
+            wrapMode: options.wrapMode,
           })
         )
       })
@@ -278,7 +281,7 @@ export async function captureResponsiveHtml(
     const { renderDiffToOgImage } = await import("./image.ts")
     ogImage = await renderDiffToOgImage(diffContent, {
       themeName: options.themeName,
-      cols: 115, // 1152px content width / ~10px per char
+      // cols defaults to 200, wrapMode defaults to "none" in renderDiffToOgImage
     })
   } catch (e) {
     // takumi not installed or error - skip OG image

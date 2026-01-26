@@ -11,9 +11,11 @@ export interface DiffViewProps {
   view: "split" | "unified"
   filetype?: string
   themeName: string
+  /** Wrap mode for long lines (default: "word") */
+  wrapMode?: "word" | "char" | "none"
 }
 
-export function DiffView({ diff, view, filetype, themeName }: DiffViewProps) {
+export function DiffView({ diff, view, filetype, themeName, wrapMode = "word" }: DiffViewProps) {
   // Memoize theme lookups to ensure stable references
   const resolvedTheme = React.useMemo(
     () => getResolvedTheme(themeName),
@@ -43,7 +45,7 @@ export function DiffView({ diff, view, filetype, themeName }: DiffViewProps) {
         filetype={filetype}
         syntaxStyle={syntaxStyle}
         showLineNumbers
-        wrapMode="word"
+        wrapMode={wrapMode}
         addedContentBg={colors.diffAddedBg}
         removedContentBg={colors.diffRemovedBg}
         contextContentBg={colors.bgPanel}
