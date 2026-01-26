@@ -1,17 +1,6 @@
 import { describe, test, expect, beforeAll } from "bun:test"
 import fs from "fs"
-
-// Check if takumi is available (optional dependency)
-let takumiAvailable = false
-beforeAll(async () => {
-  try {
-    await import("@takumi-rs/core")
-    await import("@takumi-rs/helpers")
-    takumiAvailable = true
-  } catch {
-    console.log("Skipping image tests: takumi not installed")
-  }
-})
+import path from "path"
 
 describe("image rendering", () => {
   // Valid unified diff format - each line in hunk must start with +, -, or space
@@ -31,11 +20,6 @@ index 1234567..abcdefg 100644
 `
 
   test("renderDiffToImages generates WebP images", async () => {
-    if (!takumiAvailable) {
-      console.log("Skipping: takumi not installed")
-      return
-    }
-
     const { renderDiffToImages } = await import("./image.ts")
 
     const result = await renderDiffToImages(sampleDiff, {
@@ -58,16 +42,12 @@ index 1234567..abcdefg 100644
     for (const path of result.paths) {
       expect(fs.existsSync(path)).toBe(true)
       // Clean up test files
-      fs.unlinkSync(path)
+      console.log(path)
+      // fs.unlinkSync(path)
     }
   })
 
   test("renderFrameToImages splits long content into multiple images", async () => {
-    if (!takumiAvailable) {
-      console.log("Skipping: takumi not installed")
-      return
-    }
-
     const { renderDiffToFrame } = await import("./web-utils.ts")
     const { renderFrameToImages } = await import("./image.ts")
 
@@ -102,11 +82,6 @@ ${Array.from({ length: 100 }, (_, i) => `+line ${i + 1}: some content here`).joi
   })
 
   test("renderFrameToImages supports different formats", async () => {
-    if (!takumiAvailable) {
-      console.log("Skipping: takumi not installed")
-      return
-    }
-
     const { renderDiffToImages } = await import("./image.ts")
 
     // Test PNG format
@@ -125,11 +100,6 @@ ${Array.from({ length: 100 }, (_, i) => `+line ${i + 1}: some content here`).joi
   })
 
   test("throws error when no content to render", async () => {
-    if (!takumiAvailable) {
-      console.log("Skipping: takumi not installed")
-      return
-    }
-
     const { renderFrameToImages } = await import("./image.ts")
 
     // Empty frame
@@ -144,11 +114,6 @@ ${Array.from({ length: 100 }, (_, i) => `+line ${i + 1}: some content here`).joi
   })
 
   test("renderDiffToOgImage generates 1200x630 PNG image", async () => {
-    if (!takumiAvailable) {
-      console.log("Skipping: takumi not installed")
-      return
-    }
-
     const { renderDiffToOgImage } = await import("./image.ts")
 
     const result = await renderDiffToOgImage(sampleDiff, {
@@ -165,11 +130,6 @@ ${Array.from({ length: 100 }, (_, i) => `+line ${i + 1}: some content here`).joi
   })
 
   test("renderDiffToOgImage respects custom dimensions", async () => {
-    if (!takumiAvailable) {
-      console.log("Skipping: takumi not installed")
-      return
-    }
-
     const { renderDiffToOgImage } = await import("./image.ts")
 
     const result = await renderDiffToOgImage(sampleDiff, {
@@ -183,11 +143,6 @@ ${Array.from({ length: 100 }, (_, i) => `+line ${i + 1}: some content here`).joi
   })
 
   test("renderDiffToOgImage fills vertical space with content lines", async () => {
-    if (!takumiAvailable) {
-      console.log("Skipping: takumi not installed")
-      return
-    }
-
     const { renderDiffToFrame } = await import("./web-utils.ts")
     const { calculateOgImageLayout } = await import("./image.ts")
 
@@ -196,6 +151,94 @@ ${Array.from({ length: 100 }, (_, i) => `+line ${i + 1}: some content here`).joi
 index 846e706..ca0bb64 100644
 --- a/auth.ts
 +++ b/auth.ts
+@@ -1,14 +1,46 @@
+-import { hash } from "bcrypt"
++import { hash, compare } from "bcrypt"
++import { sign, verify } from "jsonwebtoken"
++import { z } from "zod"
+
+-export async function createUser(email: string, password: string) {
+-  const hashedPassword = await hash(password, 10)
+-  return db.user.create({
+-    data: { email, password: hashedPassword }
++const userSchema = z.object({
++  email: z.string().email(),
++  password: z.string().min(8),
++  name: z.string().optional(),
++})
++
++export async function createUser(input: z.infer<typeof userSchema>) {
++  const validated = userSchema.parse(input)
++  const hashedPassword = await hash(validated.password, 12)
++  const user = await db.user.create({
++    data: {
++      email: validated.email,
++      password: hashedPassword,
++      name: validated.name,
++    }
+   })
++  return { id: user.id, email: user.email }
+ }
+
+-export async function login(email: string, password: string) {
+-  const user = await db.user.findUnique({ where: { email } })
++export async function login(email: string, password: string): Promise<string | null> {
++  const user = await db.user.findUnique({
++    where: { email },
++    select: { id: true, email: true, password: true }
++  })
+   if (!user) return null
+-  return user
++  const valid = await compare(password, user.password)
++  if (!valid) return null
++  const token = sign(
++    { userId: user.id, email: user.email },
++    process.env.JWT_SECRET!,
++    { expiresIn: "7d" }
++  )
++  return token
++}
++
++export async function verifyToken(token: string) {
++  try {
++    return verify(token, process.env.JWT_SECRET!)
++  } catch {
++    return null
++  }
+ }
+`
+
+    // Render diff to frame
+    const frame = await renderDiffToFrame(longDiff, {
+      cols: 120,
+      rows: 200,
+      themeName: "tokyonight",
+    })
+
+    // Calculate layout
+    const layout = calculateOgImageLayout(frame, {
+      height: 630,
+      themeName: "tokyonight",
+    })
+
+    // Verify layout calculations are sensible
+    // With 56 total lines and 630px height at 18px font with 1.95 line-height (35px)
+    // We can fit floor(590/35) = 16 lines
+    expect(layout.totalLines).toBeGreaterThan(30)
+    expect(layout.visibleLines).toBeGreaterThanOrEqual(15)
+
+    // Unused height should be less than one line height
+    // (no room for another full line)
+    expect(layout.unusedHeight).toBeLessThan(layout.lineHeightPx)
+  })
+
+  test("renderDiffToOgImage writes example image", async () => {
+    const { renderDiffToOgImage } = await import("./image.ts")
+
+    const exampleDiff = `diff --git a/src/auth.ts b/src/auth.ts
+index 846e706..ca0bb64 100644
+--- a/src/auth.ts
++++ b/src/auth.ts
 @@ -1,14 +1,46 @@
 -import { hash } from "bcrypt"
 +import { hash, compare } from "bcrypt"
@@ -253,26 +296,14 @@ index 846e706..ca0bb64 100644
  }
 `
 
-    // Render diff to frame
-    const frame = await renderDiffToFrame(longDiff, {
-      cols: 120,
-      rows: 200,
-      themeName: "tokyonight",
-    })
+    const buffer = await renderDiffToOgImage(exampleDiff)
 
-    // Calculate layout
-    const layout = calculateOgImageLayout(frame, {
-      height: 630,
-      themeName: "tokyonight",
-    })
+    const outputDir = path.join(process.cwd(), "tmp", "og-examples")
+    fs.mkdirSync(outputDir, { recursive: true })
+    const outputPath = path.join(outputDir, "og-example.png")
+    fs.writeFileSync(outputPath, buffer)
 
-    // Verify layout calculations are sensible
-    // With 56 total lines and 630px height, we should show ~29 lines
-    expect(layout.totalLines).toBeGreaterThan(30)
-    expect(layout.visibleLines).toBeGreaterThanOrEqual(25)
-    
-    // Unused height should be less than one effective line height
-    // (no room for another full line)
-    expect(layout.unusedHeight).toBeLessThan(layout.effectiveLineHeight)
+    expect(fs.existsSync(outputPath)).toBe(true)
+    expect(buffer.length).toBeGreaterThan(0)
   })
 })

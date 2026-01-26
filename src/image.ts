@@ -7,11 +7,7 @@ import { getResolvedTheme, rgbaToHex } from "./themes.ts"
 import {
   renderFrameToImage,
   renderFrameToPaginatedImages,
-  trimTrailingEmptyLines,
   calculateFrameLayout,
-  type RenderImageOptions,
-  type RenderPaginatedOptions,
-  type PaginatedRenderResult,
   type ImageTheme,
   type FrameLayout,
 } from "./opentui-image.ts"
@@ -58,9 +54,9 @@ export interface OgImageOptions {
   width?: number
   /** Image height in pixels (default: 630) */
   height?: number
-  /** Font size in pixels (default: 16) */
+  /** Font size in pixels (default: 18) */
   fontSize?: number
-  /** Line height multiplier (default: 1.5) */
+  /** Line height multiplier (default: 1.95) */
   lineHeight?: number
   /** Output format: webp, png, or jpeg (default: png) */
   format?: "webp" | "png" | "jpeg"
@@ -83,13 +79,9 @@ export interface OgImageLayout {
   paddingY: number
   /** Line height in pixels */
   lineHeightPx: number
-  /** Gap overlap for negative margins */
-  gapOverlap: number
-  /** Effective line height after overlap */
-  effectiveLineHeight: number
   /** Available height for content */
   availableHeight: number
-  /** Actual content height (visibleLines * effectiveLineHeight) */
+  /** Actual content height */
   contentHeight: number
   /** Unused vertical space at the bottom */
   unusedHeight: number
@@ -247,8 +239,8 @@ export function calculateOgImageLayout(
   const {
     width = 1200,
     height = 630,
-    fontSize = 16,
-    lineHeight = 1.5,
+    fontSize = 18,
+    lineHeight = 1.95,
   } = options
 
   const paddingY = 20
@@ -264,14 +256,12 @@ export function calculateOgImageLayout(
   return {
     totalLines: layout.totalLines,
     visibleLines: layout.visibleLines,
-    maxLines: Math.floor(layout.availableHeight / layout.effectiveLineHeight),
+    maxLines: Math.floor(layout.availableHeight / layout.lineHeightPx),
     width,
     height,
     paddingX,
     paddingY,
     lineHeightPx: layout.lineHeightPx,
-    gapOverlap: layout.gapOverlap,
-    effectiveLineHeight: layout.effectiveLineHeight,
     availableHeight: layout.availableHeight,
     contentHeight: layout.contentHeight,
     unusedHeight: layout.availableHeight - layout.contentHeight,
@@ -294,8 +284,8 @@ export async function renderFrameToOgImage(
     themeName = "github-light",
     width = 1200,
     height = 630,
-    fontSize = 16,
-    lineHeight = 1.5,
+    fontSize = 18,
+    lineHeight = 1.95,
     format = "png",
     quality = 90,
   } = options

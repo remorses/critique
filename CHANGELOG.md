@@ -1,3 +1,51 @@
+# 0.1.58
+
+- Tests (OG images):
+  - Write example OG image to `tmp/og-examples/og-example.png`
+  - Add fixed auth diff sample for debugging ask spacing issues
+
+# 0.1.57
+
+- `--web` (OG images):
+  - Preserve whitespace on line containers for satori span layout
+
+# 0.1.56
+
+- `--web` (OG images):
+  - Render spans as flex items instead of inline text nodes
+
+# 0.1.55
+
+- `--web` (OG images):
+  - Add estimated inter-span spacing to counter tight satori span kerning
+
+# 0.1.54
+
+- `--web` (OG images):
+  - Switch rendering backend from takumi to satori + resvg
+  - Add JetBrains Mono TTF font for Satori rendering
+  - Use sharp to encode webp/jpeg outputs
+- Image rendering (library):
+  - Remove takumi optional dependency and use satori/resvg for frame rendering
+
+# 0.1.53
+
+- `--web` (OG images):
+  - Add `letterSpacing` to span rendering to reduce tight spacing between styled spans
+
+# 0.1.52
+
+- `--web` (OG images):
+  - Default theme set to `github-light`
+  - Increase font size to 18px and line-height to 1.95
+  - Use line container backgrounds only (avoid span background clipping)
+  - Merge adjacent spans with same style to improve spacing/kerning
+  - Use explicit line heights with `gap: 0` (no negative margins)
+- Image rendering (library):
+  - New `src/opentui-image.ts` generic frame-to-image utilities
+  - Cached takumi renderer with font preloading
+  - Simplified layout calculations using lineHeightPx
+
 # 0.1.51
 
 - New `--image` flag for diff command:

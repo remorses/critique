@@ -275,16 +275,16 @@ export async function captureResponsiveHtml(
   const desktopRows = Math.max(options.baseRows * 3, 1000)
   const mobileRows = Math.max(Math.ceil(desktopRows * (options.desktopCols / options.mobileCols)), 2000)
 
-  // Try to generate OG image (takumi is optional)
+  // Try to generate OG image (satori is optional)
   let ogImage: Buffer | null = null
   try {
     const { renderDiffToOgImage } = await import("./image.ts")
+    // OG images always use github-light theme for consistency (ignores local theme)
     ogImage = await renderDiffToOgImage(diffContent, {
-      themeName: options.themeName,
-      // cols defaults to 200, wrapMode defaults to "none" in renderDiffToOgImage
+      // Uses default github-light theme and cols=120
     })
   } catch (e) {
-    // takumi not installed or error - skip OG image
+    // satori not installed or error - skip OG image
     ogImage = null
   }
 

@@ -2,7 +2,7 @@
   "name": "critique",
   "module": "src/diff.tsx",
   "type": "module",
-  "version": "0.1.51",
+  "version": "0.1.58",
   "private": false,
   "bin": "./src/cli.tsx",
   "scripts": {
@@ -27,16 +27,15 @@
     "@opentui/core": "^0.1.75",
     "@opentui/react": "^0.1.75",
     "@parcel/watcher": "^2.5.6",
+    "@resvg/resvg-js": "^2.6.2",
     "cac": "^6.7.14",
     "diff": "^8.0.2",
     "js-yaml": "^4.1.1",
     "marked": "^17.0.1",
     "picocolors": "^1.1.1",
     "react": "^19.2.0",
+    "satori": "^0.19.1",
+    "sharp": "^0.34.5",
     "zustand": "^5.0.8"
-  },
-  "optionalDependencies": {
-    "@takumi-rs/core": "^0.65.0",
-    "@takumi-rs/helpers": "^0.65.0"
   }
 }
