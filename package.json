@@ -2,7 +2,7 @@
   "name": "critique",
   "module": "src/diff.tsx",
   "type": "module",
-  "version": "0.1.75",
+  "version": "0.1.76",
   "private": false,
   "bin": "./src/cli.tsx",
   "scripts": {

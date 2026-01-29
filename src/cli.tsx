@@ -21,7 +21,12 @@ import {
   MacOSScrollAccel,
   ScrollBoxRenderable,
   BoxRenderable,
+  addDefaultParsers,
 } from "@opentui/core";
+import parsersConfig from "../parsers-config.ts";
+
+// Register custom syntax highlighting parsers
+addDefaultParsers(parsersConfig.parsers);
 import fs from "fs";
 import { tmpdir } from "os";
 import { join } from "path";

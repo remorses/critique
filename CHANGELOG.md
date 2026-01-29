@@ -1,3 +1,8 @@
+# 0.1.76
+
+- Syntax highlighting:
+  - Add tree-sitter parsers for 21 additional languages: Python, Rust, Go, C++, C#, Bash, C, Java, Ruby, PHP, Scala, HTML, JSON, YAML, Haskell, CSS, Julia, OCaml, Clojure, Swift, Nix
+
 # 0.1.75
 
 - Web previews:
