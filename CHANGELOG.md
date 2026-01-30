@@ -4,6 +4,8 @@
   - Increased default font size from 16px to 20px for better readability
   - Fixed text clipping by adding flexShrink 0 to all elements
   - Always use github-light theme (no dark mode support in OG protocol)
+  - `review --web` now generates OG images from the first few hunks of the diff
+  - Fixed `buildPatch` to include `diff --git` header for proper diff parsing
 
 # 0.1.79
 

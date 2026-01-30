@@ -538,7 +538,7 @@ async function runReviewMode(
       webSpinner.start("Generating web preview...");
       
       try {
-        const { htmlDesktop, htmlMobile } = await captureReviewResponsiveHtml({
+        const { htmlDesktop, htmlMobile, ogImage } = await captureReviewResponsiveHtml({
           hunks,
           reviewData,
           desktopCols: 230,
@@ -552,7 +552,7 @@ async function runReviewMode(
         if (acpClient) await acpClient.close();
 
         webSpinner.message("Uploading...");
-        const result = await uploadHtml(htmlDesktop, htmlMobile);
+        const result = await uploadHtml(htmlDesktop, htmlMobile, ogImage);
         webSpinner.stop("Uploaded");
         
         clack.log.success(`Preview URL: ${result.url}`, out);
@@ -849,7 +849,7 @@ async function runResumeMode(options: ResumeModeOptions) {
     webSpinner.start("Generating web preview...");
 
     try {
-      const { htmlDesktop, htmlMobile } = await captureReviewResponsiveHtml({
+      const { htmlDesktop, htmlMobile, ogImage } = await captureReviewResponsiveHtml({
         hunks: review.hunks,
         reviewData: review.reviewYaml,
         desktopCols: 230,
@@ -859,7 +859,7 @@ async function runResumeMode(options: ResumeModeOptions) {
       });
 
       webSpinner.message("Uploading...");
-      const result = await uploadHtml(htmlDesktop, htmlMobile);
+      const result = await uploadHtml(htmlDesktop, htmlMobile, ogImage);
       webSpinner.stop("Uploaded");
 
       clack.log.success(`Preview URL: ${result.url}`);

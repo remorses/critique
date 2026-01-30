@@ -141,8 +141,9 @@ export function buildPatch(
     // Skip lines without valid prefix (shouldn't happen in valid diff)
   }
 
-  // Build the unified diff format
-  const header = `--- a/${filename}
+  // Build the unified diff format with full git diff header
+  const header = `diff --git a/${filename} b/${filename}
+--- a/${filename}
 +++ b/${filename}
 @@ -${oldStart},${oldLines} +${newStart},${newLines} @@`
 

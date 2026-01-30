@@ -264,7 +264,7 @@ async function main() {
   if (webMode) {
     console.log("Capturing preview...")
     
-    const { htmlDesktop, htmlMobile } = await captureReviewResponsiveHtml({
+    const { htmlDesktop, htmlMobile, ogImage } = await captureReviewResponsiveHtml({
       hunks: exampleHunks,
       reviewData: exampleReviewData,
       desktopCols: 200,
@@ -275,7 +275,7 @@ async function main() {
     })
 
     console.log("Uploading...")
-    const result = await uploadHtml(htmlDesktop, htmlMobile)
+    const result = await uploadHtml(htmlDesktop, htmlMobile, ogImage)
     console.log(`\nPreview URL: ${result.url}`)
     console.log("(expires in 7 days)")
     return

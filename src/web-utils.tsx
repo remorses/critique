@@ -483,11 +483,31 @@ export async function captureReviewResponsiveHtml(
     themeName: string
     title?: string
   }
-): Promise<{ htmlDesktop: string; htmlMobile: string }> {
+): Promise<{ htmlDesktop: string; htmlMobile: string; ogImage: Buffer | null }> {
   // Use large row values to ensure all content fits without scrolling
   // The frameToHtml function trims empty lines at the end
   const desktopRows = Math.max(options.baseRows * 3, 1000)
   const mobileRows = Math.max(Math.ceil(desktopRows * (options.desktopCols / options.mobileCols)), 2000)
+
+  // Generate OG image from first few hunks' raw diff
+  let ogImage: Buffer | null = null
+  try {
+    const { renderDiffToOgImage } = await import("./image.ts")
+    // Extract raw diff from hunks (they have rawDiff field)
+    const diffContent = options.hunks
+      .slice(0, 5) // Take first 5 hunks max
+      .map((h: any) => h.rawDiff)
+      .join("\n")
+    if (diffContent) {
+      ogImage = await renderDiffToOgImage(diffContent, {
+        // Always use github-light for OG images (no dark mode support in OG protocol)
+        themeName: "github-light",
+      })
+    }
+  } catch (e) {
+    // takumi not installed or error - skip OG image
+    ogImage = null
+  }
 
   const [htmlDesktop, htmlMobile] = await Promise.all([
     captureReviewToHtml({
@@ -508,7 +528,7 @@ export async function captureReviewResponsiveHtml(
     }),
   ])
 
-  return { htmlDesktop, htmlMobile }
+  return { htmlDesktop, htmlMobile, ogImage }
 }
 
 /**
