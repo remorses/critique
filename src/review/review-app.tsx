@@ -180,6 +180,10 @@ export function ReviewApp({
             selectedValues={[themeName]}
             onChange={handleThemeSelect}
             onFocus={handleThemeFocus}
+            onEscape={() => {
+              setShowThemePicker(false)
+              setPreviewTheme(null)
+            }}
             placeholder="Search themes..."
             itemsPerPage={6}
             theme={resolvedTheme}

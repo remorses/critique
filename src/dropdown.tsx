@@ -24,6 +24,7 @@ export interface DropdownProps {
   options: DropdownOption[];
   onChange?: (newValue: string) => void;
   onFocus?: (value: string) => void;
+  onEscape?: () => void;
   theme: ResolvedTheme;
 }
 
@@ -32,6 +33,7 @@ const Dropdown = (props: DropdownProps) => {
     tooltip,
     onChange,
     onFocus,
+    onEscape,
     selectedValues = [],
     options,
     placeholder = "Search…",
@@ -141,6 +143,13 @@ const Dropdown = (props: DropdownProps) => {
 
   // Handle keyboard navigation
   useKeyboard((evt) => {
+    if (evt.name === "escape") {
+      evt.stopPropagation();
+      if (onEscape) {
+        onEscape();
+      }
+      return;
+    }
     if (evt.name === "up") {
       move(-1);
     }

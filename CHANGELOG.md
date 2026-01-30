@@ -1,3 +1,10 @@
+# 0.1.79
+
+- TUI:
+  - `critique`: Esc closes file/theme dropdowns before exiting
+  - `critique`: Add dropdown escape handling test coverage
+  - `critique review`: Esc closes the theme picker dropdown before exiting
+
 # 0.1.78
 
 - **Breaking change:** Single positional argument now uses `git diff` instead of `git show`

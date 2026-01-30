@@ -1368,6 +1368,10 @@ function App({ parsedFiles }: AppProps) {
             selectedValues={[themeName]}
             onChange={handleThemeSelect}
             onFocus={handleThemeFocus}
+            onEscape={() => {
+              setShowThemePicker(false);
+              setPreviewTheme(null);
+            }}
             placeholder="Search themes..."
             itemsPerPage={6}
             theme={resolvedTheme}
@@ -1381,6 +1385,9 @@ function App({ parsedFiles }: AppProps) {
             options={dropdownOptions}
             selectedValues={[]}
             onChange={handleFileSelect}
+            onEscape={() => {
+              setShowDropdown(false);
+            }}
             placeholder="Search files..."
             itemsPerPage={6}
             theme={resolvedTheme}
@@ -1561,6 +1568,10 @@ cli
 
         // Handle exit keys (Q, Escape) for loading and empty states
         useKeyboard((key) => {
+          if (parsedFiles && parsedFiles.length > 0) {
+            return;
+          }
+
           if (key.name === "escape" || key.name === "q") {
             watchRenderer.destroy();
           }
