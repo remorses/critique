@@ -1,3 +1,7 @@
+# 0.1.80
+
+- OG images: Increased default font size from 16px to 20px for better readability in social previews
+
 # 0.1.79
 
 - TUI:

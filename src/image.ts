@@ -58,7 +58,7 @@ export interface OgImageOptions {
   width?: number
   /** Image height in pixels (default: 630) */
   height?: number
-  /** Font size in pixels (default: 16) */
+  /** Font size in pixels (default: 20) */
   fontSize?: number
   /** Line height multiplier (default: 1.5) */
   lineHeight?: number
@@ -243,7 +243,7 @@ export function calculateOgImageLayout(
   const {
     width = 1200,
     height = 630,
-    fontSize = 16,
+    fontSize = 20,
     lineHeight = 1.5,
   } = options
 
@@ -288,7 +288,7 @@ export async function renderFrameToOgImage(
     themeName = "github-light",
     width = 1200,
     height = 630,
-    fontSize = 18,
+    fontSize = 22,
     lineHeight = 1.5,
     format = "png",
     quality = 90,
@@ -324,7 +324,7 @@ export async function renderDiffToOgImage(
   const { renderDiffToFrame } = await import("./web-utils.tsx")
 
   const width = options.width ?? 1200
-  const fontSize = options.fontSize ?? 16
+  const fontSize = options.fontSize ?? 20
   const paddingX = 24
   const themeName = options.themeName ?? "github-light"
 
