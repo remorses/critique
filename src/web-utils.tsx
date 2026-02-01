@@ -294,10 +294,7 @@ export async function renderDiffToFrame(
   createRoot(renderer).render(React.createElement(WebApp))
   await renderOnce()
   
-  // Wait for async highlighting to complete
-  await waitForRenderStabilization(renderer, renderOnce)
-  
-  // Measure actual content height from layout
+  // Measure content height - layout is synchronous, no wait needed for sizing
   let contentHeight = getContentHeight(renderer.root)
   
   // If content height == buffer height, content is clipped - double until it fits
@@ -305,7 +302,6 @@ export async function renderDiffToFrame(
     currentHeight = Math.min(currentHeight * 2, options.maxRows)
     resize(options.cols, currentHeight)
     await renderOnce()
-    await waitForRenderStabilization(renderer, renderOnce, 200)
     contentHeight = getContentHeight(renderer.root)
   }
   
@@ -314,8 +310,10 @@ export async function renderDiffToFrame(
   if (finalHeight < renderer.height) {
     resize(options.cols, finalHeight)
     await renderOnce()
-    await waitForRenderStabilization(renderer, renderOnce, 200)
   }
+  
+  // Wait for async highlighting to complete (only once at the end)
+  await waitForRenderStabilization(renderer, renderOnce)
 
   // Capture the final frame (using safe version that handles invalid codepoints)
   const frame = safeCaptureSpans(renderer)
@@ -476,10 +474,7 @@ export async function renderReviewToFrame(
   createRoot(renderer).render(React.createElement(ReviewWebApp))
   await renderOnce()
   
-  // Wait for async highlighting to complete
-  await waitForRenderStabilization(renderer, renderOnce)
-  
-  // Measure actual content height from layout
+  // Measure content height - layout is synchronous, no wait needed for sizing
   let contentHeight = getContentHeight(renderer.root)
   
   // If content height == buffer height, content is clipped - double until it fits
@@ -487,7 +482,6 @@ export async function renderReviewToFrame(
     currentHeight = Math.min(currentHeight * 2, options.maxRows)
     resize(options.cols, currentHeight)
     await renderOnce()
-    await waitForRenderStabilization(renderer, renderOnce, 200)
     contentHeight = getContentHeight(renderer.root)
   }
   
@@ -496,8 +490,10 @@ export async function renderReviewToFrame(
   if (finalHeight < renderer.height) {
     resize(options.cols, finalHeight)
     await renderOnce()
-    await waitForRenderStabilization(renderer, renderOnce, 200)
   }
+  
+  // Wait for async highlighting to complete (only once at the end)
+  await waitForRenderStabilization(renderer, renderOnce)
 
   // Capture the final frame (using safe version that handles invalid codepoints)
   const frame = safeCaptureSpans(renderer)
