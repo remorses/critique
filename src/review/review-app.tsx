@@ -741,7 +741,7 @@ export function HunkView({ hunk, themeName, width, isLast }: HunkViewProps) {
   const viewMode = getViewMode(additions, deletions, width)
 
   return (
-    <box style={{ flexDirection: "column", marginBottom: isLast ? 0 : 1 }}>
+    <box style={{ flexDirection: "column", marginBottom: isLast ? 0 : 1, width }}>
       {/* Hunk header */}
       <box
         style={{

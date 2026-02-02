@@ -214,52 +214,55 @@ describe("ReviewAppView", () => {
     globalThis.IS_REACT_ACT_ENVIRONMENT = false
     await testSetup.renderOnce()
     const frame = testSetup.captureCharFrame()
+    // Ensure filenames are not clipped (regression test for layout issue)
+    expect(frame).toContain("src/index.ts")
+    expect(frame).toContain("src/utils.ts")
     expect(frame).toMatchInlineSnapshot(`
-      "
-                                            └── src
-                                                ├── utils.ts (+5,-1)
-                                                └── index.ts (+1)
-
-
-         Import changes
-
-         Added logger import to support new logging functionality.
-
-
-       rc/index.ts +1-0
-
-          import { main } from './utils'
-        + import { logger } from './logger'
-
-
-         Input validation and logging
-
-         These changes add input validation to the helper function and integrate logging in the main
-         function.
-
-
-        src/utils.ts +3-1
-
-        10   function helper() {                         10   function helper() {
-        11 -   return null                               11 +   // Add validation
-                                                         12 +   if (!input) return null
-                                                         13 +   return process(input)
-        12   }                                           14   }
-
-       c/utils.ts +2-0
-
-          export function main() {
-        +   const result = helper()
-        +   console.log(result)
-            return result
-          }
-
-
-
-
-
-        (2 sections)  t theme                                      run with --web to share & collaborate
-
+      "                                                                                                    
+                                            └── src                                                       
+                                                ├── utils.ts (+5,-1)                                      
+                                                └── index.ts (+1)                                         
+                                                                                                          
+                                                                                                          
+         Import changes                                                                                   
+                                                                                                          
+         Added logger import to support new logging functionality.                                        
+                                                                                                          
+                                                                                                          
+       src/index.ts +1-0                                                                                  
+                                                                                                          
+       1   import { main } from './utils'                                                                 
+       2 + import { logger } from './logger'                                                              
+                                                                                                          
+                                                                                                          
+         Input validation and logging                                                                     
+                                                                                                          
+         These changes add input validation to the helper function and integrate logging in the main      
+         function.                                                                                        
+                                                                                                          
+                                                                                                          
+       src/utils.ts +3-1                                                                                  
+                                                                                                          
+       10   function helper() {                          10   function helper() {                         
+       11 -   return null                                11 +   // Add validation                         
+                                                         12 +   if (!input) return null                   
+                                                         13 +   return process(input)                     
+       12   }                                            14   }                                           
+                                                                                                          
+       src/utils.ts +2-0                                                                                  
+                                                                                                          
+       27   export function main() {                                                                      
+       28 +   const result = helper()                                                                     
+       29 +   console.log(result)                                                                         
+       30     return result                                                                               
+       31   }                                                                                             
+                                                                                                          
+                                                                                                          
+                                                                                                          
+                                                                                                          
+                                                                                                          
+        (2 sections)  t theme                                      run with --web to share & collaborate  
+                                                                                                          
       "
     `)
   })
@@ -282,16 +285,16 @@ describe("ReviewAppView", () => {
     await testSetup.renderOnce()
     const frame = testSetup.captureCharFrame()
     expect(frame).toMatchInlineSnapshot(`
-      "
-       Loading review...
-
-
-
-
-
-
-
-
+      "                                                            
+       Loading review...                                          
+                                                                  
+                                                                  
+                                                                  
+                                                                  
+                                                                  
+                                                                  
+                                                                  
+                                                                  
       "
     `)
   })
@@ -314,16 +317,16 @@ describe("ReviewAppView", () => {
     await testSetup.renderOnce()
     const frame = testSetup.captureCharFrame()
     expect(frame).toMatchInlineSnapshot(`
-      "
-       No review groups generated
-
-
-
-
-
-
-
-
+      "                                                            
+       No review groups generated                                 
+                                                                  
+                                                                  
+                                                                  
+                                                                  
+                                                                  
+                                                                  
+                                                                  
+                                                                  
       "
     `)
   })
@@ -347,56 +350,56 @@ describe("ReviewAppView", () => {
     await testSetup.renderOnce()
     const frame = testSetup.captureCharFrame()
     expect(frame).toMatchInlineSnapshot(`
-      "
-                                                                └── src
-                                                                    ├── utils.ts (+5,-1)
-                                                                    └── index.ts (+1)
-
-
-         Import changes
-
-         Added logger import to support new logging functionality.
-
-
-       rc/index.ts +1-0
-
-          import { main } from './utils'
-        + import { logger } from './logger'
-
-
-         Input validation and logging
-
-         These changes add input validation to the helper function and integrate logging in the main function.
-
-
-        src/utils.ts +3-1
-
-        10   function helper() {                                             10   function helper() {
-        11 -   return null                                                   11 +   // Add validation
-                                                                             12 +   if (!input) return null
-                                                                             13 +   return process(input)
-        12   }                                                               14   }
-
-       c/utils.ts +2-0
-
-          export function main() {
-        +   const result = helper()
-        +   console.log(result)
-            return result
-          }
-
-
-
-
-
-
-
-
-
-
-
-        (2 sections)  t theme                                                                              run with --web to share & collaborate
-
+      "                                                                                                                                            
+                                                                └── src                                                                           
+                                                                    ├── utils.ts (+5,-1)                                                          
+                                                                    └── index.ts (+1)                                                             
+                                                                                                                                                  
+                                                                                                                                                  
+         Import changes                                                                                                                           
+                                                                                                                                                  
+         Added logger import to support new logging functionality.                                                                                
+                                                                                                                                                  
+                                                                                                                                                  
+       src/index.ts +1-0                                                                                                                          
+                                                                                                                                                  
+       1   import { main } from './utils'                                                                                                         
+       2 + import { logger } from './logger'                                                                                                      
+                                                                                                                                                  
+                                                                                                                                                  
+         Input validation and logging                                                                                                             
+                                                                                                                                                  
+         These changes add input validation to the helper function and integrate logging in the main function.                                    
+                                                                                                                                                  
+                                                                                                                                                  
+       src/utils.ts +3-1                                                                                                                          
+                                                                                                                                                  
+       10   function helper() {                                              10   function helper() {                                             
+       11 -   return null                                                    11 +   // Add validation                                             
+                                                                             12 +   if (!input) return null                                       
+                                                                             13 +   return process(input)                                         
+       12   }                                                                14   }                                                               
+                                                                                                                                                  
+       src/utils.ts +2-0                                                                                                                          
+                                                                                                                                                  
+       27   export function main() {                                                                                                              
+       28 +   const result = helper()                                                                                                             
+       29 +   console.log(result)                                                                                                                 
+       30     return result                                                                                                                       
+       31   }                                                                                                                                     
+                                                                                                                                                  
+                                                                                                                                                  
+                                                                                                                                                  
+                                                                                                                                                  
+                                                                                                                                                  
+                                                                                                                                                  
+                                                                                                                                                  
+                                                                                                                                                  
+                                                                                                                                                  
+                                                                                                                                                  
+                                                                                                                                                  
+        (2 sections)  t theme                                                                              run with --web to share & collaborate  
+                                                                                                                                                  
       "
     `)
   })
@@ -420,76 +423,76 @@ describe("ReviewAppView", () => {
     await testSetup.renderOnce()
     const frame = testSetup.captureCharFrame()
     expect(frame).toMatchInlineSnapshot(`
-      "
-                                                            └── src                                                                             █
-                                                                ├── errors                                                                      █
-                                                                │   └── index.ts (+6)                                                           █
-                                                                ├── api                                                                         █
-                                                                │   └── users.ts (+5,-2)                                                        █
-                                                                └── config                                                                      █
-                                                                    └── database.ts (+3,-2)                                                     █
-                                                                                                                                                █
-                                                                                                                                                █
-         Custom Error Classes
-
-         Introduces a new error class for better error handling:
-
-         - NotFoundError: Used when a requested resource doesn't exist
-
-
-         This enables more specific catch blocks and better error messages.
-
-
-       rc/errors/index.ts +6-0
-
-        + export class NotFoundError extends Error {
-        +   constructor(message: string) {
-        +     super(message)
-        +     this.name = 'NotFoundError'
-        +   }
-        + }
-
-
-         User API Improvements
-
-         Error Handling
-
-         The getUser function now properly handles missing users by throwing a NotFoundError.
-
-         Security
-
-         User data is now sanitized before being returned to prevent leaking sensitive fields.
-
-
-        src/api/users.ts +5-2
-
-        15   export async function getUser(id: string) {                     15   export async function getUser(id: string) {
-        16 -   const user = await db.users.find(id)                          16 +   const user = await db.users.find(id)
-        17 -   return user                                                   17 +   if (!user) {
-                                                                             18 +     throw new NotFoundError(\`User \${id} not found\`)
-                                                                             19 +   }
-                                                                             20 +   return sanitizeUser(user)
-        18   }                                                               21   }
-
-
-         Environment-based Configuration
-
-         Database configuration now reads from environment variables:
-
-         - DB_HOST: Database hostname (default: localhost)
-         - DB_PORT: Database port (default: 5432)
-         - SSL: Automatically enabled in production
-
-
-
-        src/config/database.ts +3-2
-
-        1   export const dbConfig = {                                        1   export const dbConfig = {
-        2 -   host: 'localhost',                                             2 +   host: process.env.DB_HOST || 'localhost',
-
-
-        (3 sections)  t theme                                                                              run with --web to share & collaborate
-
+      "                                                                                                                                            
+                                                            └── src                                                                             █ 
+                                                                ├── errors                                                                      █ 
+                                                                │   └── index.ts (+6)                                                           █ 
+                                                                ├── api                                                                         █ 
+                                                                │   └── users.ts (+5,-2)                                                        █ 
+                                                                └── config                                                                      █ 
+                                                                    └── database.ts (+3,-2)                                                     █ 
+                                                                                                                                                █ 
+                                                                                                                                                █ 
+         Custom Error Classes                                                                                                                     
+                                                                                                                                                  
+         Introduces a new error class for better error handling:                                                                                  
+                                                                                                                                                  
+         - NotFoundError: Used when a requested resource doesn't exist                                                                            
+                                                                                                                                                  
+                                                                                                                                                  
+         This enables more specific catch blocks and better error messages.                                                                       
+                                                                                                                                                  
+                                                                                                                                                  
+       src/errors/index.ts +6-0                                                                                                                   
+                                                                                                                                                  
+       1 + export class NotFoundError extends Error {                                                                                             
+       2 +   constructor(message: string) {                                                                                                       
+       3 +     super(message)                                                                                                                     
+       4 +     this.name = 'NotFoundError'                                                                                                        
+       5 +   }                                                                                                                                    
+       6 + }                                                                                                                                      
+                                                                                                                                                  
+                                                                                                                                                  
+         User API Improvements                                                                                                                    
+                                                                                                                                                  
+         Error Handling                                                                                                                           
+                                                                                                                                                  
+         The getUser function now properly handles missing users by throwing a NotFoundError.                                                     
+                                                                                                                                                  
+         Security                                                                                                                                 
+                                                                                                                                                  
+         User data is now sanitized before being returned to prevent leaking sensitive fields.                                                    
+                                                                                                                                                  
+                                                                                                                                                  
+       src/api/users.ts +5-2                                                                                                                      
+                                                                                                                                                  
+       15   export async function getUser(id: string) {                      15   export async function getUser(id: string) {                     
+       16 -   const user = await db.users.find(id)                           16 +   const user = await db.users.find(id)                          
+       17 -   return user                                                    17 +   if (!user) {                                                  
+                                                                             18 +     throw new NotFoundError(\`User \${id} not found\`)             
+                                                                             19 +   }                                                             
+                                                                             20 +   return sanitizeUser(user)                                     
+       18   }                                                                21   }                                                               
+                                                                                                                                                  
+                                                                                                                                                  
+         Environment-based Configuration                                                                                                          
+                                                                                                                                                  
+         Database configuration now reads from environment variables:                                                                             
+                                                                                                                                                  
+         - DB_HOST: Database hostname (default: localhost)                                                                                        
+         - DB_PORT: Database port (default: 5432)                                                                                                 
+         - SSL: Automatically enabled in production                                                                                               
+                                                                                                                                                  
+                                                                                                                                                  
+                                                                                                                                                  
+       src/config/database.ts +3-2                                                                                                                
+                                                                                                                                                  
+       1   export const dbConfig = {                                         1   export const dbConfig = {                                        
+       2 -   host: 'localhost',                                              2 +   host: process.env.DB_HOST || 'localhost',                      
+                                                                                                                                                  
+                                                                                                                                                  
+        (3 sections)  t theme                                                                              run with --web to share & collaborate  
+                                                                                                                                                  
       "
     `)
   })
@@ -522,31 +525,31 @@ Added validation at handler start.`,
     const frame = testSetup.captureCharFrame()
     // Should only show lines 1-7 of the hunk, not the full thing
     expect(frame).toMatchInlineSnapshot(`
-      "
-                                          └── src/api                                                   █
-                                              └── handlers.ts (+9,-2)                                   █
-                                                                                                        █
-                                                                                                        █
-         Input Validation                                                                               █
-                                                                                                        █
-         Added validation at handler start.                                                             █
-                                                                                                        █
-                                                                                                        █
-        src/api/handlers.ts +5-1                                                                        █
-                                                                                                        ▀
-        10   export async function handleRequest(req:    10   export async function handleRequest(req:
-             Request) {                                       Request) {
-        11 -   const data = req.body                     11 +   // Input validation
-                                                         12 +   if (!req.body) {
-                                                         13 +     throw new ValidationError('Request
-                                                              body is required')
-                                                         14 +   }
-                                                         15 +   const data = validateInput(req.body)
-
-
-
-        (1 section)  t theme                                       run with --web to share & collaborate
-
+      "                                                                                                    
+                                          └── src/api                                                   █ 
+                                              └── handlers.ts (+9,-2)                                   █ 
+                                                                                                        █ 
+                                                                                                        █ 
+         Input Validation                                                                               █ 
+                                                                                                        █ 
+         Added validation at handler start.                                                             █ 
+                                                                                                        █ 
+                                                                                                        █ 
+       src/api/handlers.ts +5-1                                                                         █ 
+                                                                                                        ▀ 
+       10   export async function handleRequest(req:     10   export async function handleRequest(req:    
+            Request) {                                        Request) {                                  
+       11 -   const data = req.body                      11 +   // Input validation                       
+                                                         12 +   if (!req.body) {                          
+                                                         13 +     throw new ValidationError('Request bod  
+                                                              is required')                               
+                                                         14 +   }                                         
+                                                         15 +   const data = validateInput(req.body)      
+                                                                                                          
+                                                                                                          
+                                                                                                          
+        (1 section)  t theme                                       run with --web to share & collaborate  
+                                                                                                          
       "
     `)
   })
@@ -571,56 +574,56 @@ Added validation at handler start.`,
     const frame = testSetup.captureCharFrame()
     // Should show two sections: validation (lines 1-7) then processing (lines 8-16)
     expect(frame).toMatchInlineSnapshot(`
-      "
-                                                    └── src/api                                                             █
-                                                        └── handlers.ts (+9,-2)                                             █
-                                                                                                                            █
-                                                                                                                            █
-         Input Validation                                                                                                   █
-                                                                                                                            █
-         Added proper input validation at the start of the handler:                                                         █
-                                                                                                                            █
-         - Check for missing request body                                                                                   █
-         - Validate input before processing                                                                                 █
-                                                                                                                            █
-                                                                                                                            █
-                                                                                                                            █
-        src/api/handlers.ts +5-1                                                                                            █
-                                                                                                                            █
-        10   export async function handleRequest(req: Request) {   10   export async function handleRequest(req: Request) { █
-        11 -   const data = req.body                               11 +   // Input validation                               █
-                                                                   12 +   if (!req.body) {                                  █
-                                                                   13 +     throw new ValidationError('Request body is      █
-                                                                        required')                                          █
-                                                                   14 +   }                                                 █
-                                                                   15 +   const data = validateInput(req.body)              █
-                                                                                                                            █
-
-         Async Processing and Logging
-
-         Improved the processing logic:
-
-         - Made process call async for better performance
-         - Added request logging for debugging
-
-
-
-        src/api/handlers.ts +4-1
-
-        12                                                         16
-        13     // Process the request                              17     // Process the request
-        14 -   const result = process(data)                        18 +   const result = await processAsync(data)
-                                                                   19 +
-                                                                   20 +   // Logging
-                                                                   21 +   logger.info('Request processed', { requestId: req.
-        15                                                              id })
-        16     return result                                       22
-                                                                   23     return result
-
-
-
-        (2 sections)  t theme                                                          run with --web to share & collaborate
-
+      "                                                                                                                        
+                                                    └── src/api                                                             █ 
+                                                        └── handlers.ts (+9,-2)                                             █ 
+                                                                                                                            █ 
+                                                                                                                            █ 
+         Input Validation                                                                                                   █ 
+                                                                                                                            █ 
+         Added proper input validation at the start of the handler:                                                         █ 
+                                                                                                                            █ 
+         - Check for missing request body                                                                                   █ 
+         - Validate input before processing                                                                                 █ 
+                                                                                                                            █ 
+                                                                                                                            █ 
+                                                                                                                            █ 
+       src/api/handlers.ts +5-1                                                                                             █ 
+                                                                                                                            █ 
+       10   export async function handleRequest(req: Request) {    10   export async function handleRequest(req: Request) { █ 
+       11 -   const data = req.body                                11 +   // Input validation                               █ 
+                                                                   12 +   if (!req.body) {                                  █ 
+                                                                   13 +     throw new ValidationError('Request body is      █ 
+                                                                        required')                                          █ 
+                                                                   14 +   }                                                 █ 
+                                                                   15 +   const data = validateInput(req.body)              █ 
+                                                                                                                            █ 
+                                                                                                                              
+         Async Processing and Logging                                                                                         
+                                                                                                                              
+         Improved the processing logic:                                                                                       
+                                                                                                                              
+         - Made process call async for better performance                                                                     
+         - Added request logging for debugging                                                                                
+                                                                                                                              
+                                                                                                                              
+                                                                                                                              
+       src/api/handlers.ts +4-1                                                                                               
+                                                                                                                              
+       12                                                          16                                                         
+       13     // Process the request                               17     // Process the request                              
+       14 -   const result = process(data)                         18 +   const result = await processAsync(data)             
+                                                                   19 +                                                       
+                                                                   20 +   // Logging                                          
+                                                                   21 +   logger.info('Request processed', { requestId: req.  
+       15                                                               id })                                                 
+       16     return result                                        22                                                         
+                                                                   23     return result                                       
+                                                                                                                              
+                                                                                                                              
+                                                                                                                              
+        (2 sections)  t theme                                                          run with --web to share & collaborate  
+                                                                                                                              
       "
     `)
   })
@@ -645,41 +648,41 @@ Added validation at handler start.`,
     const frame = testSetup.captureCharFrame()
     // Should show: full hunk #3, then partial of largeHunk (lines 1-7)
     expect(frame).toMatchInlineSnapshot(`
-      "
-                                        └── src                                                         █
-                                            ├── utils.ts (+5,-1)                                        █
-                                            ├── index.ts (+1)                                           █
-                                            └── api                                                     █
-                                                └── handlers.ts (+9,-2)                                 █
-
-
-         Import changes
-
-         Added logger import.
-
-
-       rc/index.ts +1-0
-
-          import { main } from './utils'
-        + import { logger } from './logger'
-
-
-         Validation
-
-         Input validation logic.
-
-
-        src/api/handlers.ts +5-1
-
-        10   export async function handleRequest(req:    10   export async function handleRequest(req:
-             Request) {                                       Request) {
-        11 -   const data = req.body                     11 +   // Input validation
-                                                         12 +   if (!req.body) {
-                                                         13 +     throw new ValidationError('Request
-
-
-        (2 sections)  t theme                                      run with --web to share & collaborate
-
+      "                                                                                                    
+                                        └── src                                                         █ 
+                                            ├── utils.ts (+5,-1)                                        █ 
+                                            ├── index.ts (+1)                                           █ 
+                                            └── api                                                     █ 
+                                                └── handlers.ts (+9,-2)                                 █ 
+                                                                                                          
+                                                                                                          
+         Import changes                                                                                   
+                                                                                                          
+         Added logger import.                                                                             
+                                                                                                          
+                                                                                                          
+       src/index.ts +1-0                                                                                  
+                                                                                                          
+       1   import { main } from './utils'                                                                 
+       2 + import { logger } from './logger'                                                              
+                                                                                                          
+                                                                                                          
+         Validation                                                                                       
+                                                                                                          
+         Input validation logic.                                                                          
+                                                                                                          
+                                                                                                          
+       src/api/handlers.ts +5-1                                                                           
+                                                                                                          
+       10   export async function handleRequest(req:     10   export async function handleRequest(req:    
+            Request) {                                        Request) {                                  
+       11 -   const data = req.body                      11 +   // Input validation                       
+                                                         12 +   if (!req.body) {                          
+                                                         13 +     throw new ValidationError('Request bod  
+                                                                                                          
+                                                                                                          
+        (2 sections)  t theme                                      run with --web to share & collaborate  
+                                                                                                          
       "
     `)
   })
@@ -712,31 +715,31 @@ This uses hunkId instead of hunkIds but shows full hunk.`,
     const frame = testSetup.captureCharFrame()
     // Should show full hunk #1
     expect(frame).toMatchInlineSnapshot(`
-      "
-                                            └── src
-                                                ├── utils.ts (+5,-1)
-                                                └── index.ts (+1)
-
-
-         Full hunk via hunkId
-
-         This uses hunkId instead of hunkIds but shows full hunk.
-
-
-        src/utils.ts +3-1
-
-        10   function helper() {                         10   function helper() {
-        11 -   return null                               11 +   // Add validation
-                                                         12 +   if (!input) return null
-                                                         13 +   return process(input)
-        12   }                                           14   }
-
-
-
-
-
-        (1 section)  t theme                                       run with --web to share & collaborate
-
+      "                                                                                                    
+                                            └── src                                                       
+                                                ├── utils.ts (+5,-1)                                      
+                                                └── index.ts (+1)                                         
+                                                                                                          
+                                                                                                          
+         Full hunk via hunkId                                                                             
+                                                                                                          
+         This uses hunkId instead of hunkIds but shows full hunk.                                         
+                                                                                                          
+                                                                                                          
+       src/utils.ts +3-1                                                                                  
+                                                                                                          
+       10   function helper() {                          10   function helper() {                         
+       11 -   return null                                11 +   // Add validation                         
+                                                         12 +   if (!input) return null                   
+                                                         13 +   return process(input)                     
+       12   }                                            14   }                                           
+                                                                                                          
+                                                                                                          
+                                                                                                          
+                                                                                                          
+                                                                                                          
+        (1 section)  t theme                                       run with --web to share & collaborate  
+                                                                                                          
       "
     `)
   })
@@ -794,41 +797,41 @@ The prose above stays narrow.`,
     await testSetup.renderOnce()
     const frame = testSetup.captureCharFrame()
     expect(frame).toMatchInlineSnapshot(`
-      "
-                                                       └── src                                                              █
-                                                           └── config.ts (+3)                                               █
-                                                                                                                            █
-                                                                                                                            █
-         Configuration with Wide Content
-
-         Here's a configuration table:
-
-         ┌─────────┬──────────────────────┬───────────────┬─────────────────┐
-         │Setting  │Environment Variable  │Default Value  │Description      │
-         │─────────│──────────────────────│───────────────│─────────────────│
-         │Host     │DB_HOST               │localhost      │Database host    │
-         │─────────│──────────────────────│───────────────│─────────────────│
-         │Port     │DB_PORT               │5432           │Database port    │
-         │─────────│──────────────────────│───────────────│─────────────────│
-         │SSL      │DB_SSL                │false          │Enable SSL       │
-         │─────────│──────────────────────│───────────────│─────────────────│
-         │Pool     │DB_POOL_SIZE          │10             │Connection pool  │
-         └─────────┴──────────────────────┴───────────────┴─────────────────┘
-
-         And a diagram:
-
-         ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-         │   Client    │────▶│   Server    │────▶│  Database   │
-         └─────────────┘     └─────────────┘     └─────────────┘
-
-         The prose above stays narrow.
-
-
-       rc/config.ts +3-0
-
-
-        (1 section)  t theme                                                           run with --web to share & collaborate
-
+      "                                                                                                                        
+                                                       └── src                                                              █ 
+                                                           └── config.ts (+3)                                               █ 
+                                                                                                                            █ 
+                                                                                                                            █ 
+         Configuration with Wide Content                                                                                      
+                                                                                                                              
+         Here's a configuration table:                                                                                        
+                                                                                                                              
+         ┌─────────┬──────────────────────┬───────────────┬─────────────────┐                                                 
+         │Setting  │Environment Variable  │Default Value  │Description      │                                                 
+         │─────────│──────────────────────│───────────────│─────────────────│                                                 
+         │Host     │DB_HOST               │localhost      │Database host    │                                                 
+         │─────────│──────────────────────│───────────────│─────────────────│                                                 
+         │Port     │DB_PORT               │5432           │Database port    │                                                 
+         │─────────│──────────────────────│───────────────│─────────────────│                                                 
+         │SSL      │DB_SSL                │false          │Enable SSL       │                                                 
+         │─────────│──────────────────────│───────────────│─────────────────│                                                 
+         │Pool     │DB_POOL_SIZE          │10             │Connection pool  │                                                 
+         └─────────┴──────────────────────┴───────────────┴─────────────────┘                                                 
+                                                                                                                              
+         And a diagram:                                                                                                       
+                                                                                                                              
+         ┌─────────────┐     ┌─────────────┐     ┌─────────────┐                                                              
+         │   Client    │────▶│   Server    │────▶│  Database   │                                                              
+         └─────────────┘     └─────────────┘     └─────────────┘                                                              
+                                                                                                                              
+         The prose above stays narrow.                                                                                        
+                                                                                                                              
+                                                                                                                              
+       src/config.ts +3-0                                                                                                     
+                                                                                                                              
+                                                                                                                              
+        (1 section)  t theme                                                           run with --web to share & collaborate  
+                                                                                                                              
       "
     `)
   })
@@ -917,31 +920,31 @@ The diagram above should not wrap.`,
     globalThis.IS_REACT_ACT_ENVIRONMENT = false
     await testSetup.renderOnce()
     expect(testSetup.captureCharFrame()).toMatchInlineSnapshot(`
-      "
-                              └── src
-                                  └── config.ts (+1)
-
-
-         Architecture
-
-         ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-           ┌─────────────┐
-         │   Client    │────▶│   Router    │────▶│  Handler    │────▶│
-           Database   │
-         └─────────────┘     └─────────────┘     └─────────────┘
-           └─────────────┘
-
-
-       rc/config.ts +1-0
-
-        + export const x = 1
-
-
-
-
-
-        (1 section)  t theme         run with --web to share & collaborate
-
+      "                                                                      
+                              └── src                                       
+                                  └── config.ts (+1)                        
+                                                                            
+                                                                            
+         Architecture                                                       
+                                                                            
+         ┌─────────────┐     ┌─────────────┐     ┌─────────────┐            
+           ┌─────────────┐                                                  
+         │   Client    │────▶│   Router    │────▶│  Handler    │────▶│      
+           Database   │                                                     
+         └─────────────┘     └─────────────┘     └─────────────┘            
+           └─────────────┘                                                  
+                                                                            
+                                                                            
+       src/config.ts +1-0                                                   
+                                                                            
+       1 + export const x = 1                                               
+                                                                            
+                                                                            
+                                                                            
+                                                                            
+                                                                            
+        (1 section)  t theme         run with --web to share & collaborate  
+                                                                            
       "
     `)
   })
@@ -997,31 +1000,31 @@ The diagram above should not wrap.`,
     globalThis.IS_REACT_ACT_ENVIRONMENT = false
     await testSetup.renderOnce()
     expect(testSetup.captureCharFrame()).toMatchInlineSnapshot(`
-      "
-                              └── src
-                                  └── config.ts (+1)
-
-
-         Architecture
-
-         ┌─────────────┐     ┌─────────────┐     ┌─────────────┐     ┌───
-         │   Client    │────▶│   Router    │────▶│  Handler    │────▶│  D
-         └─────────────┘     └─────────────┘     └─────────────┘     └───
-
-
-       rc/config.ts +1-0
-
-        + export const x = 1
-
-
-
-
-
-
-
-
-        (1 section)  t theme         run with --web to share & collaborate
-
+      "                                                                      
+                              └── src                                       
+                                  └── config.ts (+1)                        
+                                                                            
+                                                                            
+         Architecture                                                       
+                                                                            
+         ┌─────────────┐     ┌─────────────┐     ┌─────────────┐     ┌───   
+         │   Client    │────▶│   Router    │────▶│  Handler    │────▶│  D   
+         └─────────────┘     └─────────────┘     └─────────────┘     └───   
+                                                                            
+                                                                            
+       src/config.ts +1-0                                                   
+                                                                            
+       1 + export const x = 1                                               
+                                                                            
+                                                                            
+                                                                            
+                                                                            
+                                                                            
+                                                                            
+                                                                            
+                                                                            
+        (1 section)  t theme         run with --web to share & collaborate  
+                                                                            
       "
     `)
   })
@@ -1073,7 +1076,7 @@ The diagram above shows the flow.`,
     // Truncation is OK, but wrapping (multi-line) is not
     const diagramHunk = createHunk(1, "src/test.ts", 0, 1, 1, [
       "+export const x = 1",
-    ])ts
+    ])
 
     // Use a diagram that fits at width=100 to verify no wrapping
     const wideDiagramReviewData: ReviewYaml = {
@@ -1210,36 +1213,36 @@ Long configuration lines that should wrap properly.`,
     await testSetup.renderOnce()
     const frame = testSetup.captureCharFrame()
     expect(frame).toMatchInlineSnapshot(`
-      "
-                                           └── src
-                                               └── config.ts (+3,-2)
-
-
-         Configuration Changes
-
-         Long configuration lines that should wrap properly.
-
-
-        src/config.ts +3-2
-
-        10   export const                                10   export const
-             VERY_LONG_CONFIG_SETTING_NAME_THAT_SPANS_MU      VERY_LONG_CONFIG_SETTING_NAME_THAT_SPANS_M
-             LTIPLE_COLUMNS = {                               LTIPLE_COLUMNS = {
-        11 -   apiEndpoint: 'https://api.example.com/v1/ 11 +   apiEndpoint: process.env.API_URL ||
-             extremely/long/path/to/some/resource/that/       'https://api.example.com/v1/extremely/long
-             needs/many/columns/to/display',                  path/to/some/resource/that/needs/many/
-                                                              columns/to/display/and/even/more/text/
-                                                              here',
-        12 -   timeout: 5000,                            12 +   timeout: parseInt(process.env.TIMEOUT ||
-                                                              '10000'),
-                                                         13 +   retryAttempts: parseInt(process.env.
-                                                              RETRY_ATTEMPTS || '3'),
-        13   }                                           14   }
-
-
-
-        (1 section)  t theme                                       run with --web to share & collaborate
-
+      "                                                                                                    
+                                            └── src                                                       
+                                                └── config.ts (+3,-2)                                     
+                                                                                                          
+                                                                                                          
+         Configuration Changes                                                                            
+                                                                                                          
+         Long configuration lines that should wrap properly.                                              
+                                                                                                          
+                                                                                                          
+       src/config.ts +3-2                                                                                 
+                                                                                                          
+       10   export const                                 10   export const                                
+            VERY_LONG_CONFIG_SETTING_NAME_THAT_SPANS_MUL      VERY_LONG_CONFIG_SETTING_NAME_THAT_SPANS_MU 
+            TIPLE_COLUMNS = {                                 TIPLE_COLUMNS = {                           
+       11 -   apiEndpoint: 'https://api.example.com/v1/  11 +   apiEndpoint: process.env.API_URL ||       
+            extremely/long/path/to/some/resource/that/        'https://api.example.com/v1/extremely/long/ 
+            needs/many/columns/to/display',                   path/to/some/resource/that/needs/many/      
+                                                              columns/to/display/and/even/more/text/here' 
+       12 -   timeout: 5000,                             12 +   timeout: parseInt(process.env.TIMEOUT ||  
+                                                              '10000'),                                   
+                                                         13 +   retryAttempts: parseInt(process.env.      
+                                                              RETRY_ATTEMPTS || '3'),                     
+       13   }                                            14   }                                           
+                                                                                                          
+                                                                                                          
+                                                                                                          
+                                                                                                          
+        (1 section)  t theme                                       run with --web to share & collaborate  
+                                                                                                          
       "
     `)
   })
@@ -1281,26 +1284,26 @@ Added environment-based URL and auth header.`,
     await testSetup.renderOnce()
     const frame = testSetup.captureCharFrame()
     expect(frame).toMatchInlineSnapshot(`
-      "
-                                             └── src                                                    █
-                                                 └── api.ts (+1,-1)                                     █
-                                                                                                        █
-                                                                                                        █
-         API Endpoint Update                                                                            █
-                                                                                                        █
-         Added environment-based URL and auth header.                                                   █
-                                                                                                        █
-                                                                                                        █
-        src/api.ts +1-1                                                                                 █
-                                                                                                        ▀
-        1 - const response = await fetch('https://api.   1 + const response = await fetch(process.env.
-            example.com/users');                             API_BASE_URL + '/users', { headers: {
-                                                             Authorization: 'Bearer ' + token } });
-        2   return response.json();                      2   return response.json();
-
-
-        (1 section)  t theme                                       run with --web to share & collaborate
-
+      "                                                                                                    
+                                             └── src                                                    █ 
+                                                 └── api.ts (+1,-1)                                     █ 
+                                                                                                        █ 
+                                                                                                        █ 
+         API Endpoint Update                                                                            █ 
+                                                                                                        █ 
+         Added environment-based URL and auth header.                                                   █ 
+                                                                                                        █ 
+                                                                                                        █ 
+       src/api.ts +1-1                                                                                  █ 
+                                                                                                        ▀ 
+       1 - const response = await fetch('https://api.    1 + const response = await fetch(process.env.    
+           example.com/users');                              API_BASE_URL + '/users', { headers: {        
+                                                             Authorization: 'Bearer ' + token } });       
+       2   return response.json();                       2   return response.json();                      
+                                                                                                          
+                                                                                                          
+        (1 section)  t theme                                       run with --web to share & collaborate  
+                                                                                                          
       "
     `)
   })
@@ -1331,31 +1334,31 @@ Added logger import.`,
     await testSetup.renderOnce()
     const frame = testSetup.captureCharFrame()
     expect(frame).toMatchInlineSnapshot(`
-      "
-                                  └── src                                           █
-                                      ├── utils.ts (+5,-1)                          █
-                                      └── index.ts (+1)                             █
-                                                                                    █
-                                                                                    █
-         Import changes                                                             █
-                                                                                    █
-         Added logger import.                                                       █
-                                                                                    █
-                                                                                    █
-       rc/index.ts +1-0                                                             ▀
-
-          import { main } from './utils'
-        + import { logger } from './logger'
-
-
-
-
-                                      ⠋ generating
-
-
-
-        (1 section)  t theme                   run with --web to share & collaborate
-
+      "                                                                                
+                                  └── src                                           █ 
+                                      ├── utils.ts (+5,-1)                          █ 
+                                      └── index.ts (+1)                             █ 
+                                                                                    █ 
+                                                                                    █ 
+         Import changes                                                             █ 
+                                                                                    █ 
+         Added logger import.                                                       █ 
+                                                                                    █ 
+                                                                                    █ 
+       src/index.ts +1-0                                                            ▀ 
+                                                                                      
+       1   import { main } from './utils'                                             
+       2 + import { logger } from './logger'                                          
+                                                                                      
+                                                                                      
+                                                                                      
+                                                                                      
+                                      ⠋ generating                                    
+                                                                                      
+                                                                                      
+                                                                                      
+        (1 section)  t theme                   run with --web to share & collaborate  
+                                                                                      
       "
     `)
   })
@@ -1440,56 +1443,56 @@ AFTER: Closures preserve context
     // - "\`\`\`diagram" appears as literal text
     // - Both diagrams merge into one big code block
     expect(frame).toMatchInlineSnapshot(`
-      "
-                                             └── src
-                                                 └── config.ts (+1)
-
-
-         ActionPanel captures actions to zustand, ActionsDialog renders them
-
-         The Problem:
-
-         BEFORE: Context lost when rendering in dialog
-         +-----------------------+          +------------------+
-         | ListItem              |  push()  | DialogOverlay    |
-         | (has useNavigation,   | -------> | (different React |
-         |  useFormContext, etc) |          |  tree, no access |
-         +-----------------------+          |  to contexts)    |
-                                            +------------------+
-
-         **The Solution:**
-         \`\`\`diagram
-         AFTER: Closures preserve context
-         +------------------------+  capture   +----------------+
-         | ListItem               | ---------> | zustand        |
-         | <Offscreen>            |  execute() | capturedActions|
-         |   <ActionPanel>        |  closures  +-------+--------+
-         |     <Action execute={  |                    |
-         |       () => push(...)  | <----- closure     | read
-         |     }/>                |   retains context  v
-         |   </ActionPanel>       |            +----------------+
-         | </Offscreen>           |            | ActionsDialog  |
-         +------------------------+            | (calls execute)|
-                                               +----------------+
-
-         ActionsDialog groups actions by section.
-
-
-       rc/config.ts +1-0
-
-        + export const x = 1
-
-
-
-
-
-
-
-
-
-
-        (1 section)  t theme                                       run with --web to share & collaborate
-
+      "                                                                                                    
+                                             └── src                                                      
+                                                 └── config.ts (+1)                                       
+                                                                                                          
+                                                                                                          
+         ActionPanel captures actions to zustand, ActionsDialog renders them                              
+                                                                                                          
+         The Problem:                                                                                     
+                                                                                                          
+         BEFORE: Context lost when rendering in dialog                                                    
+         +-----------------------+          +------------------+                                          
+         | ListItem              |  push()  | DialogOverlay    |                                          
+         | (has useNavigation,   | -------> | (different React |                                          
+         |  useFormContext, etc) |          |  tree, no access |                                          
+         +-----------------------+          |  to contexts)    |                                          
+                                            +------------------+                                          
+                                                                                                          
+         **The Solution:**                                                                                
+         \`\`\`diagram                                                                                       
+         AFTER: Closures preserve context                                                                 
+         +------------------------+  capture   +----------------+                                         
+         | ListItem               | ---------> | zustand        |                                         
+         | <Offscreen>            |  execute() | capturedActions|                                         
+         |   <ActionPanel>        |  closures  +-------+--------+                                         
+         |     <Action execute={  |                    |                                                  
+         |       () => push(...)  | <----- closure     | read                                             
+         |     }/>                |   retains context  v                                                  
+         |   </ActionPanel>       |            +----------------+                                         
+         | </Offscreen>           |            | ActionsDialog  |                                         
+         +------------------------+            | (calls execute)|                                         
+                                               +----------------+                                         
+                                                                                                          
+         ActionsDialog groups actions by section.                                                         
+                                                                                                          
+                                                                                                          
+       src/config.ts +1-0                                                                                 
+                                                                                                          
+       1 + export const x = 1                                                                             
+                                                                                                          
+                                                                                                          
+                                                                                                          
+                                                                                                          
+                                                                                                          
+                                                                                                          
+                                                                                                          
+                                                                                                          
+                                                                                                          
+                                                                                                          
+        (1 section)  t theme                                       run with --web to share & collaborate  
+                                                                                                          
       "
     `)
   })
@@ -1565,31 +1568,31 @@ This prose should stay at normal width, not expand.`,
     expect(hunkHeaderLine).toBeDefined()
 
     expect(frame).toMatchInlineSnapshot(`
-      "
-                                   └── src
-                                       └── config.ts (+1)
-
-
-         Architecture
-
-        ┌───────────────────────────────────────────────────────────────────────────
-        │                            SuLoBThShoNExpCont
-        └───────────────────────────────────────────────────────────────────────────
-         This prose should stay at normal width, not expand.
-
-
-       rc/config.ts +1-0
-
-        + export const x = 1
-
-
-
-
-
-
-
-        (1 section)  t theme                   run with --web to share & collaborate
-
+      "                                                                                
+                                   └── src                                            
+                                       └── config.ts (+1)                             
+                                                                                      
+                                                                                      
+         Architecture                                                                 
+                                                                                      
+        ┌───────────────────────────────────────────────────────────────────────────  
+        │                            SuLoBThShoNExpCont                               
+        └───────────────────────────────────────────────────────────────────────────  
+         This prose should stay at normal width, not expand.                          
+                                                                                      
+                                                                                      
+       src/config.ts +1-0                                                             
+                                                                                      
+       1 + export const x = 1                                                         
+                                                                                      
+                                                                                      
+                                                                                      
+                                                                                      
+                                                                                      
+                                                                                      
+                                                                                      
+        (1 section)  t theme                   run with --web to share & collaborate  
+                                                                                      
       "
     `)
   })
@@ -1645,41 +1648,41 @@ AFTER: Closures preserve
     // - "**The Problem:**" and "**The Solution:**" should render as bold text
     // - Each diagram should be a separate code block
     expect(frame).toMatchInlineSnapshot(`
-      "
-                                   └── src
-                                       └── config.ts (+1)
-
-
-         ActionPanel captures actions to zustand
-
-         The Problem:
-
-         BEFORE: Context lost
-         +-----------+   +-----------+
-         | ListItem  |-->| Dialog    |
-         +-----------+   +-----------+
-
-         The Solution:
-
-         AFTER: Closures preserve
-         +-----------+   +-----------+
-         | Offscreen |-->| zustand   |
-         +-----------+   +-----------+
-
-         ActionsDialog groups actions by section.
-
-
-       rc/config.ts +1-0
-
-        + export const x = 1
-
-
-
-
-
-
-        (1 section)  t theme                   run with --web to share & collaborate
-
+      "                                                                                
+                                   └── src                                            
+                                       └── config.ts (+1)                             
+                                                                                      
+                                                                                      
+         ActionPanel captures actions to zustand                                      
+                                                                                      
+         The Problem:                                                                 
+                                                                                      
+         BEFORE: Context lost                                                         
+         +-----------+   +-----------+                                                
+         | ListItem  |-->| Dialog    |                                                
+         +-----------+   +-----------+                                                
+                                                                                      
+         The Solution:                                                                
+                                                                                      
+         AFTER: Closures preserve                                                     
+         +-----------+   +-----------+                                                
+         | Offscreen |-->| zustand   |                                                
+         +-----------+   +-----------+                                                
+                                                                                      
+         ActionsDialog groups actions by section.                                     
+                                                                                      
+                                                                                      
+       src/config.ts +1-0                                                             
+                                                                                      
+       1 + export const x = 1                                                         
+                                                                                      
+                                                                                      
+                                                                                      
+                                                                                      
+                                                                                      
+                                                                                      
+        (1 section)  t theme                   run with --web to share & collaborate  
+                                                                                      
       "
     `)
   })
