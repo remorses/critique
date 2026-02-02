@@ -223,8 +223,13 @@ export async function renderDiffToFrame(
   createRoot(renderer).render(React.createElement(WebApp))
   await renderOnce()
   
-  // Measure content height - layout is synchronous, no wait needed for sizing
+  // Wait for React to mount components (may take a few render cycles)
   let contentHeight = getContentHeight(renderer.root)
+  while (contentHeight === 0) {
+    await new Promise(resolve => setTimeout(resolve, 10))
+    await renderOnce()
+    contentHeight = getContentHeight(renderer.root)
+  }
   
   // If content height == buffer height, content is clipped - double until it fits
   while (contentHeight >= currentHeight && currentHeight < options.maxRows) {
@@ -408,8 +413,13 @@ export async function renderReviewToFrame(
   createRoot(renderer).render(React.createElement(ReviewWebApp))
   await renderOnce()
   
-  // Measure content height - layout is synchronous, no wait needed for sizing
+  // Wait for React to mount components (may take a few render cycles)
   let contentHeight = getContentHeight(renderer.root)
+  while (contentHeight === 0) {
+    await new Promise(resolve => setTimeout(resolve, 10))
+    await renderOnce()
+    contentHeight = getContentHeight(renderer.root)
+  }
   
   // If content height == buffer height, content is clipped - double until it fits
   while (contentHeight >= currentHeight && currentHeight < options.maxRows) {

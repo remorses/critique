@@ -1017,6 +1017,45 @@ async function runImageMode(
   }
 }
 
+// Scrollback mode handler - outputs ANSI to stdout instead of interactive TUI
+interface ScrollbackModeOptions {
+  cols?: number;
+  theme?: string;
+}
+
+async function runScrollbackMode(
+  diffContent: string,
+  options: ScrollbackModeOptions
+) {
+  const { renderDiffToFrame } = await import("./web-utils.tsx");
+  const { frameToAnsi } = await import("./ansi-output.ts");
+  const { getResolvedTheme } = await import("./themes.ts");
+
+  const themeName = options.theme && themeNames.includes(options.theme)
+    ? options.theme
+    : persistedState.themeName ?? defaultThemeName;
+
+  const cols = options.cols || process.stdout.columns || 120;
+
+  try {
+    const frame = await renderDiffToFrame(diffContent, {
+      cols,
+      maxRows: 10000,
+      themeName,
+    });
+
+    const theme = getResolvedTheme(themeName);
+    const ansi = frameToAnsi(frame, theme.background);
+
+    process.stdout.write(ansi + "\n");
+    process.exit(0);
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error("Failed to render scrollback:", message);
+    process.exit(1);
+  }
+}
+
 // Error boundary component
 interface ErrorBoundaryProps {
   children: React.ReactNode;
@@ -1465,6 +1504,7 @@ cli
   .option("--cols <cols>", "Desktop columns for web/image render", { default: 240 })
   .option("--mobile-cols <cols>", "Mobile columns for web render", { default: 100 })
   .option("--stdin", "Read diff from stdin (for use as a pager)")
+  .option("--scrollback", "Output to terminal scrollback instead of TUI")
   .action(async (base, head, options) => {
     // Apply theme if specified (zustand subscription auto-persists)
     if (options.theme && themeNames.includes(options.theme)) {
@@ -1532,6 +1572,16 @@ cli
       await runImageMode(cleanedDiff, {
         theme: options.theme,
         cols: parseInt(options.cols) || 120,
+      });
+      return;
+    }
+
+    if (options.scrollback) {
+      // For scrollback, prefer terminal width over --cols default (240 is for web)
+      const scrollbackCols = process.stdout.columns || parseInt(options.cols) || 120;
+      await runScrollbackMode(cleanedDiff, {
+        theme: options.theme,
+        cols: scrollbackCols,
       });
       return;
     }

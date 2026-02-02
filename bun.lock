@@ -17,6 +17,7 @@
         "picocolors": "^1.1.1",
         "react": "^19.2.0",
         "resend": "^6.8.0",
+        "supports-color": "^10.2.2",
         "zustand": "^5.0.8",
       },
       "devDependencies": {

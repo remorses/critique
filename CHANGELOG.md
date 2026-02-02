@@ -1,3 +1,12 @@
+# 0.1.84
+
+- New `--scrollback` option: output diff to terminal scrollback instead of interactive TUI
+  - Renders using opentui test renderer and converts to ANSI escape sequences
+  - Auto-detects terminal color support (truecolor → 256 → 16 → plain text)
+  - Respects `FORCE_COLOR` and `NO_COLOR` environment variables
+  - Outputs plain text when piped (non-TTY)
+- Add `supports-color` dependency for terminal capability detection
+
 # 0.1.83
 
 - Internal:
