@@ -1,3 +1,10 @@
+# 0.1.83
+
+- Internal:
+  - Update opentui to 0.1.77
+  - Simplify span capture: use opentui's built-in `getSpanLines()` instead of custom implementation
+  - Remove ~60 lines of duplicated span capture code in `web-utils.tsx`
+
 # 0.1.82
 
 - `--web`:

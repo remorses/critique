@@ -4,7 +4,7 @@ import { createRoot } from "@opentui/react"
 import React from "react"
 import { RGBA } from "@opentui/core"
 
-describe("safeCaptureSpans", () => {
+describe("getSpanLines rendering", () => {
   let renderer: Awaited<ReturnType<typeof createTestRenderer>>["renderer"] | null = null
 
   afterEach(() => {
@@ -64,7 +64,7 @@ describe("safeCaptureSpans", () => {
     expect(text).toContain("src/errors/index.ts")
   })
 
-  test("safeCaptureSpans uses getRealCharBytes for correct character decoding", async () => {
+  test("renderDiffToFrame uses getSpanLines for correct character decoding", async () => {
     // Import the function we're testing
     const { renderDiffToFrame } = await import("./web-utils.tsx")
     

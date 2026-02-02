@@ -8,82 +8,11 @@ import fs from "fs"
 import { tmpdir } from "os"
 import { join } from "path"
 import { getResolvedTheme, rgbaToHex } from "./themes.ts"
-import { RGBA, type CapturedFrame, type CapturedLine, type CapturedSpan, type RootRenderable } from "@opentui/core"
-import type { CliRenderer } from "@opentui/core"
+import type { CapturedFrame, RootRenderable, CliRenderer } from "@opentui/core"
 import type { IndexedHunk, ReviewYaml } from "./review/types.ts"
 import { loadStoredLicenseKey } from "./license.ts"
 
 const execAsync = promisify(exec)
-
-function safeCaptureSpans(renderer: CliRenderer): CapturedFrame {
-  const buffer = renderer.currentRenderBuffer
-  const { char, fg, bg, attributes } = buffer.buffers
-  const width = buffer.width
-  const height = buffer.height
-
-  const CHAR_FLAG_CONTINUATION = 0xc0000000 | 0
-  const CHAR_FLAG_MASK = 0xc0000000 | 0
-
-  const realTextBytes = buffer.getRealCharBytes(true)
-  const realTextLines = new TextDecoder().decode(realTextBytes).split("\n")
-
-  const lines: CapturedLine[] = []
-
-  for (let y = 0; y < height; y++) {
-    const spans: CapturedSpan[] = []
-    let currentSpan: CapturedSpan | null = null
-
-    const lineChars = [...(realTextLines[y] || "")]
-    let charIdx = 0
-
-    for (let x = 0; x < width; x++) {
-      const i = y * width + x
-      const cp = char[i]!
-      const cellFg = RGBA.fromValues(fg[i * 4]!, fg[i * 4 + 1]!, fg[i * 4 + 2]!, fg[i * 4 + 3]!)
-      const cellBg = RGBA.fromValues(bg[i * 4]!, bg[i * 4 + 1]!, bg[i * 4 + 2]!, bg[i * 4 + 3]!)
-      const cellAttrs = attributes[i]! & 0xff
-
-      // Continuation cells are placeholders for wide characters (emojis, CJK)
-      const isContinuation = (cp & CHAR_FLAG_MASK) === CHAR_FLAG_CONTINUATION
-      const cellChar = isContinuation ? "" : (lineChars[charIdx++] ?? " ")
-
-      if (
-        currentSpan &&
-        currentSpan.fg.equals(cellFg) &&
-        currentSpan.bg.equals(cellBg) &&
-        currentSpan.attributes === cellAttrs
-      ) {
-        currentSpan.text += cellChar
-        currentSpan.width += 1
-      } else {
-        if (currentSpan) {
-          spans.push(currentSpan)
-        }
-        currentSpan = {
-          text: cellChar,
-          fg: cellFg,
-          bg: cellBg,
-          attributes: cellAttrs,
-          width: 1,
-        }
-      }
-    }
-
-    if (currentSpan) {
-      spans.push(currentSpan)
-    }
-
-    lines.push({ spans })
-  }
-
-  const cursorState = renderer.getCursorState()
-  return {
-    cols: width,
-    rows: height,
-    cursor: [cursorState.x, cursorState.y] as [number, number],
-    lines,
-  }
-}
 
 // Worker URL for uploading HTML previews
 export const WORKER_URL = process.env.CRITIQUE_WORKER_URL || "https://critique.work"
@@ -315,12 +244,17 @@ export async function renderDiffToFrame(
   // Wait for async highlighting to complete (only once at the end)
   await waitForRenderStabilization(renderer, renderOnce)
 
-  // Capture the final frame (using safe version that handles invalid codepoints)
-  const frame = safeCaptureSpans(renderer)
+  // Capture the final frame
+  const buffer = renderer.currentRenderBuffer
+  const cursorState = renderer.getCursorState()
+  const frame: CapturedFrame = {
+    cols: buffer.width,
+    rows: buffer.height,
+    cursor: [cursorState.x, cursorState.y],
+    lines: buffer.getSpanLines(),
+  }
   
-  // Clean up
   renderer.destroy()
-
   return frame
 }
 
@@ -495,12 +429,17 @@ export async function renderReviewToFrame(
   // Wait for async highlighting to complete (only once at the end)
   await waitForRenderStabilization(renderer, renderOnce)
 
-  // Capture the final frame (using safe version that handles invalid codepoints)
-  const frame = safeCaptureSpans(renderer)
+  // Capture the final frame
+  const buffer = renderer.currentRenderBuffer
+  const cursorState = renderer.getCursorState()
+  const frame: CapturedFrame = {
+    cols: buffer.width,
+    rows: buffer.height,
+    cursor: [cursorState.x, cursorState.y],
+    lines: buffer.getSpanLines(),
+  }
   
-  // Clean up
   renderer.destroy()
-
   return frame
 }
 
