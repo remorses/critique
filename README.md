@@ -187,9 +187,6 @@ critique web -- src/api.ts src/utils.ts
 
 # Custom title for the HTML page
 critique web --title "Fix authentication bug"
-
-# Generate local HTML file instead of uploading
-critique web --local
 ```
 
 **Features:**
@@ -208,7 +205,6 @@ critique web --local
 | `--commit <ref>` | Show changes from a specific commit | - |
 | `--cols <n>` | Terminal width for rendering | `240` |
 | `--mobile-cols <n>` | Terminal width for mobile version | `100` |
-| `--local` | Save HTML locally instead of uploading | - |
 | `--filter <pattern>` | Filter files by glob (can be used multiple times) | - |
 | `--title <text>` | Custom HTML document title | `Critique Diff` |
 | `--theme <name>` | Theme for rendering (disables auto dark/light mode) | - |

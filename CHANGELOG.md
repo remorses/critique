@@ -1,3 +1,7 @@
+# 0.1.85
+
+- Docs: remove undocumented `--local` option from README (fixes #24)
+
 # 0.1.84
 
 - New `--scrollback` option: output diff to terminal scrollback instead of interactive TUI
