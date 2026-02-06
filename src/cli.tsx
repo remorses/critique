@@ -562,7 +562,25 @@ async function runReviewMode(
         }
         clack.outro("", out);
         if (json) {
-          console.log(JSON.stringify({ url: result.url, id: result.id }));
+          // Aggregate per-file stats from hunks
+          const fileStatsMap = new Map<string, { added: number; removed: number }>();
+          for (const hunk of hunks) {
+            let entry = fileStatsMap.get(hunk.filename);
+            if (!entry) {
+              entry = { added: 0, removed: 0 };
+              fileStatsMap.set(hunk.filename, entry);
+            }
+            for (const line of hunk.lines) {
+              if (line.startsWith("+")) entry.added++;
+              if (line.startsWith("-")) entry.removed++;
+            }
+          }
+          const fileStats = Array.from(fileStatsMap.entries()).map(([filename, stats]) => ({
+            filename,
+            added: stats.added,
+            removed: stats.removed,
+          }));
+          console.log(JSON.stringify({ url: result.url, id: result.id, files: fileStats }));
         }
 
         if (webOptions.open) {
@@ -960,7 +978,15 @@ async function runWebMode(
       log("Get unlimited links and support the project: https://critique.work/buy");
     }
     if (options.json) {
-      console.log(JSON.stringify({ url: result.url, id: result.id }));
+      const fileStats = files.map((file) => {
+        const { additions, deletions } = countChanges(file.hunks);
+        return {
+          filename: getFileName(file),
+          added: additions,
+          removed: deletions,
+        };
+      });
+      console.log(JSON.stringify({ url: result.url, id: result.id, files: fileStats }));
     }
 
     if (options.open) {
@@ -1629,7 +1655,7 @@ cli
   .option("--cols <cols>", "Desktop columns for web/image render", { default: 240 })
   .option("--mobile-cols <cols>", "Mobile columns for web render", { default: 100 })
   .option("--stdin", "Read diff from stdin (for use as a pager)")
-  .option("--scrollback", "Output to terminal scrollback instead of TUI")
+  .option("--scrollback", "Output to terminal scrollback instead of TUI (auto-enabled when non-TTY)")
   .action(async (base, head, options) => {
     // Apply theme if specified (zustand subscription auto-persists)
     if (options.theme && themeNames.includes(options.theme)) {
@@ -1701,7 +1727,7 @@ cli
       return;
     }
 
-    if (options.scrollback) {
+    if (options.scrollback || !process.stdout.isTTY) {
       // For scrollback, prefer terminal width over --cols default (240 is for web)
       const scrollbackCols = process.stdout.columns || parseInt(options.cols) || 120;
       await runScrollbackMode(cleanedDiff, {
