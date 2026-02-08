@@ -2,6 +2,8 @@
 // Builds git commands, parses diff files, detects filetypes for syntax highlighting,
 // and provides helpers for unified/split view mode selection.
 
+import { execSync } from "child_process"
+
 /**
  * Strip submodule status lines from git diff output.
  * git diff --submodule=diff adds various status lines that the diff parser doesn't understand:
@@ -260,7 +262,58 @@ export function buildGitCommand(options: GitCommandOptions): string {
   if (options.base) {
     return `git diff ${options.base} --no-prefix ${renameArg} ${submoduleArg} ${contextArg} ${filterArg}`.trim();
   }
-  return `git add -N . && git diff --no-prefix ${renameArg} ${submoduleArg} ${contextArg} ${filterArg}`.trim();
+  // Default (no args): ignore submodules here — dirty submodule diffs are fetched
+  // separately via buildSubmoduleDiffCommand() to avoid showing committed submodule
+  // ref changes that have no actual uncommitted content.
+  return `git add -N . && git diff --no-prefix ${renameArg} --ignore-submodules=all ${contextArg} ${filterArg}`.trim();
+}
+
+/**
+ * Get submodule paths that have dirty working trees (uncommitted changes).
+ * Returns only submodules with actual uncommitted modifications, not those
+ * that merely point to a different commit than what the parent repo recorded.
+ *
+ * Uses `git submodule status` which prefixes each line with:
+ * - ' ' (space): submodule matches recorded commit and is clean
+ * - '+': submodule is at a different commit than recorded
+ * - '-': submodule is not initialized
+ * - 'U': submodule has merge conflicts
+ *
+ * A submodule with '+' prefix AND a trailing dirty marker (e.g. " (modified content)")
+ * or one where `git status --porcelain` inside it is non-empty has dirty changes.
+ */
+export function getDirtySubmodulePaths(): string[] {
+  try {
+    // git submodule foreach runs a command in each initialized submodule.
+    // We check if the submodule has any uncommitted changes (modified, staged, or untracked).
+    // $displaypath gives us the relative path from the parent repo root.
+    const output = execSync(
+      `git submodule foreach --quiet 'if [ -n "$(git status --porcelain)" ]; then echo "$displaypath"; fi'`,
+      { encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] },
+    )
+    return output
+      .trim()
+      .split("\n")
+      .filter((line) => line.length > 0)
+  } catch {
+    // No submodules, or git command failed — return empty
+    return []
+  }
+}
+
+/**
+ * Build a git diff command that only shows diffs for specific submodule paths.
+ * Used to get the actual file-level diffs inside dirty submodules.
+ */
+export function buildSubmoduleDiffCommand(
+  submodulePaths: string[],
+  options: Pick<GitCommandOptions, "context" | "filter" | "positionalFilters">,
+): string {
+  const contextArg = options.context ? `-U${options.context}` : ""
+  const renameArg = "-M"
+  const submoduleArg = "--submodule=diff"
+  const pathArgs = submodulePaths.map((p) => `"${p}"`).join(" ")
+  return `git diff --no-prefix ${renameArg} ${submoduleArg} ${contextArg} -- ${pathArgs}`.trim()
 }
 
 /**

@@ -47,8 +47,11 @@ import {
   detectFiletype,
   stripSubmoduleHeaders,
   parseGitDiffFiles,
+  getDirtySubmodulePaths,
+  buildSubmoduleDiffCommand,
   IGNORED_FILES,
   type ParsedFile,
+  type GitCommandOptions,
 } from "./diff-utils.ts";
 import type { TreeFileInfo } from "./directory-tree.ts";
 
@@ -90,7 +93,8 @@ interface ReviewModeOptions {
 async function runReviewMode(
   gitCommand: string,
   agent: string,
-  options: ReviewModeOptions = {}
+  options: ReviewModeOptions = {},
+  reviewOptions?: { isDefaultMode?: boolean; diffOptions?: Pick<GitCommandOptions, "context" | "filter" | "positionalFilters"> },
 ) {
   const { sessionIds, webOptions, model, json } = options;
   const { tmpdir } = await import("os");
@@ -111,9 +115,27 @@ async function runReviewMode(
     encoding: "utf-8",
   });
 
-  logger.info("Got git diff", { length: gitDiff.length });
+  // In default mode, append dirty submodule diffs
+  let fullDiff = gitDiff;
+  if (reviewOptions?.isDefaultMode) {
+    const dirtySubmodules = getDirtySubmodulePaths();
+    if (dirtySubmodules.length > 0) {
+      const subCmd = buildSubmoduleDiffCommand(dirtySubmodules, reviewOptions.diffOptions || {});
+      try {
+        const { stdout: subDiff } = await execAsync(subCmd, { encoding: "utf-8" });
+        if (subDiff.trim()) {
+          fullDiff = fullDiff + "\n" + subDiff;
+        }
+      } catch {
+        // Submodule diff failed — skip
+      }
+    }
+  }
+  const gitDiffResult = fullDiff;
 
-  if (!gitDiff.trim()) {
+  logger.info("Got git diff", { length: gitDiffResult.length });
+
+  if (!gitDiffResult.trim()) {
     clack.log.warn("No changes to review", out);
     clack.outro("", out);
     if (json) console.log(JSON.stringify({ error: "No changes to review" }));
@@ -135,7 +157,7 @@ async function runReviewMode(
   type StoredReview = import("./review/index.ts").StoredReview;
 
   // Parse hunks with IDs
-  const hunks = await parseHunksWithIds(gitDiff);
+  const hunks = await parseHunksWithIds(gitDiffResult);
   logger.info("Parsed hunks", { count: hunks.length });
 
   if (hunks.length === 0) {
@@ -1533,12 +1555,31 @@ cli
       encoding: "utf-8",
     });
 
-    if (!gitDiff.trim()) {
+    // In default (unstaged) mode, append dirty submodule diffs
+    let fullHunksDiff = gitDiff;
+    if (!options.staged) {
+      const dirtySubmodules = getDirtySubmodulePaths();
+      if (dirtySubmodules.length > 0) {
+        const subCmd = buildSubmoduleDiffCommand(dirtySubmodules, {
+          filter: options.filter,
+        });
+        try {
+          const { stdout: subDiff } = await execAsync(subCmd, { encoding: "utf-8" });
+          if (subDiff.trim()) {
+            fullHunksDiff = fullHunksDiff + "\n" + subDiff;
+          }
+        } catch {
+          // Submodule diff failed — skip
+        }
+      }
+    }
+
+    if (!fullHunksDiff.trim()) {
       console.log(options.staged ? "No staged changes" : "No unstaged changes");
       process.exit(0);
     }
 
-    const hunks = await parseHunksWithIds(stripSubmoduleHeaders(gitDiff));
+    const hunks = await parseHunksWithIds(stripSubmoduleHeaders(fullHunksDiff));
 
     if (hunks.length === 0) {
       console.log("No hunks found");
@@ -1603,12 +1644,32 @@ cli
         encoding: "utf-8",
       });
 
-      if (!gitDiff.trim()) {
+      // Keep hunk lookup behavior aligned with `hunks list` by appending
+      // dirty submodule diffs before parsing and searching for stable IDs.
+      let fullHunksDiff = gitDiff;
+      const dirtySubmodules = getDirtySubmodulePaths();
+      if (dirtySubmodules.length > 0) {
+        const subCmd = buildSubmoduleDiffCommand(dirtySubmodules, {
+          filter: parsed.filename,
+        });
+        try {
+          const { stdout: subDiff } = await execAsync(subCmd, {
+            encoding: "utf-8",
+          });
+          if (subDiff.trim()) {
+            fullHunksDiff = fullHunksDiff + "\n" + subDiff;
+          }
+        } catch {
+          // Submodule diff failed — skip
+        }
+      }
+
+      if (!fullHunksDiff.trim()) {
         console.error(`No unstaged changes in file: ${parsed.filename}`);
         process.exit(1);
       }
 
-      const hunks = await parseHunksWithIds(stripSubmoduleHeaders(gitDiff));
+      const hunks = await parseHunksWithIds(stripSubmoduleHeaders(fullHunksDiff));
       const hunk = findHunkByStableId(hunks, id);
 
       if (!hunk) {
@@ -1673,6 +1734,9 @@ cli
       positionalFilters: options['--'],
     });
 
+    // Detect default mode (no args): submodule diffs are handled separately
+    const isDefaultMode = !options.staged && !options.commit && !base && !head && !options.stdin;
+
     // Get diff content - from stdin or git
     let diffContent: string;
     
@@ -1688,6 +1752,32 @@ cli
         encoding: "utf-8",
       });
       diffContent = gitDiff;
+
+      // In default mode, append diffs from dirty submodules only.
+      // The main git diff uses --ignore-submodules=all, so we separately
+      // fetch diffs for submodules that have uncommitted changes.
+      // This avoids showing submodule ref changes where the submodule
+      // itself has already committed everything.
+      if (isDefaultMode) {
+        const dirtySubmodules = getDirtySubmodulePaths();
+        if (dirtySubmodules.length > 0) {
+          const subCmd = buildSubmoduleDiffCommand(dirtySubmodules, {
+            context: options.context,
+            filter: options.filter,
+            positionalFilters: options['--'],
+          });
+          try {
+            const { stdout: subDiff } = await execAsync(subCmd, {
+              encoding: "utf-8",
+            });
+            if (subDiff.trim()) {
+              diffContent = diffContent + "\n" + subDiff;
+            }
+          } catch {
+            // Submodule diff failed (e.g. submodule not initialized) — skip
+          }
+        }
+      }
     }
 
     // Clean submodule headers once
@@ -1790,12 +1880,36 @@ cli
                 encoding: "utf-8",
               });
 
-              if (!gitDiff.trim()) {
+              // In default mode (watch is only enabled in default mode),
+              // append dirty submodule diffs
+              let fullDiff = gitDiff;
+              if (isDefaultMode) {
+                const dirtySubmodules = getDirtySubmodulePaths();
+                if (dirtySubmodules.length > 0) {
+                  const subCmd = buildSubmoduleDiffCommand(dirtySubmodules, {
+                    context: options.context,
+                    filter: options.filter,
+                    positionalFilters: options['--'],
+                  });
+                  try {
+                    const { stdout: subDiff } = await execAsync(subCmd, {
+                      encoding: "utf-8",
+                    });
+                    if (subDiff.trim()) {
+                      fullDiff = fullDiff + "\n" + subDiff;
+                    }
+                  } catch {
+                    // Submodule diff failed — skip
+                  }
+                }
+              }
+
+              if (!fullDiff.trim()) {
                 setParsedFiles([]);
                 return;
               }
 
-              const files = parseGitDiffFiles(stripSubmoduleHeaders(gitDiff), parsePatch);
+              const files = parseGitDiffFiles(stripSubmoduleHeaders(fullDiff), parsePatch);
               const processedFiles = processFiles(files, formatPatch);
               setParsedFiles(processedFiles);
             } catch (error) {
@@ -1922,11 +2036,19 @@ cli
       // --json implies --web
       const useWeb = options.web || options.json;
       const webOptions = useWeb ? { web: true, open: options.open } : undefined;
+      const isDefaultMode = !options.staged && !options.commit && !base && !head;
       await runReviewMode(gitCommand, options.agent, {
         sessionIds,
         webOptions,
         model: options.model,
         json: options.json,
+      }, {
+        isDefaultMode,
+        diffOptions: {
+          context: options.context,
+          filter: options.filter,
+          positionalFilters: options['--'],
+        },
       });
     } catch (error) {
       console.error("Error running review:", error);
@@ -2230,12 +2352,34 @@ cli
       encoding: "utf-8",
     });
 
-    if (!gitDiff.trim()) {
+    // In default mode, append dirty submodule diffs
+    let fullWebDiff = gitDiff;
+    const isWebDefaultMode = !options.staged && !options.commit && !base && !head;
+    if (isWebDefaultMode) {
+      const dirtySubmodules = getDirtySubmodulePaths();
+      if (dirtySubmodules.length > 0) {
+        const subCmd = buildSubmoduleDiffCommand(dirtySubmodules, {
+          context: options.context,
+          filter: options.filter,
+          positionalFilters: options['--'],
+        });
+        try {
+          const { stdout: subDiff } = await execAsync(subCmd, { encoding: "utf-8" });
+          if (subDiff.trim()) {
+            fullWebDiff = fullWebDiff + "\n" + subDiff;
+          }
+        } catch {
+          // Submodule diff failed — skip
+        }
+      }
+    }
+
+    if (!fullWebDiff.trim()) {
       console.log("No changes to display");
       process.exit(0);
     }
 
-    const cleanedDiff = stripSubmoduleHeaders(gitDiff);
+    const cleanedDiff = stripSubmoduleHeaders(fullWebDiff);
 
     await runWebMode(cleanedDiff, {
       title: options.title,

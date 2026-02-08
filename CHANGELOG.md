@@ -1,3 +1,9 @@
+# 0.1.87
+
+- `hunks`:
+  - `critique hunks add <id>` now appends dirty submodule diffs before hunk lookup
+  - Fixes mismatch where IDs listed by `critique hunks list` for submodule changes could fail with "Hunk not found"
+
 # 0.1.86
 
 - New `hunks` commands for non-interactive selective staging:
