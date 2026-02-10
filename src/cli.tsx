@@ -1191,11 +1191,11 @@ class ScrollAcceleration {
   }
 }
 
-interface AppProps {
+export interface AppProps {
   parsedFiles: ParsedFile[];
 }
 
-function App({ parsedFiles }: AppProps) {
+export function App({ parsedFiles }: AppProps) {
   const { width: initialWidth } = useTerminalDimensions();
   const [width, setWidth] = React.useState(initialWidth);
   const [scrollAcceleration] = React.useState(() => new ScrollAcceleration());
@@ -1438,7 +1438,6 @@ function App({ parsedFiles }: AppProps) {
   // Always render the same structure - scrollbox is never remounted
   return (
     <box
-      onMouseUp={onMouseUp}
       style={{
         flexDirection: "column",
         height: "100%",
@@ -1485,9 +1484,11 @@ function App({ parsedFiles }: AppProps) {
       {/* Scrollbox - always mounted, preserves scroll position */}
       <scrollbox
         ref={scrollboxRef}
+        scrollY
         scrollAcceleration={scrollAcceleration}
         style={{
           flexGrow: 1,
+          flexShrink: 1,
           rootOptions: {
             backgroundColor: bgColor,
             border: false,
@@ -1837,6 +1838,8 @@ cli
             process.exit(0);
           },
           exitOnCtrlC: true,
+          useMouse: true,
+          enableMouseMovement: true,
         }),
       ]);
       const { parsePatch, formatPatch } = diffModule;
@@ -2397,6 +2400,8 @@ cli
     process.stdout.write("Saved license key to ~/.critique/license.json\n")
   });
 
-cli.help();
-cli.version("1.0.0");
-cli.parse();
+if (import.meta.main) {
+  cli.help();
+  cli.version("1.0.0");
+  cli.parse();
+}
