@@ -2,7 +2,7 @@ import * as React from "react"
 import { afterEach, describe, expect, it } from "bun:test"
 import { act } from "react"
 import { testRender } from "@opentui/react/test-utils"
-import Dropdown from "./dropdown.tsx"
+import Dropdown, { filterDropdownOptions } from "./dropdown.tsx"
 import { getResolvedTheme } from "./themes.ts"
 
 const themeOptions = [
@@ -61,5 +61,41 @@ describe("Dropdown", () => {
     frame = testSetup.captureCharFrame()
     expect(frame).toContain("closed")
     expect(frame).not.toContain("Select theme")
+  })
+
+  it("filters options by title and keyword intersections", () => {
+    const options = [
+      { title: "GitHub", value: "github", keywords: ["git", "hub"] },
+      { title: "Tokyo Night", value: "tokyonight", keywords: ["tokyo", "night"] },
+      { title: "Ayu", value: "ayu", keywords: ["light"] },
+    ]
+
+    const tokyoOnly = filterDropdownOptions(options, "tokyo")
+    expect(tokyoOnly).toMatchInlineSnapshot(`
+      [
+        {
+          "keywords": [
+            "tokyo",
+            "night",
+          ],
+          "title": "Tokyo Night",
+          "value": "tokyonight",
+        },
+      ]
+    `)
+
+    const intersection = filterDropdownOptions(options, "git hub")
+    expect(intersection).toMatchInlineSnapshot(`
+      [
+        {
+          "keywords": [
+            "git",
+            "hub",
+          ],
+          "title": "GitHub",
+          "value": "github",
+        },
+      ]
+    `)
   })
 })

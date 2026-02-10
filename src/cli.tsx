@@ -1851,6 +1851,7 @@ cli
         const [parsedFiles, setParsedFiles] = React.useState<ParsedFile[] | null>(
           shouldWatch ? null : initialParsedFiles
         );
+        const themeName = useAppStore((s) => s.themeName);
 
         const watchRenderer = useRenderer();
 
@@ -1954,9 +1955,7 @@ cli
           };
         }, []);
 
-        const defaultBg = getResolvedTheme(
-          useAppStore.getState().themeName,
-        ).background;
+        const defaultBg = getResolvedTheme(themeName).background;
 
         if (parsedFiles === null) {
           return (
@@ -2165,6 +2164,7 @@ cli
         const selectedFiles = usePickStore((s) => s.selectedFiles);
         const message = usePickStore((s) => s.message);
         const messageType = usePickStore((s) => s.messageType);
+        const themeName = useAppStore((s) => s.themeName);
 
         const handleChange = async (value: string) => {
           const isSelected = selectedFiles.has(value);
@@ -2257,7 +2257,7 @@ cli
           }
         };
 
-        const pickTheme = getResolvedTheme(defaultThemeName);
+        const pickTheme = getResolvedTheme(themeName);
 
         return (
           <box

@@ -2,9 +2,9 @@
 // Supports keyboard navigation, fuzzy search filtering, and mouse interaction.
 // Used by main diff view for file picker and theme picker overlays.
 
-import React, { useState, useEffect, useRef, useCallback, type ReactNode } from "react";
+import React, { useState, useEffect, type ReactNode } from "react";
 import { useKeyboard } from "@opentui/react";
-import { TextAttributes, TextareaRenderable } from "@opentui/core";
+import { TextAttributes } from "@opentui/core";
 import { type ResolvedTheme, rgbaToHex } from "./themes";
 
 export interface DropdownOption {
@@ -26,6 +26,23 @@ export interface DropdownProps {
   onFocus?: (value: string) => void;
   onEscape?: () => void;
   theme: ResolvedTheme;
+}
+
+export function filterDropdownOptions(options: DropdownOption[], searchText: string): DropdownOption[] {
+  if (!searchText.trim()) {
+    return options;
+  }
+
+  const needles = searchText.toLowerCase().trim().split(/\s+/);
+
+  return options.filter((option) => {
+    const searchableText = [option.title, ...(option.keywords || [])]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase();
+
+    return needles.every((needle) => searchableText.includes(needle));
+  });
 }
 
 const Dropdown = (props: DropdownProps) => {
@@ -53,29 +70,11 @@ const Dropdown = (props: DropdownProps) => {
   const [selected, setSelected] = useState(0);
   const [offset, setOffset] = useState(0);
   const [searchText, setSearchText] = useState("");
-  const inputRef = useRef<TextareaRenderable | null>(null);
-
-  const setInputRef = useCallback((node: TextareaRenderable | null) => {
-    inputRef.current = node;
-  }, []);
-
-  const handleSearchTextChange = () => {
-    const value = inputRef.current?.plainText || "";
-    setSearchText(value);
-  };
 
   const inFocus = true;
 
   // Filter options based on search
-  const filteredOptions = options.filter((option) => {
-    if (!searchText.trim()) return true;
-    const needles = searchText.toLowerCase().trim().split(/\s+/);
-    const searchableText = [option.title, ...(option.keywords || [])]
-      .filter(Boolean)
-      .join(" ")
-      .toLowerCase();
-    return needles.every((needle) => searchableText.includes(needle));
-  });
+  const filteredOptions = filterDropdownOptions(options, searchText);
 
   // Get visible options for current page
   const visibleOptions = filteredOptions.slice(offset, offset + itemsPerPage);
@@ -161,6 +160,7 @@ const Dropdown = (props: DropdownProps) => {
       if (currentOption) {
         selectItem(currentOption.value);
       }
+      return;
     }
   });
 
@@ -179,19 +179,11 @@ const Dropdown = (props: DropdownProps) => {
           </box>
           <box style={{ paddingTop: 1, paddingBottom: 1, flexDirection: "row" }}>
             <text flexShrink={0} fg={theme.primary}>&gt; </text>
-            <textarea
-              ref={setInputRef}
-              height={1}
-              flexGrow={1}
-              wrapMode="none"
-              keyBindings={[
-                { name: "return", action: "submit" },
-                { name: "linefeed", action: "submit" },
-              ]}
-              onContentChange={handleSearchTextChange}
+            <input
+              style={{ flexGrow: 1 }}
+              onInput={setSearchText}
               placeholder={placeholder}
               focused={inFocus}
-              initialValue=""
               focusedBackgroundColor={theme.backgroundPanel}
               cursorColor={theme.primary}
               focusedTextColor={theme.textMuted}

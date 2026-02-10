@@ -37,7 +37,7 @@ export function DiffView({ diff, view, filetype, themeName, wrapMode = "word" }:
   }), [resolvedTheme])
 
   return (
-    <box style={{ backgroundColor: colors.bgPanel }}>
+    <box key={themeName} style={{ backgroundColor: colors.bgPanel }}>
       <diff
         diff={diff}
         view={view}
