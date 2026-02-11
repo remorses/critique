@@ -324,7 +324,7 @@ Files with more than 6000 lines of diff are also hidden for performance.
   <img src="https://github.com/coderabbitai.png" alt="CodeRabbit" height="24" />
 </a>
 
-Sponsored by CodeRabbit.
+Sponsored by [CodeRabbit](https://coderabbit.link/remorses).
 
 ## License
 

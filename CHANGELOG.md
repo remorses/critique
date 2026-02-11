@@ -1,3 +1,8 @@
+# 0.1.97
+
+- `README`:
+  - Make the `CodeRabbit` sponsor text clickable while keeping the compact logo link
+
 # 0.1.96
 
 - `README`:
