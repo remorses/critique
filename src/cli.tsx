@@ -3,7 +3,7 @@
 // Provides TUI diff viewing, AI-powered review generation, and web preview upload.
 // Commands: default (diff), review (AI analysis), web (HTML upload), pick (cherry-pick files).
 
-import { cac } from "@xmorse/cac";
+import { goke } from "goke";
 import {
   createRoot,
   flushSync,
@@ -1174,7 +1174,7 @@ function execSyncWithError(
   }
 }
 
-const cli = cac("critique");
+const cli = goke("critique");
 
 class ScrollAcceleration {
   public multiplier: number = 1;
@@ -1714,8 +1714,8 @@ cli
   .option("--open", "Open in browser (with --web)")
   .option("--json", "Output JSON to stdout (with --web)")
   .option("--image", "Generate images instead of TUI (saved to /tmp)")
-  .option("--cols <cols>", "Desktop columns for web/image render", { default: 240 })
-  .option("--mobile-cols <cols>", "Mobile columns for web render", { default: 100 })
+  .option("--cols <cols>", "Desktop columns for web/image render (default: 240)")
+  .option("--mobile-cols <cols>", "Mobile columns for web render (default: 100)")
   .option("--stdin", "Read diff from stdin (for use as a pager)")
   .option("--scrollback", "Output to terminal scrollback instead of TUI (auto-enabled when non-TTY)")
   .action(async (base, head, options) => {
@@ -1992,7 +1992,7 @@ cli
 
 cli
   .command("review [base] [head]", "AI-powered diff review")
-  .option("--agent <name>", "AI agent to use (default: opencode)", { default: "opencode" })
+  .option("--agent <name>", "AI agent to use (default: opencode)")
   .option("--model <id>", "Model to use for review (e.g., anthropic/claude-sonnet-4-20250514 for opencode, claude-sonnet-4-20250514 for claude)")
   .option("--staged", "Review staged changes")
   .option("--commit <ref>", "Review changes from a specific commit")
@@ -2015,8 +2015,10 @@ cli
         return;
       }
 
-      if (options.agent !== "opencode" && options.agent !== "claude") {
-        console.error(`Unknown agent: ${options.agent}. Supported: opencode, claude`);
+      // Default agent to opencode if not specified
+      const agent = options.agent || "opencode";
+      if (agent !== "opencode" && agent !== "claude") {
+        console.error(`Unknown agent: ${agent}. Supported: opencode, claude`);
         process.exit(1);
       }
 
@@ -2039,7 +2041,7 @@ cli
       const useWeb = options.web || options.json;
       const webOptions = useWeb ? { web: true, open: options.open } : undefined;
       const isDefaultMode = !options.staged && !options.commit && !base && !head;
-      await runReviewMode(gitCommand, options.agent, {
+      await runReviewMode(gitCommand, agent, {
         sessionIds,
         webOptions,
         model: options.model,
@@ -2324,16 +2326,8 @@ cli
   .command("web [base] [head]", "DEPRECATED: Use --web flag instead")
   .option("--staged", "Show staged changes")
   .option("--commit <ref>", "Show changes from a specific commit")
-  .option(
-    "--cols <cols>",
-    "Number of columns for desktop rendering",
-    { default: 240 },
-  )
-  .option(
-    "--mobile-cols <cols>",
-    "Number of columns for mobile rendering",
-    { default: 100 },
-  )
+  .option("--cols <cols>", "Number of columns for desktop rendering (default: 240)")
+  .option("--mobile-cols <cols>", "Number of columns for mobile rendering (default: 100)")
   .option("--open", "Open in browser after generating")
   .option("--context <lines>", "Number of context lines (default: 3)")
   .option("--theme <name>", "Theme to use for rendering")

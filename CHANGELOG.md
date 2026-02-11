@@ -1,3 +1,8 @@
+# 0.1.98
+
+- Dependencies:
+  - Replace `@xmorse/cac` with `goke` for CLI argument parsing
+
 # 0.1.97
 
 - `README`:
