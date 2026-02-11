@@ -3,6 +3,14 @@
 // Warn: when taking queries from the nvim-treesitter repo, make sure to include the query dependencies as well
 //       marked with for example `; inherits: ecma` at the top of the file. Just put the dependencies before the actual query.
 //       ALSO: Some queries use breaking changes in the nvim-treesitter repo, that are not compatible with the (web-)tree-sitter parser.
+import { resolve, dirname } from "path"
+import { fileURLToPath } from "url"
+
+// Local query files for languages where remote queries have incompatible predicates
+import jsonHighlights from "./queries/json/highlights.scm" with { type: "file" }
+
+const __dirname = dirname(fileURLToPath(import.meta.url))
+
 export default {
   parsers: [
     {
@@ -164,7 +172,9 @@ export default {
       wasm: "https://github.com/tree-sitter/tree-sitter-json/releases/download/v0.24.8/tree-sitter-json.wasm",
       queries: {
         highlights: [
-          "https://raw.githubusercontent.com/nvim-treesitter/nvim-treesitter/refs/heads/master/queries/json/highlights.scm",
+          // Local query file - nvim-treesitter and tree-sitter-json queries use predicates/captures
+          // incompatible with web-tree-sitter or themes.ts
+          resolve(__dirname, jsonHighlights),
         ],
       },
     },

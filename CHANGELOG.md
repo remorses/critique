@@ -1,3 +1,9 @@
+# 0.1.94
+
+- Syntax highlighting:
+  - Fix JSON syntax highlighting by using local query file with captures compatible with themes.ts (nvim-treesitter uses incompatible `#set!` and `#eq?` predicates)
+  - Fix syntax highlighting in web preview by pre-initializing TreeSitter client before rendering
+
 # 0.1.93
 
 - Dependencies:

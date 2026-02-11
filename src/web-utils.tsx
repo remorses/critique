@@ -105,8 +105,13 @@ export async function renderDiffToFrame(
 ): Promise<CapturedFrame> {
   const { createTestRenderer } = await import("@opentui/core/testing")
   const { createRoot } = await import("@opentui/react")
+  const { getTreeSitterClient } = await import("@opentui/core")
   const React = await import("react")
   const { parsePatch, formatPatch } = await import("diff")
+  
+  // Pre-initialize TreeSitter client to ensure syntax highlighting works
+  const tsClient = getTreeSitterClient()
+  await tsClient.initialize()
   
   const { DiffView } = await import("./components/index.ts")
   const {
@@ -356,7 +361,12 @@ export async function renderReviewToFrame(
 ): Promise<CapturedFrame> {
   const { createTestRenderer } = await import("@opentui/core/testing")
   const { createRoot } = await import("@opentui/react")
+  const { getTreeSitterClient } = await import("@opentui/core")
   const React = await import("react")
+  
+  // Pre-initialize TreeSitter client to ensure syntax highlighting works
+  const tsClient = getTreeSitterClient()
+  await tsClient.initialize()
   
   const { ReviewAppView } = await import("./review/review-app.tsx")
   const { themeNames, defaultThemeName } = await import("./themes.ts")
