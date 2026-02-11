@@ -28,8 +28,8 @@
   "dependencies": {
     "@agentclientprotocol/sdk": "^0.13.1",
     "@clack/prompts": "1.0.0-alpha.9",
-    "@opentui/core": "npm:@opentuah/core@^0.1.81",
-    "@opentui/react": "npm:@opentuah/react@^0.1.81",
+    "@opentui/core": "npm:@opentuah/core@0.1.85",
+    "@opentui/react": "npm:@opentuah/react@0.1.85",
     "@parcel/watcher": "^2.5.6",
     "@xmorse/cac": "^6.0.7",
     "diff": "^8.0.2",
@@ -42,6 +42,7 @@
     "zustand": "^5.0.8"
   },
   "optionalDependencies": {
+    "@opentuah/core-darwin-arm64": "^0.1.85",
     "@takumi-rs/core": "^0.65.0",
     "@takumi-rs/helpers": "^0.65.0"
   }
