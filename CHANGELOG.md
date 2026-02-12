@@ -1,3 +1,15 @@
+# 0.1.101
+
+- `critique` / `critique --web` / OG images:
+  - Pass `addedBg`/`removedBg` alongside content backgrounds so opentui's word-level highlights don't inherit dark defaults on light themes
+  - Keep a small `github-light`-only `addedWordBg` override to make added word highlights visible in images
+
+# 0.1.100
+
+- Dependencies:
+  - Update `@opentui/core` / `@opentui/react` npm aliases to `@opentuah/*@0.1.88`
+  - Remove `@opentuah/core-darwin-arm64` optional dependency (core pulls the correct platform binary via its own optional deps)
+
 # 0.1.99
 
 - `critique` / `critique review` / `critique web` / `critique hunks list`:

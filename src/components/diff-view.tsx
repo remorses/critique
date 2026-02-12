@@ -48,6 +48,14 @@ export function DiffView({ diff, view, filetype, themeName, wrapMode = "word" }:
         syntaxStyle={syntaxStyle}
         showLineNumbers
         wrapMode={wrapMode}
+        // `addedBg`/`removedBg` are used by opentui as the base colors for word-level highlights.
+        // We set them to match the content backgrounds so light themes don't inherit dark defaults.
+        addedBg={colors.diffAddedBg}
+        removedBg={colors.diffRemovedBg}
+        contextBg={colors.bgPanel}
+        // github-light's diffAddedBg is already quite pale, so a small explicit boost keeps
+        // word highlights visible without relying on internal defaults.
+        addedWordBg={themeName === "github-light" ? "#acf2bd" : undefined}
         addedContentBg={colors.diffAddedBg}
         removedContentBg={colors.diffRemovedBg}
         contextContentBg={colors.bgPanel}
