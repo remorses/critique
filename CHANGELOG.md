@@ -1,3 +1,10 @@
+# 0.1.99
+
+- `critique` / `critique review` / `critique web` / `critique hunks list`:
+  - Define `--filter <pattern>` as an array schema in goke so repeated flags are parsed explicitly as `string[]`
+- `critique review`:
+  - Define `--session <id>` as an array schema so repeated session flags are handled natively
+
 # 0.1.98
 
 - Dependencies:

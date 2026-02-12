@@ -3,7 +3,7 @@
 // Provides TUI diff viewing, AI-powered review generation, and web preview upload.
 // Commands: default (diff), review (AI analysis), web (HTML upload), pick (cherry-pick files).
 
-import { goke } from "goke";
+import { goke, wrapJsonSchema } from "goke";
 import {
   createRoot,
   flushSync,
@@ -1539,7 +1539,11 @@ export function App({ parsedFiles }: AppProps) {
 cli
   .command("hunks list", "List all hunks with stable IDs for selective staging")
   .option("--staged", "List staged hunks instead of unstaged")
-  .option("--filter <pattern>", "Filter files by glob pattern")
+  .option("--filter <pattern>", wrapJsonSchema({
+    type: "array",
+    items: { type: "string" },
+    description: "Filter files by glob pattern (can be used multiple times)",
+  }))
   .action(async (options) => {
     const {
       parseHunksWithIds,
@@ -1708,7 +1712,11 @@ cli
   .option("--commit <ref>", "Show changes from a specific commit")
   .option("--watch", "Watch for file changes and refresh diff")
   .option("--context <lines>", "Number of context lines (default: 3)")
-  .option("--filter <pattern>", "Filter files by glob pattern (can be used multiple times)")
+  .option("--filter <pattern>", wrapJsonSchema({
+    type: "array",
+    items: { type: "string" },
+    description: "Filter files by glob pattern (can be used multiple times)",
+  }))
   .option("--theme <name>", "Theme to use for rendering")
   .option("--web [title]", "Generate web preview instead of TUI")
   .option("--open", "Open in browser (with --web)")
@@ -1997,8 +2005,16 @@ cli
   .option("--staged", "Review staged changes")
   .option("--commit <ref>", "Review changes from a specific commit")
   .option("--context <lines>", "Number of context lines (default: 3)")
-  .option("--filter <pattern>", "Filter files by glob pattern")
-  .option("--session <id>", "Session ID(s) to include as context (can be repeated)")
+  .option("--filter <pattern>", wrapJsonSchema({
+    type: "array",
+    items: { type: "string" },
+    description: "Filter files by glob pattern (can be used multiple times)",
+  }))
+  .option("--session <id>", wrapJsonSchema({
+    type: "array",
+    items: { type: "string" },
+    description: "Session ID(s) to include as context (can be repeated)",
+  }))
   .option("--web", "Generate web preview instead of TUI")
   .option("--open", "Open web preview in browser (with --web)")
   .option("--json", "Output JSON to stdout (implies --web)")
@@ -2032,7 +2048,7 @@ cli
         positionalFilters: options['--'],
       });
 
-      // Normalize session option to array (cac returns string for single, array for multiple)
+      // Normalize session option to array (goke array schema always yields string[])
       const sessionIds = options.session
         ? Array.isArray(options.session) ? options.session : [options.session]
         : undefined;
@@ -2331,7 +2347,11 @@ cli
   .option("--open", "Open in browser after generating")
   .option("--context <lines>", "Number of context lines (default: 3)")
   .option("--theme <name>", "Theme to use for rendering")
-  .option("--filter <pattern>", "Filter files by glob pattern (can be used multiple times)")
+  .option("--filter <pattern>", wrapJsonSchema({
+    type: "array",
+    items: { type: "string" },
+    description: "Filter files by glob pattern (can be used multiple times)",
+  }))
   .option("--title <title>", "HTML document title")
   .action(async (base, head, options) => {
     // Build git command and get diff
