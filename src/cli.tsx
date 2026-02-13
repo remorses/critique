@@ -184,23 +184,23 @@ async function runReviewMode(
   // Save pending review (called on exit or completion)
   const savePendingReview = (status: "in_progress" | "completed") => {
     if (reviewSaved || !pendingReview) return;
-    
+
     // Update with latest YAML content
     const reviewYaml = readReviewYaml(yamlPath);
     if (reviewYaml) {
       pendingReview.reviewYaml = reviewYaml;
       pendingReview.title = reviewYaml.title || "Untitled review";
     }
-    
+
     // Only save if there's actual content (at least one hunk group)
     if (pendingReview.reviewYaml.hunks.length === 0) {
       logger.debug("No content to save, skipping");
       return;
     }
-    
+
     pendingReview.status = status;
     pendingReview.updatedAt = Date.now();
-    
+
     try {
       saveReview(pendingReview);
       reviewSaved = true;
@@ -249,9 +249,9 @@ async function runReviewMode(
 
   const printNotification = (notification: import("@agentclientprotocol/sdk").SessionNotification) => {
     const log = ensureAnalysisLog();
-    
+
     const update = notification.update;
-    
+
     if (update.sessionUpdate === "agent_thought_chunk") {
       if (!lastThinking) {
         log.message(pc.default.gray("thinking..."));
@@ -298,7 +298,7 @@ async function runReviewMode(
       const status = (tool.status || "").toLowerCase();
       const isActiveStatus = status === "pending" || status === "in_progress";
       const isDoneStatus = status === "completed" || status === "error" || status === "cancelled";
-      
+
       // Get file from locations or rawInput.filePath
       let file = tool.locations?.[0]?.path?.split("/").pop() || "";
       if (!file && tool.rawInput) {
@@ -314,21 +314,21 @@ async function runReviewMode(
         }
         updateToolSpinner(activeToolCalls.size);
       }
-      
+
       // Skip if we've already shown this tool call with file info
       // (first notification often has empty locations, update has the file)
       if (seenToolCalls.has(toolId)) {
         // Already shown with file info, skip
         return;
       }
-      
+
       // For read/write/edit, wait until we have file info before showing
       if ((isRead || isWrite || isEdit) && !file) {
         return;
       }
-      
+
       seenToolCalls.add(toolId);
-      
+
       let line: string;
       if (isWrite && file) {
         line = `write ${file}`;
@@ -449,10 +449,10 @@ async function runReviewMode(
       if (selectedSessionIds.length > 0) {
         const loadSpinner = clack.spinner(out);
         loadSpinner.start(`Loading ${selectedSessionIds.length} session${selectedSessionIds.length === 1 ? "" : "s"}...`);
-        
+
         const compressedSessions: Awaited<ReturnType<typeof compressSession>>[] = [];
         const sessionsToLoad = sessions.filter((s) => selectedSessionIds.includes(s.sessionId));
-        
+
         for (const sessionInfo of sessionsToLoad) {
           try {
             const content = await acpClient.loadSessionContent(sessionInfo.sessionId, cwd);
@@ -467,7 +467,7 @@ async function runReviewMode(
     }
 
     const hunksContext = hunksToContextXml(hunks);
-    
+
     analysisSpinner = clack.spinner(out);
     analysisSpinner.start("Analyzing diff...");
 
@@ -481,7 +481,7 @@ async function runReviewMode(
       (sessionId) => {
         reviewSessionId = sessionId;
         logger.info("Review session started", { sessionId });
-        
+
         // Initialize pending review with ACP session ID
         const now = Date.now();
         pendingReview = {
@@ -521,12 +521,12 @@ async function runReviewMode(
           analysisSpinner = null;
         }
         updateToolSpinner(0);
-        
+
         logger.error("Review session error", error);
         const errorMessage = error instanceof Error ? error.message : String(error);
         clack.log.error(errorMessage, out);
         clack.outro("", out);
-        
+
         // Save partial progress
         savePendingReview("in_progress");
         if (acpClient) await acpClient.close();
@@ -558,7 +558,7 @@ async function runReviewMode(
 
       const webSpinner = clack.spinner(out);
       webSpinner.start("Generating web preview...");
-      
+
       try {
         const { htmlDesktop, htmlMobile, ogImage } = await captureReviewResponsiveHtml({
           hunks,
@@ -576,7 +576,7 @@ async function runReviewMode(
         webSpinner.message("Uploading...");
         const result = await uploadHtml(htmlDesktop, htmlMobile, ogImage);
         webSpinner.stop("Uploaded");
-        
+
         clack.log.success(`Preview URL: ${result.url}`, out);
         clack.log.info(formatPreviewExpiry(result.expiresInDays), out);
         if (typeof result.expiresInDays === "number") {
@@ -630,7 +630,7 @@ async function runReviewMode(
         (error) => Promise.reject(error), // Reject immediately on error
       ),
     ]);
-    
+
     const log = ensureAnalysisLog();
     if (currentMessage) {
       log.message(pc.default.dim(currentMessage.split("\n")[0]));
@@ -644,7 +644,7 @@ async function runReviewMode(
       onDestroy() {
         // Save review before exiting (will be in_progress if not completed)
         savePendingReview("in_progress");
-        
+
         if (acpClient) {
           acpClient.close();
         }
@@ -659,7 +659,7 @@ async function runReviewMode(
     });
 
     const root = createRoot(renderer);
-    
+
     // Helper to render with current isGenerating state
     const renderApp = (isGenerating: boolean) => {
       root.render(
@@ -689,22 +689,22 @@ async function runReviewMode(
       });
   } catch (error) {
     logger.error("Review mode error", error);
-    
+
     // Stop any active spinners
     if (analysisSpinner) {
       analysisSpinner.stop("Failed");
       analysisSpinner = null;
     }
     updateToolSpinner(0);
-    
+
     // Show the error - extract message for cleaner display
     const errorMessage = error instanceof Error ? error.message : String(error);
     clack.log.error(errorMessage);
     clack.outro("");
-    
+
     // Save partial progress
     savePendingReview("in_progress");
-    
+
     if (acpClient) {
       await acpClient.close();
     }
@@ -779,11 +779,11 @@ async function runResumeMode(options: ResumeModeOptions) {
   // If review is in_progress, try to resume the ACP session
   if (review.status === "in_progress") {
     clack.log.info(`Resuming interrupted review: ${review.title}`);
-    
+
     const { createAcpClient, readReviewYaml, saveReview } = await import("./review/index.ts");
     const { tmpdir } = await import("os");
     const { join } = await import("path");
-    
+
     // Create temp file for YAML output (continue from stored content)
     const yamlPath = join(tmpdir(), `critique-review-${Date.now()}.yaml`);
     // Write existing YAML content to temp file so AI can continue from there
@@ -802,16 +802,16 @@ async function runResumeMode(options: ResumeModeOptions) {
         }).join("\n")
       : "";
     fs.writeFileSync(yamlPath, existingYaml);
-    
+
     // Connect to ACP and try to resume
     const acpClient = createAcpClient(review.agent);
     acpClient.startConnection();
-    
+
     const resumeSpinner = clack.spinner();
     resumeSpinner.start("Resuming ACP session...");
-    
+
     const resumed = await acpClient.resumeSession(review.id, review.cwd);
-    
+
     if (!resumed) {
       resumeSpinner.stop("Session expired");
       clack.log.warn("ACP session no longer available. Showing partial progress.");
@@ -821,7 +821,7 @@ async function runResumeMode(options: ResumeModeOptions) {
     } else {
       resumeSpinner.stop("Session resumed");
       clack.outro("");
-      
+
       // Track for saving on exit
       let reviewSaved = false;
       const savePendingReview = (status: "in_progress" | "completed") => {
@@ -839,7 +839,7 @@ async function runResumeMode(options: ResumeModeOptions) {
           logger.info("Review saved", { status });
         }
       };
-      
+
       // Start TUI with isGenerating: true
       const renderer = await createCliRenderer({
         onDestroy() {
@@ -850,7 +850,7 @@ async function runResumeMode(options: ResumeModeOptions) {
         },
         exitOnCtrlC: true,
       });
-      
+
       const root = createRoot(renderer);
       root.render(
         <ErrorBoundary>
@@ -862,7 +862,7 @@ async function runResumeMode(options: ResumeModeOptions) {
           />
         </ErrorBoundary>
       );
-      
+
       // Wait for session to complete (it's already running from resume)
       // The ACP client will receive updates and we watch the YAML file
       // For now, just keep the TUI running - it will update from YAML file changes
@@ -1014,7 +1014,7 @@ async function runWebMode(
     if (options.open) {
       await openInBrowser(result.url);
     }
-    
+
     process.exit(0);
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
@@ -1748,7 +1748,7 @@ cli
 
     // Get diff content - from stdin or git
     let diffContent: string;
-    
+
     if (options.stdin) {
       // Handle stdin mode (for lazygit pager integration)
       diffContent = "";
@@ -2418,7 +2418,7 @@ cli
   .command("unpublish <url>", "Delete a published diff by URL or ID")
   .action(async (url: string) => {
     const { deleteUpload, extractDiffId } = await import("./web-utils.tsx")
-    
+
     const id = extractDiffId(url)
     if (!id) {
       process.stderr.write("Error: Invalid URL or ID format.\n")
@@ -2427,9 +2427,9 @@ cli
     }
 
     process.stdout.write(`Deleting diff ${id}...\n`)
-    
+
     const result = await deleteUpload(url)
-    
+
     if (result.success) {
       process.stdout.write(`${result.message}\n`)
     } else {

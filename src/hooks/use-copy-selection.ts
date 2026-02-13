@@ -109,6 +109,7 @@ export interface CopySelectionHandlers {
  * ```
  */
 export function useCopySelection(): CopySelectionHandlers {
+
   const renderer = useRenderer()
 
   const onMouseUp = async () => {
