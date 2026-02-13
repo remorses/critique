@@ -26,17 +26,17 @@
 (escape_sequence) @string
 
 ; Keep JSON punctuation muted (not operator-red / not full-bright)
-("\"") @conceal
+("\"") @comment
 
 ; JSON separators should render muted, not like operators
 [
   ","
   ":"
-] @conceal
+] @comment
 
 [
   "["
   "]"
   "{"
   "}"
-] @conceal
+] @comment

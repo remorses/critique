@@ -1,7 +1,7 @@
 # 0.1.103
 
 - Syntax highlighting:
-  - JSON: render punctuation (quotes/brackets/separators) as muted instead of operator red / full-bright
+  - JSON: render punctuation (quotes/brackets/separators) using comment color instead of operator red / full-bright
 
 # 0.1.102
 
