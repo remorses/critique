@@ -24,6 +24,8 @@ export interface CaptureOptions {
   title?: string
   /** Wrap mode for long lines (default: "word") */
   wrapMode?: "word" | "char" | "none"
+  /** Show privacy/expiry notice block at top (default: true) */
+  showNotice?: boolean
 }
 
 export interface UploadResult {
@@ -159,6 +161,7 @@ export async function renderDiffToFrame(
   const webMuted = rgbaToHex(webTheme.textMuted)
 
   const showExpiryNotice = shouldShowExpiryNotice()
+  const showNotice = options.showNotice !== false
 
   // Create the diff view component
   // NOTE: No height: "100%" - let content determine its natural height
@@ -171,11 +174,13 @@ export async function renderDiffToFrame(
           backgroundColor: webBg,
         },
       },
-      renderNoticeBlock({
-        textColor: webText,
-        mutedColor: webMuted,
-        showExpiry: showExpiryNotice,
-      }),
+      showNotice
+        ? renderNoticeBlock({
+            textColor: webText,
+            mutedColor: webMuted,
+            showExpiry: showExpiryNotice,
+          })
+        : null,
       filesWithRawDiff.map((file, idx) => {
         const fileName = getFileName(file)
         const oldFileName = getOldFileName(file)
@@ -393,6 +398,7 @@ export async function renderReviewToFrame(
   const webText = rgbaToHex(theme.text)
   const webMuted = rgbaToHex(theme.textMuted)
   const showExpiryNotice = shouldShowExpiryNotice()
+  const showNotice = options.showNotice !== false
 
   // Content-fitting: start small, double if clipped, shrink to fit
   let currentHeight = 100
@@ -414,11 +420,13 @@ export async function renderReviewToFrame(
           backgroundColor: webBg,
         },
       },
-      renderNoticeBlock({
-        textColor: webText,
-        mutedColor: webMuted,
-        showExpiry: showExpiryNotice,
-      }),
+      showNotice
+        ? renderNoticeBlock({
+            textColor: webText,
+            mutedColor: webMuted,
+            showExpiry: showExpiryNotice,
+          })
+        : null,
       React.createElement(ReviewAppView, {
         hunks: options.hunks,
         reviewData: options.reviewData,

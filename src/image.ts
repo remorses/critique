@@ -334,11 +334,12 @@ export async function renderDiffToOgImage(
   const charWidth = fontSize * 0.6
   const cols = options.cols ?? Math.floor(contentWidth / charWidth)
 
-  // Render diff to captured frame
+  // Render diff to captured frame (no notice block for OG images)
   const frame = await renderDiffToFrame(diffContent, {
     cols,
     maxRows: 200,
     themeName,
+    showNotice: false,
   })
 
   // Convert frame to OG image
