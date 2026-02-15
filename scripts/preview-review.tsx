@@ -13,14 +13,16 @@ import * as React from "react"
 import { ReviewApp, ReviewAppView } from "../src/review/review-app.tsx"
 import { createHunk } from "../src/review/hunk-parser.ts"
 import type { ReviewYaml } from "../src/review/types.ts"
-import { captureReviewResponsiveHtml, uploadHtml } from "../src/web-utils.tsx"
+import { captureReviewResponsiveHtml, renderReviewToFrame, uploadHtml } from "../src/web-utils.tsx"
+import { renderFrameToPdf, type PdfTheme } from "../src/opentui-pdf.ts"
 import fs from "fs"
 import { tmpdir } from "os"
-import { join } from "path"
+import { join, resolve } from "path"
 
 // Parse command line arguments
 const args = process.argv.slice(2)
 const webMode = args.includes("--web")
+const pdfMode = args.includes("--pdf")
 const captureMode = args.includes("--capture") // Internal flag for PTY capture
 
 // Parse --cols and --rows passed by captureResponsiveHtml
@@ -278,6 +280,47 @@ async function main() {
     const result = await uploadHtml(htmlDesktop, htmlMobile, ogImage)
     console.log(`\nPreview URL: ${result.url}`)
     console.log("(expires in 7 days)")
+    return
+  }
+
+  // PDF mode: capture frame and render to PDF
+  if (pdfMode) {
+    const { getResolvedTheme, rgbaToHex } = await import("../src/themes.ts")
+
+    const themeName = "github-light"
+    const cols = 140
+
+    console.log("Capturing review frame...")
+    const frame = await renderReviewToFrame({
+      hunks: exampleHunks,
+      reviewData: exampleReviewData,
+      cols,
+      maxRows: 5000,
+      themeName,
+    })
+
+    console.log(`Frame: ${frame.cols}x${frame.lines.length} lines`)
+
+    // Resolve theme colors for PDF
+    const theme = getResolvedTheme(themeName)
+    const pdfTheme: PdfTheme = {
+      background: rgbaToHex(theme.background),
+      text: rgbaToHex(theme.text),
+    }
+
+    // Use same font as web: JetBrains Mono Nerd
+    const fontPath = resolve(import.meta.dir, "../public/jetbrains-mono-nerd.woff2")
+
+    console.log("Rendering PDF...")
+    const result = await renderFrameToPdf(frame, {
+      theme: pdfTheme,
+      fontPath,
+    })
+
+    const outPath = join(tmpdir(), `critique-review-${Date.now()}.pdf`)
+    fs.writeFileSync(outPath, result.buffer)
+    console.log(`\nPDF written: ${outPath}`)
+    console.log(`Pages: ${result.pageCount}, Lines: ${result.totalLines}`)
     return
   }
 
