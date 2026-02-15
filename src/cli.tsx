@@ -58,6 +58,8 @@ import {
   type GitCommandOptions,
 } from "./diff-utils.ts";
 import type { TreeFileInfo } from "./directory-tree.ts";
+import packageJson from "../package.json" assert { type: "json" };
+
 
 // Lazy-load watcher only when --watch is used
 let watcherModule: typeof import("@parcel/watcher") | null = null;
@@ -2444,6 +2446,6 @@ cli
 
 if (import.meta.main) {
   cli.help();
-  cli.version("1.0.0");
+  cli.version(packageJson.version);
   cli.parse();
 }
