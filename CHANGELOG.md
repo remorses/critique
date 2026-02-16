@@ -1,3 +1,35 @@
+# 0.1.106
+
+- New `--pdf` flag:
+  - Generate PDF documents from diff and review commands
+  - `critique HEAD~3 --pdf` writes to /tmp/critique-diff-*.pdf
+  - `critique HEAD~3 --pdf output.pdf` writes to specific path
+  - `critique review --pdf` generates PDF after AI review completes
+  - `--open` flag to launch PDF in default viewer after generation
+- PDF rendering:
+  - New `opentui-pdf.ts` module converts CapturedFrame to multi-page PDF using pdfkit
+  - Smart page breaking at natural section boundaries (empty line sequences)
+  - Auto-fits font size to frame width so content never clips horizontally
+  - Uses JetBrains Mono Nerd font (ships pre-converted .ttf, 2.4MB)
+  - Handles all text attributes: bold, italic, dim, underline, strikethrough
+  - Correct positioning of CJK/emoji/wide characters using span.width
+  - Default page size: A4 portrait (595x842 pt)
+- Dependencies:
+  - Add pdfkit as optional dependency (same as takumi)
+  - Remove wawoff2 (ship pre-converted .ttf font instead)
+  - Move resend to devDependencies (only used by Cloudflare Worker)
+- File organization:
+  - Move parsers-config.ts, global.d.ts, and queries/ into src/ directory
+  - Add dist/ to package.json files array (fixes published package missing compiled files)
+- `review --pdf`:
+  - Wait for AI generation to complete before exporting PDF
+  - Default to github-light theme for better print readability (can override with --theme)
+- Tests:
+  - Suppress React act() warnings in opentui component tests (expected behavior for TUI testing)
+  - Increase DataPathsManager maxListeners to suppress EventTarget memory leak warning in DiffView tests
+- Bug fixes:
+  - Fix CLI version number display (thanks @tobeycodes for the contribution)
+
 # 0.1.105
 
 - `critique --stdin` / `critique --web`:
