@@ -308,8 +308,8 @@ async function main() {
       text: rgbaToHex(theme.text),
     }
 
-    // Use same font as web: JetBrains Mono Nerd
-    const fontPath = resolve(import.meta.dir, "../public/jetbrains-mono-nerd.woff2")
+    // Use same font as web: JetBrains Mono Nerd (pre-converted TTF for pdfkit)
+    const fontPath = resolve(import.meta.dir, "../public/jetbrains-mono-nerd.ttf")
 
     console.log("Rendering PDF...")
     const result = await renderFrameToPdf(frame, {

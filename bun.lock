@@ -16,7 +16,6 @@
         "marked": "^17.0.1",
         "picocolors": "^1.1.1",
         "react": "^19.2.0",
-        "resend": "^6.8.0",
         "supports-color": "^10.2.2",
         "zustand": "^5.0.8",
       },
@@ -26,17 +25,17 @@
         "@types/js-yaml": "^4.0.9",
         "@types/pdfkit": "^0.17.5",
         "hono": "^4.7.10",
-        "pdfkit": "^0.17.2",
+        "resend": "^6.8.0",
         "sharp": "^0.34.5",
         "stripe": "^20.2.0",
         "tuistory": "^0.0.13",
         "typescript": "^5.9.3",
-        "wawoff2": "^2.0.1",
         "wrangler": "^4.19.1",
       },
       "optionalDependencies": {
         "@takumi-rs/core": "^0.65.0",
         "@takumi-rs/helpers": "^0.65.0",
+        "pdfkit": "^0.17.2",
       },
     },
   },
@@ -578,8 +577,6 @@
     "utif2": ["utif2@4.1.0", "", { "dependencies": { "pako": "^1.0.11" } }, "sha512-+oknB9FHrJ7oW7A2WZYajOcv4FcDR4CfoGB0dPNfxbi4GO05RRnFmt5oa23+9w32EanrYcSJWspUiJkLMs+37w=="],
 
     "uuid": ["uuid@10.0.0", "", { "bin": { "uuid": "dist/bin/uuid" } }, "sha512-8XkAphELsDnEGrDxUOHB3RGvXz6TeuYSGEZBOjtTtPm2lwhGBjLgOzLHB63IUWfBpNucQjND6d3AOudO+H3RWQ=="],
-
-    "wawoff2": ["wawoff2@2.0.1", "", { "dependencies": { "argparse": "^2.0.1" }, "bin": { "woff2_compress.js": "bin/woff2_compress.js", "woff2_decompress.js": "bin/woff2_decompress.js" } }, "sha512-r0CEmvpH63r4T15ebFqeOjGqU4+EgTx4I510NtK35EMciSdcTxCw3Byy3JnBonz7iyIFZ0AbVo0bbFpEVuhCYA=="],
 
     "web-tree-sitter": ["web-tree-sitter@0.25.10", "", { "peerDependencies": { "@types/emscripten": "^1.40.0" }, "optionalPeers": ["@types/emscripten"] }, "sha512-Y09sF44/13XvgVKgO2cNDw5rGk6s26MgoZPXLESvMXeefBf7i6/73eFurre0IsTW6E14Y0ArIzhUMmjoc7xyzA=="],
 

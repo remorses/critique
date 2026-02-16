@@ -85,10 +85,17 @@ interface ReviewWebOptions {
   open?: boolean;
 }
 
+interface ReviewPdfOptions {
+  pdf: boolean;
+  filename?: string;
+  open?: boolean;
+}
+
 // Review mode options
 interface ReviewModeOptions {
   sessionIds?: string[];
   webOptions?: ReviewWebOptions;
+  pdfOptions?: ReviewPdfOptions;
   model?: string;
   json?: boolean;
 }
@@ -100,7 +107,7 @@ async function runReviewMode(
   options: ReviewModeOptions = {},
   reviewOptions?: { isDefaultMode?: boolean; diffOptions?: Pick<GitCommandOptions, "context" | "filter" | "positionalFilters"> },
 ) {
-  const { sessionIds, webOptions, model, json } = options;
+  const { sessionIds, webOptions, pdfOptions, model, json } = options;
   const { tmpdir } = await import("os");
   const { join } = await import("path");
   const pc = await import("picocolors");
@@ -624,6 +631,74 @@ async function runReviewMode(
       }
     }
 
+    // PDF mode: generate PDF after review completes
+    if (pdfOptions) {
+      const { renderReviewToFrame } = await import("./web-utils.tsx");
+      const { renderFrameToPdf } = await import("./opentui-pdf.ts");
+      const { join } = await import("path");
+      const { tmpdir: getTmpdir } = await import("os");
+
+      // Read review data from YAML
+      const reviewData = readReviewYaml(yamlPath);
+      if (!reviewData) {
+        throw new Error("No review data found");
+      }
+
+      const pdfSpinner = clack.spinner(out);
+      pdfSpinner.start("Generating PDF...");
+
+      try {
+        const themeName = defaultThemeName;
+        const cols = 140;
+
+        // Capture frame using opentui test renderer
+        const frame = await renderReviewToFrame({
+          hunks,
+          reviewData,
+          cols,
+          maxRows: 10000,
+          themeName,
+        });
+
+        // Resolve theme colors
+        const reviewTheme = getResolvedTheme(themeName);
+        const fontPath = join(import.meta.dir, "..", "public", "jetbrains-mono-nerd.ttf");
+
+        const result = await renderFrameToPdf(frame, {
+          theme: {
+            background: rgbaToHex(reviewTheme.background),
+            text: rgbaToHex(reviewTheme.text),
+          },
+          fontPath,
+        });
+
+        // Clean up temp file
+        try { fs.unlinkSync(yamlPath); } catch {}
+        if (acpClient) await acpClient.close();
+
+        const outPath = pdfOptions.filename || join(getTmpdir(), `critique-review-${Date.now()}.pdf`);
+        fs.writeFileSync(outPath, result.buffer);
+        pdfSpinner.stop("PDF generated");
+
+        clack.log.success(`PDF written: ${outPath}`, out);
+        clack.log.info(`${result.pageCount} page${result.pageCount === 1 ? "" : "s"}, ${result.totalLines} lines`, out);
+        clack.outro("", out);
+
+        if (pdfOptions.open) {
+          const { openInBrowser } = await import("./web-utils.tsx");
+          await openInBrowser(outPath);
+        }
+        process.exit(0);
+      } catch (error: any) {
+        pdfSpinner.stop("Failed");
+        try { fs.unlinkSync(yamlPath); } catch {}
+        if (acpClient) await acpClient.close();
+        clack.log.error(`Failed to generate PDF: ${error.message}`, out);
+        clack.outro("", out);
+        process.exit(1);
+      }
+    }
+
     // TUI mode: wait for first valid group, then start interactive UI
     // Race against session errors (e.g., invalid model) to fail fast
     await Promise.race([
@@ -1026,6 +1101,71 @@ async function runWebMode(
     if (options.json) {
       console.log(JSON.stringify({ error: message }));
     }
+    process.exit(1);
+  }
+}
+
+// PDF mode handler - receives already-cleaned diff content
+interface PdfModeOptions {
+  filename?: string;
+  open?: boolean;
+  theme?: string;
+  cols?: number;
+}
+
+async function runPdfMode(
+  diffContent: string,
+  options: PdfModeOptions
+) {
+  const { renderDiffToFrame } = await import("./web-utils.tsx");
+  const { renderFrameToPdf } = await import("./opentui-pdf.ts");
+  const { join } = await import("path");
+  const { tmpdir } = await import("os");
+
+  const themeName = options.theme && themeNames.includes(options.theme)
+    ? options.theme
+    : persistedState.themeName ?? defaultThemeName;
+
+  const cols = options.cols || 140;
+
+  console.log("Rendering to PDF...");
+
+  try {
+    // Capture frame using opentui test renderer
+    const frame = await renderDiffToFrame(diffContent, {
+      cols,
+      maxRows: 10000,
+      themeName,
+    });
+
+    // Resolve theme colors
+    const theme = getResolvedTheme(themeName);
+
+    // Resolve font path (shipped .ttf in public/)
+    const fontPath = join(import.meta.dir, "..", "public", "jetbrains-mono-nerd.ttf");
+
+    const result = await renderFrameToPdf(frame, {
+      theme: {
+        background: rgbaToHex(theme.background),
+        text: rgbaToHex(theme.text),
+      },
+      fontPath,
+    });
+
+    const outPath = options.filename || join(tmpdir(), `critique-diff-${Date.now()}.pdf`);
+    fs.writeFileSync(outPath, result.buffer);
+    console.log(`\nPDF written: ${outPath}`);
+    console.log(`${result.pageCount} page${result.pageCount === 1 ? "" : "s"}, ${result.totalLines} lines`);
+
+    if (options.open) {
+      const { openInBrowser } = await import("./web-utils.tsx");
+      await openInBrowser(outPath);
+    }
+
+    process.exit(0);
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error("Failed to generate PDF:", message);
     process.exit(1);
   }
 }
@@ -1723,7 +1863,8 @@ cli
   }))
   .option("--theme <name>", "Theme to use for rendering")
   .option("--web [title]", "Generate web preview instead of TUI")
-  .option("--open", "Open in browser (with --web)")
+  .option("--pdf [filename]", "Generate PDF instead of TUI (default: /tmp/critique-diff-*.pdf)")
+  .option("--open", "Open in browser (with --web/--pdf)")
   .option("--json", "Output JSON to stdout (with --web)")
   .option("--image", "Generate images instead of TUI (saved to /tmp)")
   .option("--cols <cols>", "Desktop columns for web/image render (default: 240)")
@@ -1818,6 +1959,17 @@ cli
         cols: parseInt(options.cols) || 240,
         mobileCols: parseInt(options.mobileCols) || 100,
         theme: options.theme,
+      });
+      return;
+    }
+
+    if (options.pdf !== undefined) {
+      const filename = typeof options.pdf === 'string' ? options.pdf : undefined;
+      await runPdfMode(cleanedDiff, {
+        filename,
+        open: options.open,
+        theme: options.theme,
+        cols: parseInt(options.cols) || 140,
       });
       return;
     }
@@ -2020,7 +2172,8 @@ cli
     description: "Session ID(s) to include as context (can be repeated)",
   }))
   .option("--web", "Generate web preview instead of TUI")
-  .option("--open", "Open web preview in browser (with --web)")
+  .option("--pdf [filename]", "Generate PDF instead of TUI (default: /tmp/critique-review-*.pdf)")
+  .option("--open", "Open in browser/viewer (with --web/--pdf)")
   .option("--json", "Output JSON to stdout (implies --web)")
   .option("--resume [id]", "Resume a previous review (shows select if no ID provided)")
   .action(async (base, head, options) => {
@@ -2060,10 +2213,17 @@ cli
       // --json implies --web
       const useWeb = options.web || options.json;
       const webOptions = useWeb ? { web: true, open: options.open } : undefined;
+      const usePdf = options.pdf !== undefined;
+      const pdfOptions = usePdf ? {
+        pdf: true,
+        filename: typeof options.pdf === 'string' ? options.pdf : undefined,
+        open: options.open,
+      } : undefined;
       const isDefaultMode = !options.staged && !options.commit && !base && !head;
       await runReviewMode(gitCommand, agent, {
         sessionIds,
         webOptions,
+        pdfOptions,
         model: options.model,
         json: options.json,
       }, {

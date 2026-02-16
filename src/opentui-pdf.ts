@@ -129,18 +129,11 @@ function trimTrailingEmptyLines(lines: CapturedLine[]): CapturedLine[] {
 // ─────────────────────────────────────────────────────────────
 
 /**
- * Load a font file as a Buffer, decompressing woff2 if needed.
- * PDFKit's fontkit has issues with woff2 files directly,
- * so we decompress them to raw TTF using wawoff2.
+ * Load a font file as a Buffer.
+ * Supports .ttf, .otf formats. Use .ttf for best pdfkit compatibility.
  */
-async function loadFontBuffer(fontPath: string): Promise<Buffer> {
-  const raw = fs.readFileSync(fontPath)
-  if (fontPath.endsWith(".woff2")) {
-    const wawoff2 = await import("wawoff2")
-    const decompressed = await wawoff2.decompress(raw)
-    return Buffer.from(decompressed)
-  }
-  return raw
+function loadFontBuffer(fontPath: string): Buffer {
+  return fs.readFileSync(fontPath)
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -506,14 +499,13 @@ export async function renderFrameToPdf(
   let hasItalicFont = false
 
   if (fontPath) {
-    const fontBuffer = await loadFontBuffer(fontPath)
-    doc.registerFont("mono", fontBuffer)
+    doc.registerFont("mono", loadFontBuffer(fontPath))
     if (fontBoldPath) {
-      doc.registerFont("mono-bold", await loadFontBuffer(fontBoldPath))
+      doc.registerFont("mono-bold", loadFontBuffer(fontBoldPath))
       hasBoldFont = true
     }
     if (fontItalicPath) {
-      doc.registerFont("mono-italic", await loadFontBuffer(fontItalicPath))
+      doc.registerFont("mono-italic", loadFontBuffer(fontItalicPath))
       hasItalicFont = true
     }
   } else {
