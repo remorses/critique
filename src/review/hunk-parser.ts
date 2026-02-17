@@ -167,6 +167,80 @@ export function findHunkByStableId(hunks: IndexedHunk[], stableId: string): Inde
 }
 
 /**
+ * Split a rawDiff string into its header (everything before the first @@ line)
+ * and body (from the first @@ line to the end, excluding trailing empty lines).
+ */
+function splitRawDiff(rawDiff: string): { header: string; body: string } {
+  const lines = rawDiff.split("\n")
+
+  // Find the first @@ line
+  let firstHunkLine = 0
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i]!.startsWith("@@")) {
+      firstHunkLine = i
+      break
+    }
+  }
+
+  const header = lines.slice(0, firstHunkLine).join("\n")
+
+  // Strip trailing empty lines from the body
+  let end = lines.length
+  while (end > firstHunkLine && lines[end - 1] === "") end--
+  const body = lines.slice(firstHunkLine, end).join("\n")
+
+  return { header, body }
+}
+
+/**
+ * Combine multiple hunk patches into a single patch string.
+ *
+ * When staging multiple hunks from the same file sequentially, earlier hunks
+ * shift line numbers for later ones, causing "Hunk not found" errors.
+ * This function merges all hunks into one patch so `git apply` processes
+ * them atomically — no line shifting occurs.
+ *
+ * Hunks from different files are placed under separate headers.
+ * Hunks from the same file are merged under a single header with
+ * multiple @@ sections, sorted by oldStart.
+ */
+export function combineHunkPatches(hunks: IndexedHunk[]): string {
+  if (hunks.length === 0) return ""
+  if (hunks.length === 1) return hunks[0]!.rawDiff
+
+  // Group hunks by filename, preserving insertion order
+  const byFile = new Map<string, IndexedHunk[]>()
+  for (const hunk of hunks) {
+    const existing = byFile.get(hunk.filename)
+    if (existing) existing.push(hunk)
+    else byFile.set(hunk.filename, [hunk])
+  }
+
+  const patches: string[] = []
+  for (const [, fileHunks] of byFile) {
+    // Sort by oldStart so hunks appear in file order
+    fileHunks.sort((a, b) => a.oldStart - b.oldStart)
+
+    if (fileHunks.length === 1) {
+      patches.push(fileHunks[0]!.rawDiff)
+      continue
+    }
+
+    // Take the header from the first hunk's rawDiff,
+    // then append the @@ body sections from every hunk.
+    const { header } = splitRawDiff(fileHunks[0]!.rawDiff)
+    const bodies: string[] = []
+    for (const h of fileHunks) {
+      bodies.push(splitRawDiff(h.rawDiff).body)
+    }
+
+    patches.push(header + "\n" + bodies.join("\n") + "\n")
+  }
+
+  return patches.join("\n")
+}
+
+/**
  * Build a valid unified diff patch string from lines
  * 
  * This function generates a valid patch that can be parsed by diff libraries.

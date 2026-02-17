@@ -13,6 +13,7 @@ import {
   updateCoverageFromGroup,
   getUncoveredPortions,
   formatUncoveredMessage,
+  combineHunkPatches,
 } from "./hunk-parser.ts"
 import type { ReviewGroup } from "./types.ts"
 
@@ -1080,5 +1081,225 @@ describe("Regression: patch format compatibility", () => {
     // new: 7 context + 3 added = 10
     expect(parsed[0]!.hunks[0]!.oldLines).toBe(9)
     expect(parsed[0]!.hunks[0]!.newLines).toBe(10)
+  })
+})
+
+// ============================================================================
+// combineHunkPatches Tests
+// ============================================================================
+
+describe("combineHunkPatches", () => {
+  it("should return empty string for empty array", () => {
+    expect(combineHunkPatches([])).toBe("")
+  })
+
+  it("should return rawDiff unchanged for a single hunk", () => {
+    const hunk = createHunk(1, "src/file.ts", 0, 10, 10, [
+      " context",
+      "-old",
+      "+new",
+    ])
+
+    expect(combineHunkPatches([hunk])).toBe(hunk.rawDiff)
+  })
+
+  it("should combine two hunks from the same file under one header", () => {
+    const hunk1 = createHunk(1, "src/file.ts", 0, 10, 10, [
+      " context",
+      "-old line 1",
+      "+new line 1",
+      " context",
+    ])
+    const hunk2 = createHunk(2, "src/file.ts", 1, 50, 50, [
+      " context",
+      "-old line 2",
+      "+new line 2",
+      " context",
+    ])
+
+    const combined = combineHunkPatches([hunk1, hunk2])
+
+    // Should contain a single file header
+    const headerMatches = combined.match(/diff --git/g) || []
+    expect(headerMatches.length).toBe(1)
+
+    // Should contain two @@ sections
+    const hunkMatches = combined.match(/^@@/gm) || []
+    expect(hunkMatches.length).toBe(2)
+
+    // Should be parseable by the diff library
+    const parsed = parsePatch(combined)
+    expect(parsed.length).toBe(1)
+    expect(parsed[0]!.hunks.length).toBe(2)
+    expect(parsed[0]!.hunks[0]!.oldStart).toBe(10)
+    expect(parsed[0]!.hunks[1]!.oldStart).toBe(50)
+  })
+
+  it("should sort same-file hunks by oldStart", () => {
+    // Pass hunks in reverse order — combineHunkPatches should sort them
+    const hunkLater = createHunk(1, "src/file.ts", 0, 100, 100, [
+      " context",
+      "-old",
+      "+new",
+    ])
+    const hunkEarlier = createHunk(2, "src/file.ts", 1, 10, 10, [
+      " context",
+      "-old",
+      "+new",
+    ])
+
+    const combined = combineHunkPatches([hunkLater, hunkEarlier])
+
+    const parsed = parsePatch(combined)
+    expect(parsed[0]!.hunks[0]!.oldStart).toBe(10)
+    expect(parsed[0]!.hunks[1]!.oldStart).toBe(100)
+  })
+
+  it("should keep hunks from different files as separate sections", () => {
+    const hunkA = createHunk(1, "src/a.ts", 0, 5, 5, [
+      " context",
+      "-old a",
+      "+new a",
+    ])
+    const hunkB = createHunk(2, "src/b.ts", 0, 10, 10, [
+      " context",
+      "-old b",
+      "+new b",
+    ])
+
+    const combined = combineHunkPatches([hunkA, hunkB])
+
+    // Should contain two file headers
+    const headerMatches = combined.match(/diff --git/g) || []
+    expect(headerMatches.length).toBe(2)
+
+    // Each should be parseable
+    const parsed = parsePatch(combined)
+    expect(parsed.length).toBe(2)
+    expect(parsed[0]!.hunks.length).toBe(1)
+    expect(parsed[1]!.hunks.length).toBe(1)
+  })
+
+  it("should handle a mix of same-file and different-file hunks", () => {
+    const hunk1 = createHunk(1, "src/a.ts", 0, 5, 5, [
+      " ctx",
+      "-old1",
+      "+new1",
+    ])
+    const hunk2 = createHunk(2, "src/a.ts", 1, 50, 50, [
+      " ctx",
+      "-old2",
+      "+new2",
+    ])
+    const hunk3 = createHunk(3, "src/b.ts", 0, 10, 10, [
+      " ctx",
+      "+added",
+    ])
+
+    const combined = combineHunkPatches([hunk1, hunk2, hunk3])
+
+    const parsed = parsePatch(combined)
+    // Two files: a.ts with 2 hunks, b.ts with 1 hunk
+    expect(parsed.length).toBe(2)
+
+    const fileA = parsed.find(p => p.oldFileName?.includes("a.ts"))
+    const fileB = parsed.find(p => p.oldFileName?.includes("b.ts"))
+    expect(fileA!.hunks.length).toBe(2)
+    expect(fileB!.hunks.length).toBe(1)
+  })
+
+  it("should produce valid patches for the exact bug scenario (line-shift)", () => {
+    // Simulate the original bug: two hunks in the same file where the first
+    // adds 2 lines, shifting the second hunk's position
+    const hunk1 = createHunk(1, "src/cli.tsx", 0, 100, 100, [
+      " const a = 1",
+      "-const b = 2",
+      "+const b = 2 // updated",
+      "+const b2 = 2.5 // new line",
+      " const c = 3",
+    ])
+    const hunk2 = createHunk(2, "src/cli.tsx", 1, 200, 200, [
+      " function foo() {",
+      "-  return null",
+      "+  return value",
+      "+  // extra line",
+      " }",
+    ])
+
+    const combined = combineHunkPatches([hunk1, hunk2])
+
+    // Both hunks should be in one parseable patch with original line numbers
+    const parsed = parsePatch(combined)
+    expect(parsed.length).toBe(1)
+    expect(parsed[0]!.hunks.length).toBe(2)
+    expect(parsed[0]!.hunks[0]!.oldStart).toBe(100)
+    expect(parsed[0]!.hunks[1]!.oldStart).toBe(200)
+  })
+
+  it("should handle three hunks from the same file", () => {
+    const hunks = [
+      createHunk(1, "src/main.ts", 0, 10, 10, [" ctx", "-a", "+b"]),
+      createHunk(2, "src/main.ts", 1, 50, 50, [" ctx", "-c", "+d"]),
+      createHunk(3, "src/main.ts", 2, 100, 100, [" ctx", "-e", "+f"]),
+    ]
+
+    const combined = combineHunkPatches(hunks)
+
+    const parsed = parsePatch(combined)
+    expect(parsed.length).toBe(1)
+    expect(parsed[0]!.hunks.length).toBe(3)
+  })
+
+  it("should preserve diff content exactly", () => {
+    const lines1 = [" function hello() {", '-  console.log("hi")', '+  console.log("hello")', " }"]
+    const lines2 = [" function bye() {", '-  console.log("bye")', '+  console.log("goodbye")', " }"]
+
+    const hunk1 = createHunk(1, "greet.ts", 0, 1, 1, lines1)
+    const hunk2 = createHunk(2, "greet.ts", 1, 20, 20, lines2)
+
+    const combined = combineHunkPatches([hunk1, hunk2])
+
+    // All original content lines should be present
+    for (const line of [...lines1, ...lines2]) {
+      expect(combined).toContain(line)
+    }
+  })
+})
+
+describe("combineHunkPatches with formatPatch-style rawDiff", () => {
+  it("should handle rawDiff from parseHunksWithIds (Index: header format)", async () => {
+    const { parseHunksWithIds } = await import("./hunk-parser.ts")
+
+    const gitDiff = [
+      "diff --git a/src/api.ts b/src/api.ts",
+      "--- a/src/api.ts",
+      "+++ b/src/api.ts",
+      "@@ -1,4 +1,5 @@",
+      " import { fetch } from 'node-fetch'",
+      "+import { logger } from './logger'",
+      " ",
+      " export async function getData() {",
+      "   const response = await fetch('/api')",
+      "@@ -20,5 +21,6 @@ export async function postData(data) {",
+      "   const response = await fetch('/api', {",
+      "     method: 'POST',",
+      "     body: JSON.stringify(data),",
+      "+    headers: { 'Content-Type': 'application/json' },",
+      "   })",
+      "   return response.json()",
+    ].join("\n")
+
+    const hunks = await parseHunksWithIds(gitDiff)
+    expect(hunks.length).toBe(2)
+
+    // Combine both hunks — this is the real-world scenario
+    const combined = combineHunkPatches(hunks)
+
+    // Should produce a parseable patch with both @@ sections
+    const parsed = parsePatch(combined)
+    expect(parsed.length).toBe(1)
+    expect(parsed[0]!.hunks.length).toBe(2)
+    expect(parsed[0]!.hunks[0]!.oldStart).toBe(1)
+    expect(parsed[0]!.hunks[1]!.oldStart).toBe(20)
   })
 })

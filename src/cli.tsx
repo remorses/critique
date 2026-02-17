@@ -1885,21 +1885,30 @@ cli
       parseHunksWithIds,
       findHunkByStableId,
       parseHunkId,
+      combineHunkPatches,
     } = await import("./review/index.ts");
 
+    // Step 1: Parse all IDs upfront, group by filename
+    const fileGroups = new Map<string, string[]>();
     for (const id of ids) {
-      // Validate ID format
       const parsed = parseHunkId(id);
       if (!parsed) {
         console.error(`Invalid hunk ID format: ${id}`);
         console.error("Expected format: file:@-oldStart,oldLines+newStart,newLines");
         process.exit(1);
       }
+      const existing = fileGroups.get(parsed.filename);
+      if (existing) existing.push(id);
+      else fileGroups.set(parsed.filename, [id]);
+    }
 
-      // Get fresh diff for this specific file
+    // Step 2: For each file, fetch diff once and resolve all hunks
+    const resolvedHunks: Awaited<ReturnType<typeof parseHunksWithIds>> = [];
+
+    for (const [filename, fileIds] of fileGroups) {
       const gitCommand = buildGitCommand({
         staged: false,
-        filter: parsed.filename,
+        filter: filename,
       });
 
       const { stdout: gitDiff } = await execAsync(gitCommand, {
@@ -1912,7 +1921,7 @@ cli
       const dirtySubmodules = getDirtySubmodulePaths();
       if (dirtySubmodules.length > 0) {
         const subCmd = buildSubmoduleDiffCommand(dirtySubmodules, {
-          filter: parsed.filename,
+          filter: filename,
         });
         try {
           const { stdout: subDiff } = await execAsync(subCmd, {
@@ -1927,36 +1936,43 @@ cli
       }
 
       if (!fullHunksDiff.trim()) {
-        console.error(`No unstaged changes in file: ${parsed.filename}`);
+        console.error(`No unstaged changes in file: ${filename}`);
         process.exit(1);
       }
 
       const hunks = await parseHunksWithIds(stripSubmoduleHeaders(fullHunksDiff));
-      const hunk = findHunkByStableId(hunks, id);
 
-      if (!hunk) {
-        console.error(`Hunk not found: ${id}`);
-        console.error("The diff may have changed. Run 'critique hunks list' to see current hunks.");
-        process.exit(1);
+      for (const stableId of fileIds) {
+        const hunk = findHunkByStableId(hunks, stableId);
+        if (!hunk) {
+          console.error(`Hunk not found: ${stableId}`);
+          console.error("The diff may have changed. Run 'critique hunks list' to see current hunks.");
+          process.exit(1);
+        }
+        resolvedHunks.push(hunk);
       }
+    }
 
-      // Apply the hunk's raw diff to staging area
-      // Use -p0 because our diff uses --no-prefix (no a/ b/ path prefixes)
-      const tmpFile = join(tmpdir(), `critique-hunk-${Date.now()}.patch`);
-      fs.writeFileSync(tmpFile, hunk.rawDiff);
+    // Step 3: Combine all hunks into a single patch and apply atomically.
+    // This avoids the line-shift bug where staging hunk A changes line numbers
+    // for hunk B in the same file, causing B's stable ID to become stale.
+    const combinedPatch = combineHunkPatches(resolvedHunks);
+    const tmpFile = join(tmpdir(), `critique-hunk-${Date.now()}.patch`);
+    fs.writeFileSync(tmpFile, combinedPatch);
 
-      try {
-        execSync(`git apply --cached -p0 "${tmpFile}"`, { stdio: "pipe" });
+    try {
+      execSync(`git apply --cached -p0 "${tmpFile}"`, { stdio: "pipe" });
+      for (const id of ids) {
         console.log(`Staged: ${id}`);
-      } catch (error) {
-        const err = error as { stderr?: Buffer };
-        const stderr = err.stderr?.toString() || "Unknown error";
-        console.error(`Failed to stage hunk: ${id}`);
-        console.error(stderr);
-        process.exit(1);
-      } finally {
-        fs.unlinkSync(tmpFile);
       }
+    } catch (error) {
+      const err = error as { stderr?: Buffer };
+      const stderr = err.stderr?.toString() || "Unknown error";
+      console.error("Failed to stage hunks:");
+      console.error(stderr);
+      process.exit(1);
+    } finally {
+      fs.unlinkSync(tmpFile);
     }
   });
 

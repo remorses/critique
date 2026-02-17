@@ -1,3 +1,10 @@
+# 0.1.108
+
+- `hunks add`:
+  - Fix bug where staging multiple hunks from the same file failed because line numbers shifted after each `git apply`
+  - All selected hunks are now combined into a single patch and applied atomically in one `git apply --cached` call
+  - No more need to re-list and re-stage one hunk at a time
+
 # 0.1.107
 
 - `--pdf`:

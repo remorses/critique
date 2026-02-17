@@ -19,6 +19,7 @@ export {
   hunkToStableId,
   parseHunkId,
   findHunkByStableId,
+  combineHunkPatches,
 } from "./hunk-parser.ts"
 export { AcpClient, OpencodeAcpClient, createAcpClient, type AgentType } from "./acp-client.ts"
 export { compressSession, sessionsToContextXml } from "./session-context.ts"
