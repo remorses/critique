@@ -24,6 +24,8 @@ export interface CaptureOptions {
   title?: string
   /** Wrap mode for long lines (default: "word") */
   wrapMode?: "word" | "char" | "none"
+  /** Force split or unified view mode, bypassing auto-detection */
+  viewMode?: "split" | "unified"
   /** Show privacy/expiry notice block at top (default: false, enabled for web uploads) */
   showNotice?: boolean
 }
@@ -184,8 +186,8 @@ export async function renderDiffToFrame(
         const oldFileName = getOldFileName(file)
         const filetype = detectFiletype(fileName)
         const { additions, deletions } = countChanges(file.hunks)
-        // Use higher threshold (150) for web rendering vs TUI (100)
-        const viewMode = getViewMode(additions, deletions, options.cols, 150)
+        // Use forced viewMode if set, otherwise auto-detect (higher threshold 150 for web vs TUI 100)
+        const viewMode = options.viewMode || getViewMode(additions, deletions, options.cols, 150)
 
         // Build file header elements - show "old → new" for renames
         const fileHeaderChildren = oldFileName

@@ -91,6 +91,8 @@ interface ReviewPdfOptions {
   pdf: boolean;
   filename?: string;
   open?: boolean;
+  /** Page size preset or custom WxH in points (default: "a4-landscape") */
+  pageSize?: string;
 }
 
 // Review mode options
@@ -654,7 +656,9 @@ async function runReviewMode(
       try {
         // PDF defaults to github-light (better for print/reading)
         const themeName = "github-light";
-        const cols = 140;
+        // Parse page size (default: a4-landscape for more horizontal space)
+        const [reviewPageWidth, reviewPageHeight] = parsePageSize(pdfOptions.pageSize || "a4-landscape");
+        const cols = reviewPageWidth > reviewPageHeight ? 200 : 140;
 
         // Capture frame using opentui test renderer
         const frame = await renderReviewToFrame({
@@ -670,6 +674,8 @@ async function runReviewMode(
         const fontPath = join(import.meta.dir, "..", "public", "jetbrains-mono-nerd.ttf");
 
         const result = await renderFrameToPdf(frame, {
+          pageWidth: reviewPageWidth,
+          pageHeight: reviewPageHeight,
           theme: {
             background: rgbaToHex(reviewTheme.background),
             text: rgbaToHex(reviewTheme.text),
@@ -800,6 +806,9 @@ async function runReviewMode(
 interface ResumeModeOptions {
   reviewId?: string;
   web?: boolean;
+  pdf?: boolean;
+  pdfFilename?: string;
+  pdfPageSize?: string;
   open?: boolean;
 }
 
@@ -1005,6 +1014,63 @@ async function runResumeMode(options: ResumeModeOptions) {
     }
   }
 
+  // PDF mode: render to PDF and exit
+  if (options.pdf) {
+    const { renderReviewToFrame } = await import("./web-utils.tsx");
+    const { renderFrameToPdf } = await import("./opentui-pdf.ts");
+    const { join } = await import("path");
+    const { tmpdir: getTmpdir } = await import("os");
+
+    const pdfSpinner = clack.spinner();
+    pdfSpinner.start("Generating PDF...");
+
+    try {
+      const themeName = "github-light";
+      const [pdfPageWidth, pdfPageHeight] = parsePageSize(options.pdfPageSize || "a4-landscape");
+      const pdfCols = pdfPageWidth > pdfPageHeight ? 200 : 140;
+
+      const frame = await renderReviewToFrame({
+        hunks: review.hunks,
+        reviewData: review.reviewYaml,
+        cols: pdfCols,
+        maxRows: 10000,
+        themeName,
+      });
+
+      const pdfTheme = getResolvedTheme(themeName);
+      const fontPath = join(import.meta.dir, "..", "public", "jetbrains-mono-nerd.ttf");
+
+      const result = await renderFrameToPdf(frame, {
+        pageWidth: pdfPageWidth,
+        pageHeight: pdfPageHeight,
+        theme: {
+          background: rgbaToHex(pdfTheme.background),
+          text: rgbaToHex(pdfTheme.text),
+        },
+        fontPath,
+      });
+
+      const outPath = options.pdfFilename || join(getTmpdir(), `critique-review-${Date.now()}.pdf`);
+      fs.writeFileSync(outPath, result.buffer);
+      pdfSpinner.stop("PDF generated");
+
+      clack.log.success(`PDF written: ${outPath}`);
+      clack.log.info(`${result.pageCount} page${result.pageCount === 1 ? "" : "s"}, ${result.totalLines} lines`);
+      clack.outro("");
+
+      if (options.open) {
+        const { openInBrowser } = await import("./web-utils.tsx");
+        await openInBrowser(outPath);
+      }
+      process.exit(0);
+    } catch (error: any) {
+      pdfSpinner.stop("Failed");
+      clack.log.error(`Failed to generate PDF: ${error.message}`);
+      clack.outro("");
+      process.exit(1);
+    }
+  }
+
   // TUI mode: render directly
   clack.outro("");
 
@@ -1116,6 +1182,39 @@ interface PdfModeOptions {
   open?: boolean;
   theme?: string;
   cols?: number;
+  /** Page size preset or custom WxH in points (default: "a4-landscape") */
+  pageSize?: string;
+}
+
+/** Standard page size presets in points [width, height] */
+const PAGE_SIZE_PRESETS: Record<string, [number, number]> = {
+  "a4-landscape": [842, 595],
+  "a4-portrait": [595, 842],
+  "a3-landscape": [1191, 842],
+  "a3-portrait": [842, 1191],
+  "letter-landscape": [792, 612],
+  "letter-portrait": [612, 792],
+  "legal-landscape": [1008, 612],
+  "legal-portrait": [612, 1008],
+}
+
+/**
+ * Parse a page size string into [width, height] in points.
+ * Accepts presets like "a4-landscape" or custom "WxH" (e.g. "1000x600").
+ */
+function parsePageSize(size: string): [number, number] {
+  const preset = PAGE_SIZE_PRESETS[size.toLowerCase()]
+  if (preset) return preset
+
+  // Try custom WxH format
+  const match = size.match(/^(\d+)x(\d+)$/i)
+  if (match) {
+    return [parseInt(match[1]!, 10), parseInt(match[2]!, 10)]
+  }
+
+  throw new Error(
+    `Invalid page size "${size}". Use a preset (${Object.keys(PAGE_SIZE_PRESETS).join(", ")}) or custom WxH (e.g. 1000x600)`
+  )
 }
 
 async function runPdfMode(
@@ -1132,16 +1231,21 @@ async function runPdfMode(
     ? options.theme
     : "github-light";
 
-  const cols = options.cols || 140;
+  // Parse page size (default: a4-landscape for more horizontal space)
+  const [pageWidth, pageHeight] = parsePageSize(options.pageSize || "a4-landscape");
+  // Landscape default uses more cols for split diff; portrait keeps old default
+  const cols = options.cols || (pageWidth > pageHeight ? 200 : 140);
 
   console.log("Rendering to PDF...");
 
   try {
     // Capture frame using opentui test renderer
+    // Force split view for landscape pages (enough horizontal space)
     const frame = await renderDiffToFrame(diffContent, {
       cols,
       maxRows: 10000,
       themeName,
+      viewMode: pageWidth > pageHeight ? "split" : undefined,
     });
 
     // Resolve theme colors
@@ -1151,6 +1255,8 @@ async function runPdfMode(
     const fontPath = join(import.meta.dir, "..", "public", "jetbrains-mono-nerd.ttf");
 
     const result = await renderFrameToPdf(frame, {
+      pageWidth,
+      pageHeight,
       theme: {
         background: rgbaToHex(theme.background),
         text: rgbaToHex(theme.text),
@@ -1870,6 +1976,7 @@ cli
   .option("--theme <name>", "Theme to use for rendering")
   .option("--web [title]", "Generate web preview instead of TUI")
   .option("--pdf [filename]", "Generate PDF instead of TUI (default: /tmp/critique-diff-*.pdf)")
+  .option("--pdf-page-size <size>", "PDF page size: a4-landscape (default), a4-portrait, a3-landscape, letter-landscape, or WxH in points")
   .option("--open", "Open in browser (with --web/--pdf)")
   .option("--json", "Output JSON to stdout (with --web)")
   .option("--image", "Generate images instead of TUI (saved to /tmp)")
@@ -1975,7 +2082,8 @@ cli
         filename,
         open: options.open,
         theme: options.theme,
-        cols: parseInt(options.cols) || 140,
+        cols: parseInt(options.cols) || undefined,
+        pageSize: options.pdfPageSize,
       });
       return;
     }
@@ -2179,6 +2287,7 @@ cli
   }))
   .option("--web", "Generate web preview instead of TUI")
   .option("--pdf [filename]", "Generate PDF instead of TUI (default: /tmp/critique-review-*.pdf)")
+  .option("--pdf-page-size <size>", "PDF page size: a4-landscape (default), a4-portrait, a3-landscape, letter-landscape, or WxH in points")
   .option("--open", "Open in browser/viewer (with --web/--pdf)")
   .option("--json", "Output JSON to stdout (implies --web)")
   .option("--resume [id]", "Resume a previous review (shows select if no ID provided)")
@@ -2189,6 +2298,9 @@ cli
         await runResumeMode({
           reviewId: typeof options.resume === "string" ? options.resume : undefined,
           web: options.web,
+          pdf: options.pdf !== undefined,
+          pdfFilename: typeof options.pdf === 'string' ? options.pdf : undefined,
+          pdfPageSize: options.pdfPageSize,
           open: options.open,
         });
         return;
@@ -2224,6 +2336,7 @@ cli
         pdf: true,
         filename: typeof options.pdf === 'string' ? options.pdf : undefined,
         open: options.open,
+        pageSize: options.pdfPageSize,
       } : undefined;
       const isDefaultMode = !options.staged && !options.commit && !base && !head;
       await runReviewMode(gitCommand, agent, {

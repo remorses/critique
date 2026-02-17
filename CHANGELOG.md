@@ -1,3 +1,14 @@
+# 0.1.107
+
+- `--pdf`:
+  - Default to landscape A4 (842x595 pt) instead of portrait for more horizontal space
+  - Force split diff view in landscape mode for side-by-side comparison
+  - Bump default columns from 140 to 200 in landscape mode
+  - New `--pdf-page-size` option to customize page dimensions
+    - Presets: `a4-landscape` (default), `a4-portrait`, `a3-landscape`, `a3-portrait`, `letter-landscape`, `letter-portrait`, `legal-landscape`, `legal-portrait`
+    - Custom sizes: `WxH` in points (e.g. `1000x600`)
+  - Works for both `critique --pdf` and `critique review --pdf`
+
 # 0.1.106
 
 - New `--pdf` flag:
