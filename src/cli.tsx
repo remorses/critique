@@ -31,6 +31,7 @@ import parsersConfig from "./parsers-config.ts";
 
 // Register custom syntax highlighting parsers
 addDefaultParsers(parsersConfig.parsers);
+import stripAnsi from "strip-ansi";
 import fs from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
@@ -2009,10 +2010,13 @@ cli
 
     if (options.stdin) {
       // Handle stdin mode (for lazygit pager integration)
+      // Lazygit uses --color=always by default, so strip ANSI escape codes
+      // before parsing the diff (parsePatch expects plain text)
       diffContent = "";
       for await (const chunk of process.stdin) {
         diffContent += chunk;
       }
+      diffContent = stripAnsi(diffContent);
     } else {
       // Get diff from git (runs once for all modes)
       const { stdout: gitDiff } = await execAsync(gitCommand, {

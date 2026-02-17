@@ -156,6 +156,18 @@ const RENAME_DIFF = [
   " export default name",
 ].join("\n")
 
+// Colored diff (lazygit uses --color=always by default, issue #28)
+const COLORED_DIFF = [
+  "\x1B[1mdiff --git a/src/hello.ts b/src/hello.ts\x1B[m",
+  "\x1B[1m--- a/src/hello.ts\x1B[m",
+  "\x1B[1m+++ b/src/hello.ts\x1B[m",
+  "\x1B[36m@@ -1,3 +1,3 @@\x1B[m",
+  " const greeting = 'hello'",
+  "\x1B[31m-console.log(greeting)\x1B[m",
+  "\x1B[32m+console.log(greeting + ' world')\x1B[m",
+  " export default greeting",
+].join("\n")
+
 // Binary file diff (lazygit shows these)
 const BINARY_DIFF = [
   "diff --git a/logo.png b/logo.png",
@@ -390,6 +402,30 @@ describe("--stdin pager mode (lazygit issue #25)", () => {
     expect(trimmed).not.toContain("URL is private")
     session.close()
   }, 15000)
+
+  test("colored diff from lazygit (issue #28)", async () => {
+    const diffPath = tempFile("colored.diff", COLORED_DIFF)
+    const session = await launchCritique(diffPath)
+    await session.waitForText("hello", { timeout: 15000 })
+    const trimmed = await session.text({ trimEnd: true })
+
+    // Should strip ANSI codes and parse the diff correctly
+    // (not show "unknown +0-0")
+    expect(trimmed).toContain("hello.ts")
+    expect(trimmed).not.toContain("unknown")
+
+    expect(trimmed).toMatchInlineSnapshot(`
+      "
+       a/src/hello.ts → b/src/hello.ts +1-1
+
+       1   const greeting = 'hello'
+       2 - console.log(greeting)
+       2 + console.log(greeting + ' world')
+       3   export default greeting"
+    `)
+
+    session.close()
+  }, 30000)
 
   test("narrow terminal (40 cols) forces unified view", async () => {
     const diffPath = tempFile("narrow.diff", SINGLE_FILE_DIFF)
