@@ -83,7 +83,7 @@ Use critique as a custom pager in [lazygit](https://github.com/jesseduffield/laz
 ```yaml
 # ~/.config/lazygit/config.yml
 git:
-  paging:
+  pagers:
     pager: critique --stdin
 ```
 
