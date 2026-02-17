@@ -36,3 +36,6 @@ tmp
 
 # opensrc - source code for packages
 opensrc/
+
+# local test repo
+test-repo/
