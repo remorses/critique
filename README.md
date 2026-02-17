@@ -142,7 +142,8 @@ critique review --web --open
 | `--commit <ref>` | Review changes from a specific commit |
 | `--session <id>` | Include session(s) as context (can be repeated) |
 | `--web` | Generate web preview instead of TUI |
-| `--open` | Open web preview in browser (with --web) |
+| `--pdf [filename]` | Generate PDF instead of TUI. Great for reading on e-ink devices — see [e-reader guide](docs/e-reader-guide.md) |
+| `--open` | Open in browser/viewer (with --web/--pdf) |
 | `--filter <pattern>` | Filter files by glob pattern |
 
 ### Pick Files from Another Branch
@@ -274,6 +275,18 @@ critique web --title "Fix authentication bug"
 - The URL is based on a SHA-256 hash of the content, so identical diffs produce the same URL (deduplication)
 - Use `?v=desktop` or `?v=mobile` query params to force a specific version
 - If upload fails, critique automatically saves the HTML locally as a fallback
+
+## E-Ink Reading
+
+Generate PDFs from diffs and AI reviews to read on Kindle or Boox e-readers. Useful when you have background agents writing code — tools like [kimaki](https://kimaki.xyz) (runs coding agents from Discord) or [clawdbot](https://clawd.bot) (self-hosted AI assistant connected to Discord/Slack/Telegram) — and you want to review their changes away from your desk on an e-ink device.
+
+```bash
+critique --pdf                    # diff as PDF
+critique review --pdf             # AI review as PDF
+critique review main --pdf --open # review branch changes, open in viewer
+```
+
+The PDF preserves syntax highlighting and diff formatting. Email it to your Kindle, drop it in BooxDrop, or save to a synced Google Drive folder. See [docs/e-reader-guide.md](docs/e-reader-guide.md) for detailed setup for each device.
 
 ## Features
 
