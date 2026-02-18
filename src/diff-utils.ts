@@ -227,9 +227,10 @@ export function buildGitCommand(options: GitCommandOptions): string {
     : [];
   const positionalFilters = options.positionalFilters || [];
   const filters = [...filterOptions, ...positionalFilters];
+  // Use single quotes to prevent shell expansion of $ in paths like d.$owner.$repo.$.tsx
   const filterArg =
     filters.length > 0
-      ? `-- ${filters.map((f: string) => `"${f}"`).join(" ")}`
+      ? `-- ${filters.map((f: string) => `'${f}'`).join(" ")}`
       : "";
 
   if (options.staged) {
@@ -312,7 +313,7 @@ export function buildSubmoduleDiffCommand(
   const contextArg = options.context ? `-U${options.context}` : ""
   const renameArg = "-M"
   const submoduleArg = "--submodule=diff"
-  const pathArgs = submodulePaths.map((p) => `"${p}"`).join(" ")
+  const pathArgs = submodulePaths.map((p) => `'${p}'`).join(" ")
   return `git diff --no-prefix ${renameArg} ${submoduleArg} ${contextArg} -- ${pathArgs}`.trim()
 }
 
