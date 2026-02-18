@@ -5,6 +5,7 @@
 import * as React from "react"
 import { SyntaxStyle } from "@opentuah/core"
 import { getSyntaxTheme, getResolvedTheme, rgbaToHex } from "../themes.ts"
+import { balanceBackticks } from "../balance-backticks.ts"
 
 export interface DiffViewProps {
   diff: string
@@ -16,6 +17,13 @@ export interface DiffViewProps {
 }
 
 export function DiffView({ diff, view, filetype, themeName, wrapMode = "word" }: DiffViewProps) {
+  // Balance backticks before passing to <diff> so tree-sitter doesn't
+  // misparse hunks that start inside a template literal
+  const balancedDiff = React.useMemo(
+    () => balanceBackticks(diff, filetype),
+    [diff, filetype],
+  )
+
   // Memoize theme lookups to ensure stable references
   const resolvedTheme = React.useMemo(
     () => getResolvedTheme(themeName),
@@ -40,7 +48,7 @@ export function DiffView({ diff, view, filetype, themeName, wrapMode = "word" }:
   return (
     <box key={themeName} style={{ backgroundColor: colors.bgPanel }}>
       <diff
-        diff={diff}
+        diff={balancedDiff}
         view={view}
         fg={colors.text}
         treeSitterClient={undefined}
