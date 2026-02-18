@@ -246,7 +246,7 @@ critique web --title "Fix authentication bug"
 
 - **Mobile optimized** - Automatically detects mobile devices and serves a unified diff view optimized for smaller screens. Add `?v=mobile` to any URL to force mobile view.
 - **Dark/Light mode** - Automatically adapts to your system's color scheme preference using CSS `prefers-color-scheme`.
-- **Syntax highlighting** - Full syntax highlighting for 18+ languages, same as the terminal UI.
+- **Syntax highlighting** - Full syntax highlighting for 20+ languages, same as the terminal UI.
 - **Split view** - Side-by-side diff on desktop, unified view on mobile.
 - **Fast loading** - HTML is streamed for quick initial render, cached for 24 hours.
 
@@ -264,8 +264,8 @@ critique web --title "Fix authentication bug"
 
 **How it works:**
 
-1. Captures the terminal UI output using a PTY (pseudo-terminal)
-2. Converts ANSI escape codes to styled HTML with syntax highlighting
+1. Renders the diff using opentui's test renderer to capture structured frame data
+2. Converts the captured spans to styled HTML with syntax highlighting
 3. Generates both desktop (240 cols, split view) and mobile (100 cols, unified view) versions
 4. Uploads to [critique.work](https://critique.work) (Cloudflare Worker + KV storage)
 5. Returns a shareable URL that expires after 7 days
@@ -290,7 +290,7 @@ The PDF preserves syntax highlighting and diff formatting. Email it to your Kind
 
 ## Features
 
-- **Syntax Highlighting** - Powered by [Shiki](https://shiki.style/) with support for 18+ languages
+- **Syntax Highlighting** - Powered by [Tree-sitter](https://tree-sitter.github.io/) via [opentui](https://github.com/sst/opentui) with support for 20+ languages
 - **Split View** - Side-by-side comparison for wide terminals (auto-switches to unified view on narrow terminals)
 - **Word-Level Diff** - Highlights specific word changes within modified lines
 - **File Navigation** - Quick file switcher with fuzzy search
@@ -301,7 +301,7 @@ The PDF preserves syntax highlighting and diff formatting. Email it to your Kind
 
 ## Supported Languages
 
-TypeScript, JavaScript, TSX, JSX, JSON, Markdown, HTML, CSS, Python, Rust, Go, Java, C, C++, YAML, TOML, Bash, SQL
+TypeScript, JavaScript, TSX, JSX, JSON, Markdown, HTML, CSS, Python, Rust, Go, Java, C, C++, C#, Ruby, PHP, Scala, Haskell, Julia, OCaml, Clojure, Swift, Nix, YAML, Bash
 
 ## Configuration
 
@@ -327,7 +327,7 @@ Files with more than 6000 lines of diff are also hidden for performance.
 ## Built With
 
 - [opentui](https://github.com/sst/opentui) - React-based terminal UI framework
-- [Shiki](https://shiki.style/) - Syntax highlighting
+- [Tree-sitter](https://tree-sitter.github.io/) - Syntax highlighting
 - [diff](https://github.com/kpdecker/jsdiff) - Diff algorithm
 - [Hono](https://hono.dev/) - Web framework for the preview worker
 
