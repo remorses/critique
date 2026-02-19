@@ -17,49 +17,36 @@
 // the closing backtick. The \-escape handler already covers escaped backticks
 // inside strings ('\`'), and unescaped backticks inside regular strings are
 // rare enough that the tradeoff is worth it.
+//
+// Why no comment state tracking: same problem — `://` in URL template
+// literals like `${protocol}://${host}` triggers line_comment state,
+// hiding the closing backtick. This is extremely common in real code.
+// Backticks in real comments are usually in pairs (`value`) so the count
+// stays even. The rare odd-backtick-in-comment false positive is a minor
+// visual artifact vs the `:// breaks all highlighting` bug.
 
-export type TokenState = "code" | "line_comment" | "block_comment"
+export type TokenState = "code"
 
 /**
  * Count backtick characters that act as template literal delimiters.
  *
- * Uses a character-by-character state machine to skip backticks that appear
- * inside line comments (//) and block comments (/* ... *​/).
- *
+ * Walks character by character, counting unescaped backticks.
  * Escaped characters (\x) are skipped — this handles \` inside template
  * literal content and backticks inside regex patterns like /\`/.
  */
 export function countBackticks(code: string): number {
-  let state: TokenState = "code"
   let count = 0
 
   for (let i = 0; i < code.length; i++) {
     const ch = code[i]!
-    const next = code[i + 1]
-
-    switch (state) {
-      case "code":
-        if (ch === "`") count++
-        // Skip next char after backslash — handles \` inside template literal
-        // content that appears in "code" state when hunk starts mid-template,
-        // and also handles backticks inside regex patterns like /\`/
-        else if (ch === "\\") i++
-        else if (ch === "/" && next === "/") { state = "line_comment"; i++ }
-        else if (ch === "/" && next === "*") { state = "block_comment"; i++ }
-        break
-      case "line_comment":
-        if (ch === "\n") state = "code"
-        break
-      case "block_comment":
-        if (ch === "*" && next === "/") { state = "code"; i++ }
-        break
-    }
+    if (ch === "\\") i++
+    else if (ch === "`") count++
   }
 
   return count
 }
 
-interface DiffHunk {
+export interface DiffHunk {
   header: string
   lines: string[]
 }

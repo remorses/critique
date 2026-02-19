@@ -24,14 +24,6 @@ describe("countBackticks", () => {
     expect(countBackticks("const x = `hello \\` world`")).toBe(2)
   })
 
-  it("skips backticks inside line comments", () => {
-    expect(countBackticks("// use ` for templates\nconst x = 1")).toBe(0)
-  })
-
-  it("skips backticks inside block comments", () => {
-    expect(countBackticks("/* use ` for templates */\nconst x = 1")).toBe(0)
-  })
-
   it("handles nested template literals", () => {
     expect(countBackticks("`outer ${`inner`} rest`")).toBe(4)
   })
@@ -41,15 +33,7 @@ describe("countBackticks", () => {
     expect(countBackticks("const re = /\\`/g")).toBe(0)
   })
 
-  it("handles block comment spanning multiple lines", () => {
-    const code = "/* template uses `\n   backtick ` */\nconst x = `hello`"
-    expect(countBackticks(code)).toBe(2)
-  })
-
-  // --- Edge cases from oracle review ---
-
   it("handles apostrophe inside template literal (it's)", () => {
-    // The apostrophe must NOT enter a string state that hides the closing `
     expect(countBackticks("const s = `it's fine`")).toBe(2)
   })
 
@@ -57,16 +41,14 @@ describe("countBackticks", () => {
     expect(countBackticks('const s = `class="foo"`')).toBe(2)
   })
 
-  it("handles URL inside template literal — known limitation", () => {
-    // Known limitation: // inside template text enters line_comment state,
-    // hiding the closing backtick on the same line. This is a false positive
-    // (count=1 when it should be 2). Fixing requires full template state
-    // tracking which can't work on partial code (diff hunks).
-    // If the closing backtick is on a DIFFERENT line, \n resets the comment
-    // state and it works correctly.
-    expect(countBackticks("const s = `https://example.com`")).toBe(1) // ideally 2
-    // Multi-line version works because \n resets comment state
-    expect(countBackticks("const s = `https://example.com\n`")).toBe(2)
+  it("handles URL inside template literal (://)", () => {
+    // The :// must NOT trigger comment state and hide the closing backtick
+    expect(countBackticks("const s = `https://example.com`")).toBe(2)
+  })
+
+  it("handles protocol template literal", () => {
+    // Real-world pattern: `${protocol}://${host}:${port}${path}`
+    expect(countBackticks("const url = `${protocol}://${host}:${port}${path}`")).toBe(2)
   })
 
   it("handles nested template with apostrophe", () => {
@@ -78,7 +60,6 @@ describe("countBackticks", () => {
   })
 
   it("handles multiple unmatched backticks (odd > 1)", () => {
-    // 3 backticks — adding 1 makes 4 (even), which is enough for balancing
     expect(countBackticks("` text ` more `")).toBe(3)
   })
 
@@ -92,18 +73,21 @@ describe("countBackticks", () => {
 
   it("handles escaped backslash before backtick", () => {
     // \\\` — the first \\ is an escaped backslash, then \` is an escaped backtick
-    // Result: neither backslash nor backtick are counted
     expect(countBackticks("const x = `end\\\\\\``")).toBe(2)
   })
 
-  it("handles mixed comments and backticks", () => {
-    const code = [
-      "// doc: use ` for templates",  // 0 (in comment)
-      "const b = `template`",          // 2
-      "/* another ` */",                // 0 (in block comment)
-      "const c = `open",                // 1
-    ].join("\n")
-    expect(countBackticks(code)).toBe(3)
+  // Backticks inside comments are counted (no comment state tracking).
+  // This is a deliberate tradeoff: comment tracking would break on ://
+  // in URL templates, which is far more common than odd-backtick comments.
+  it("counts backticks inside comments (no comment tracking)", () => {
+    // Single backtick in comment: counted (false positive, but rare)
+    expect(countBackticks("// use ` for templates\nconst x = 1")).toBe(1)
+    // Paired backticks in comment: counted but even, so no false positive
+    expect(countBackticks("// use `template` syntax\nconst x = 1")).toBe(2)
+  })
+
+  it("counts backticks inside block comments (no comment tracking)", () => {
+    expect(countBackticks("/* use ` for templates */\nconst x = 1")).toBe(1)
   })
 })
 
@@ -210,13 +194,9 @@ describe("balanceBackticks", () => {
     const result = balanceBackticks(patch, "typescript")
     const lines = result.split("\n")
 
-    // Header unchanged
     expect(lines[2]).toBe("@@ -0,0 +1,3 @@")
-    // Backtick prepended to first + line
     expect(lines[3]).toBe("+`const x = `open template")
   })
-
-  // --- Edge cases from oracle review ---
 
   it("does not modify hunk with only no-newline markers", () => {
     const patch = [
@@ -247,14 +227,43 @@ describe("balanceBackticks", () => {
     expect(balanceBackticks(patch, "typescript")).toBe(patch)
   })
 
-  it("keeps patch unchanged for multiline template containing URL", () => {
-    // URL with // on different line from closing backtick works correctly
+  it("keeps patch unchanged for URL template literal (regression)", () => {
+    // Real-world regression: :// triggered comment state, hiding closing backtick
     const patch = makePatch([
-      " const s = `https://example.com",
-      " more text`",
+      " const url = `${protocol}://${host}:${port}${path}`",
+      " const x = 1",
       "-const y = 2",
       "+const y = 3",
     ])
+    expect(balanceBackticks(patch, "typescript")).toBe(patch)
+  })
+
+  it("keeps patch unchanged for WebSocket URL template from real patch", () => {
+    // Regression test from actual tunnel client patch
+    const patch = [
+      "--- src/client.ts",
+      "+++ src/client.ts",
+      "@@ -267,10 +267,16 @@ export class TunnelClient {",
+      "     const protocol = localHttps ? 'wss' : 'ws'",
+      "     const url = `${protocol}://${localHost}:${localPort}${msg.path}`",
+      " ",
+      "-    console.log(`WS OPEN ${msg.path} (${msg.connId})`)",
+      "+    // Forward WebSocket subprotocol if present (e.g. \"vite-hmr\")",
+      "+    const subprotocol = msg.headers['sec-websocket-protocol']",
+      "+    const protocols = subprotocol",
+      "+      ? subprotocol.split(',').map((p) => p.trim())",
+      "+      : undefined",
+      "+",
+      "+    console.log(`WS OPEN ${msg.path} (${msg.connId})${protocols ? ` protocols=${protocols}` : ''}`)",
+      " ",
+      "     try {",
+      "-      const localWs = new WebSocket(url)",
+      "+      const localWs = new WebSocket(url, protocols)",
+      " ",
+      "       localWs.on('open', () => {",
+      "         console.log(`WS CONNECTED ${msg.connId}`)",
+    ].join("\n")
+    // Must remain unchanged — all backticks are balanced (10 total, even)
     expect(balanceBackticks(patch, "typescript")).toBe(patch)
   })
 
