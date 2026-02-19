@@ -25,14 +25,12 @@
 // stays even. The rare odd-backtick-in-comment false positive is a minor
 // visual artifact vs the `:// breaks all highlighting` bug.
 
-export type TokenState = "code"
-
 /**
- * Count backtick characters that act as template literal delimiters.
+ * Count unescaped backtick characters in a code string.
  *
- * Walks character by character, counting unescaped backticks.
- * Escaped characters (\x) are skipped — this handles \` inside template
- * literal content and backticks inside regex patterns like /\`/.
+ * Walks character by character. Backslash skips the next character,
+ * everything else is checked for backtick. No state tracking —
+ * see file header for why string/comment states were removed.
  */
 export function countBackticks(code: string): number {
   let count = 0
