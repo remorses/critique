@@ -99,6 +99,20 @@ describe("countDelimiter", () => {
       expect(countDelimiter("x = 'hello'\ny = 'world'", "'''")).toBe(0)
     })
   })
+
+  describe("triple backticks (Markdown)", () => {
+    it("counts fenced code block markers", () => {
+      expect(countDelimiter("```ts\nconst x = 1\n```", "```")).toBe(2)
+    })
+
+    it("counts single fence marker (unclosed code block)", () => {
+      expect(countDelimiter("still inside fence\n```", "```")).toBe(1)
+    })
+
+    it("returns 0 for plain markdown without fences", () => {
+      expect(countDelimiter("# Title\n\nSome text with `inline` code", "```")).toBe(0)
+    })
+  })
 })
 
 // ============================================================================
@@ -331,6 +345,46 @@ describe("balanceDelimiters", () => {
       const result = balanceDelimiters(patch, "go")
       const lines = result.split("\n")
       expect(lines[3]).toBe(" `still inside raw string`")
+    })
+  })
+
+  describe("markdown", () => {
+    const mdPatch = (hunkLines: string[]) => [
+      "--- file.md",
+      "+++ file.md",
+      "@@ -10,4 +10,4 @@",
+      ...hunkLines,
+    ].join("\n")
+
+    it("returns patch unchanged when code fences are balanced", () => {
+      const patch = mdPatch([
+        " ```ts",
+        " const x = 1",
+        " ```",
+        "+New paragraph",
+      ])
+      expect(balanceDelimiters(patch, "markdown")).toBe(patch)
+    })
+
+    it("prepends balancing code fence when count is odd", () => {
+      const patch = mdPatch([
+        " inside fenced block",
+        " ```",
+        "-old line",
+        "+new line",
+      ])
+      const result = balanceDelimiters(patch, "markdown")
+      const lines = result.split("\n")
+      expect(lines[3]).toBe(" ```inside fenced block")
+    })
+
+    it("does not modify when only inline code backticks are present", () => {
+      const patch = mdPatch([
+        " This has `inline` code",
+        "-old",
+        "+new",
+      ])
+      expect(balanceDelimiters(patch, "markdown")).toBe(patch)
     })
   })
 

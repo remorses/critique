@@ -1,8 +1,9 @@
 // Delimiter balancing for syntax highlighting in diff hunks.
 //
 // When a diff hunk starts inside a paired delimiter (template literal,
-// triple-quoted string, etc.), tree-sitter sees an odd number of that
-// delimiter and misparses everything after the first occurrence.
+// triple-quoted string, fenced code block, etc.), tree-sitter sees an
+// odd number of that delimiter and misparses everything after the first
+// occurrence.
 //
 // Two-pass fix:
 //   1. Tokenizer: count delimiter occurrences in each hunk's content,
@@ -27,6 +28,7 @@
 const LANGUAGE_DELIMITERS: Record<string, string[]> = {
   typescript: ["`"],
   python: ['"""', "'''"],
+  markdown: ["```"],
   go: ["`"],
   scala: ['"""'],
   swift: ['"""'],
