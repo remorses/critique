@@ -1,3 +1,15 @@
+# 0.1.109
+
+- Syntax highlighting:
+  - Generalize delimiter balancing from backtick-only to any paired delimiter that spans lines
+  - Add Python support: balance `"""` and `'''` triple-quoted strings / docstrings
+  - Add Go support: balance `` ` `` raw string literals
+  - Add Scala, Swift, Julia support: balance `"""` triple-quoted strings
+  - Fix: diff hunks starting inside a template literal or docstring no longer cause tree-sitter to misparse subsequent code
+- Bug fixes:
+  - `--filter`: use single quotes in shell commands so paths containing `$` characters are not shell-expanded
+  - `--stdin` (lazygit pager): strip ANSI escape codes from colored diffs before parsing so filenames are not mangled
+
 # 0.1.108
 
 - `hunks add`:
