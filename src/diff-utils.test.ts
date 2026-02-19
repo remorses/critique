@@ -4,7 +4,7 @@
 // extracts rename metadata for all rename/copy sections.
 
 import { describe, expect, it } from "bun:test"
-import { parsePatch } from "diff"
+import { parsePatch, formatPatch } from "diff"
 import {
   preprocessDiff,
   parseGitDiffFiles,
@@ -12,6 +12,10 @@ import {
   getFileName,
   getOldFileName,
   buildGitCommand,
+  buildSubmoduleDiffCommand,
+  filterParsedFilesByPatterns,
+  getFilterPatterns,
+  matchesFileFilters,
 } from "./diff-utils.ts"
 
 // ============================================================================
@@ -307,6 +311,27 @@ describe("parseGitDiffFiles", () => {
     expect(files[0]!.renameTo).toBeUndefined()
   })
 
+  it("should parse formatPatch output (Index header) without losing filenames", () => {
+    const rawDiff = [
+      "diff --git src/main.ts src/main.ts",
+      "index abc123..def456 100644",
+      "--- src/main.ts",
+      "+++ src/main.ts",
+      "@@ -1,1 +1,1 @@",
+      "-const x = 1",
+      "+const x = 2",
+    ].join("\n")
+
+    const parsed = parsePatch(rawDiff)
+    const formatted = formatPatch(parsed[0]!)
+    const files = parseGitDiffFiles(formatted, parsePatch)
+
+    expect(files.length).toBe(1)
+    expect(files[0]!.oldFileName).toBe("src/main.ts")
+    expect(files[0]!.newFileName).toBe("src/main.ts")
+    expect(files[0]!.hunks.length).toBe(1)
+  })
+
   it("should parse copy with content changes", () => {
     const rawDiff = [
       "diff --git original.ts copied.ts",
@@ -535,6 +560,73 @@ describe("buildGitCommand with rename detection", () => {
   it("should include -M flag in two-dot range", () => {
     const cmd = buildGitCommand({ base: "main..feature" })
     expect(cmd).toContain("-M")
+  })
+})
+
+// ============================================================================
+// filter helpers
+// ============================================================================
+
+describe("filter helpers", () => {
+  it("should combine --filter and positional filters", () => {
+    expect(
+      getFilterPatterns({
+        filter: ["src/**/*.ts", "src/**/*.ts", "README.md"],
+        positionalFilters: ["packages/*/src/**"],
+      })
+    ).toEqual(["src/**/*.ts", "README.md", "packages/*/src/**"])
+  })
+
+  it("should match file paths using glob patterns", () => {
+    expect(matchesFileFilters("submodules/opentui/packages/react/src/app.tsx", ["submodules/**/react/**/*.tsx"])).toBe(true)
+    expect(matchesFileFilters("submodules/opentui/packages/core/src/app.ts", ["submodules/**/react/**/*.tsx"])).toBe(false)
+  })
+
+  it("should preserve plain path filter behavior", () => {
+    expect(matchesFileFilters("src/main.ts", ["src"])).toBe(true)
+    expect(matchesFileFilters("src/main.ts", ["src/"])).toBe(true)
+    expect(matchesFileFilters("src/main.ts", ["./src"])).toBe(true)
+    expect(matchesFileFilters("src/main.ts", ["."])).toBe(true)
+    expect(matchesFileFilters("src/main.ts", ["./"])).toBe(true)
+    expect(matchesFileFilters("src/main.ts", ["src/main.ts"])).toBe(true)
+    expect(matchesFileFilters("src/main.ts", ["main.ts"])).toBe(false)
+  })
+
+  it("should filter parsed files after submodule diff merge", () => {
+    const files = [
+      {
+        oldFileName: "src/main.ts",
+        newFileName: "src/main.ts",
+        hunks: [{ lines: ["+const app = 1"] }],
+      },
+      {
+        oldFileName: "opentui/packages/react/src/index.tsx",
+        newFileName: "opentui/packages/react/src/index.tsx",
+        hunks: [{ lines: ["+export const x = 1"] }],
+      },
+      {
+        oldFileName: "opentui/packages/core/src/index.ts",
+        newFileName: "opentui/packages/core/src/index.ts",
+        hunks: [{ lines: ["+export const y = 1"] }],
+      },
+    ]
+
+    const filtered = filterParsedFilesByPatterns(files, {
+      filter: "opentui/**/react/**/*.tsx",
+    })
+
+    expect(filtered).toHaveLength(1)
+    expect(filtered[0]!.newFileName).toBe("opentui/packages/react/src/index.tsx")
+  })
+})
+
+describe("buildSubmoduleDiffCommand", () => {
+  it("should only scope to submodule paths and context", () => {
+    const cmd = buildSubmoduleDiffCommand(["opentui", "errore"], { context: 7 })
+    expect(cmd).toContain("git diff --no-prefix")
+    expect(cmd).toContain("--submodule=diff")
+    expect(cmd).toContain("-U7")
+    expect(cmd).toContain("-- 'opentui' 'errore'")
   })
 })
 

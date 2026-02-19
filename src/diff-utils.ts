@@ -81,6 +81,16 @@ export function preprocessDiff(rawDiff: string): {
     sections.push({ startIdx: sections.length, lines: currentSection })
   }
 
+  // Some callers may pass patch text produced by `diff`'s formatPatch(), which
+  // uses "Index:" headers instead of "diff --git". In that case, do not
+  // drop the whole payload: return it as-is so parsePatch can still parse hunks.
+  if (sections.length === 0) {
+    return {
+      processedDiff: rawDiff,
+      renameInfo,
+    }
+  }
+
   const outputSections: string[] = []
 
   for (let sectionIdx = 0; sectionIdx < sections.length; sectionIdx++) {
@@ -210,6 +220,64 @@ export interface GitCommandOptions {
 }
 
 /**
+ * Normalize file filter patterns from both --filter and positional args after --.
+ */
+export function getFilterPatterns(
+  options: Pick<GitCommandOptions, "filter" | "positionalFilters">,
+): string[] {
+  const filterOptions = options.filter
+    ? Array.isArray(options.filter)
+      ? options.filter
+      : [options.filter]
+    : [];
+  const positionalFilters = options.positionalFilters || [];
+  return [...new Set([...filterOptions, ...positionalFilters].filter((pattern) => pattern.length > 0))];
+}
+
+/**
+ * Check whether a filepath matches any user-provided file filter glob.
+ * No patterns means "match everything".
+ */
+export function matchesFileFilters(filePath: string, patterns: string[]): boolean {
+  if (patterns.length === 0) return true;
+
+  return patterns.some((rawPattern) => {
+    const pattern = rawPattern.startsWith("./") ? rawPattern.slice(2) : rawPattern;
+    if (pattern === "." || pattern === "") return true;
+
+    // Keep compatibility with existing git pathspec behavior for plain paths:
+    // - "src" should match "src/**"
+    // - "src/" should match descendants under src/
+    // - "src/file.ts" should match that exact file
+    const hasGlobMagic = /[*?[\]{}!]/.test(pattern);
+    if (!hasGlobMagic) {
+      if (pattern.endsWith("/")) {
+        return filePath.startsWith(pattern);
+      }
+      return filePath === pattern || filePath.startsWith(pattern + "/");
+    }
+
+    const glob = new Bun.Glob(pattern);
+    return glob.match(filePath);
+  });
+}
+
+/**
+ * Apply critique --filter globs to already-parsed diff files.
+ * This is used after appending submodule diffs, where git pathspec filters are
+ * no longer sufficient.
+ */
+export function filterParsedFilesByPatterns<T extends ParsedFile>(
+  files: T[],
+  options: Pick<GitCommandOptions, "filter" | "positionalFilters">,
+): T[] {
+  const patterns = getFilterPatterns(options);
+  if (patterns.length === 0) return files;
+
+  return files.filter((file) => matchesFileFilters(getFileName(file), patterns));
+}
+
+/**
  * Build git command string based on options
  */
 export function buildGitCommand(options: GitCommandOptions): string {
@@ -220,13 +288,7 @@ export function buildGitCommand(options: GitCommandOptions): string {
   const renameArg = "-M";
 
   // Combine --filter options with positional args after --
-  const filterOptions = options.filter
-    ? Array.isArray(options.filter)
-      ? options.filter
-      : [options.filter]
-    : [];
-  const positionalFilters = options.positionalFilters || [];
-  const filters = [...filterOptions, ...positionalFilters];
+  const filters = getFilterPatterns(options);
   // Use single quotes to prevent shell expansion of $ in paths like d.$owner.$repo.$.tsx
   const filterArg =
     filters.length > 0
@@ -308,7 +370,7 @@ export function getDirtySubmodulePaths(): string[] {
  */
 export function buildSubmoduleDiffCommand(
   submodulePaths: string[],
-  options: Pick<GitCommandOptions, "context" | "filter" | "positionalFilters">,
+  options: Pick<GitCommandOptions, "context">,
 ): string {
   const contextArg = options.context ? `-U${options.context}` : ""
   const renameArg = "-M"

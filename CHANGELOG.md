@@ -1,3 +1,20 @@
+# 0.1.110
+
+- `--filter` with dirty submodules:
+  - Apply file glob filters after dirty submodule diffs are merged into the combined diff result
+  - Fixes cases where `--filter` matched top-level files but still showed unrelated files coming from submodule diffs
+  - Keep compatibility with plain path filters (e.g. `src`, `src/`, `./src`) in the post-merge filtering path
+- Commands updated:
+  - `critique` (default mode, including `--watch` refreshes)
+  - `critique review`
+  - `critique hunks list`
+  - `critique hunks add`
+  - `critique web` (deprecated command)
+- Internal cleanup:
+  - `buildSubmoduleDiffCommand` now only scopes by submodule paths/context; user file globs are applied in a post-merge filtering pass
+  - Add regression tests for filter pattern normalization and post-merge parsed-file filtering
+  - Fix parsing for post-filtered patches emitted via `formatPatch` (`Index:` headers), avoiding `unknown +0-0` file entries
+
 # 0.1.109
 
 - Syntax highlighting:

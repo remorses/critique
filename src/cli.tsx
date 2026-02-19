@@ -43,6 +43,7 @@ import { logger } from "./logger.ts";
 import { saveStoredLicenseKey } from "./license.ts";
 import {
   buildGitCommand,
+  filterParsedFilesByPatterns,
   getFileName,
   getFileStatus,
   getOldFileName,
@@ -54,6 +55,7 @@ import {
   parseGitDiffFiles,
   getDirtySubmodulePaths,
   buildSubmoduleDiffCommand,
+  getFilterPatterns,
   IGNORED_FILES,
   type ParsedFile,
   type GitCommandOptions,
@@ -136,7 +138,9 @@ async function runReviewMode(
   if (reviewOptions?.isDefaultMode) {
     const dirtySubmodules = getDirtySubmodulePaths();
     if (dirtySubmodules.length > 0) {
-      const subCmd = buildSubmoduleDiffCommand(dirtySubmodules, reviewOptions.diffOptions || {});
+      const subCmd = buildSubmoduleDiffCommand(dirtySubmodules, {
+        context: reviewOptions.diffOptions?.context,
+      });
       try {
         const { stdout: subDiff } = await execAsync(subCmd, { encoding: "utf-8" });
         if (subDiff.trim()) {
@@ -146,6 +150,8 @@ async function runReviewMode(
         // Submodule diff failed — skip
       }
     }
+
+    fullDiff = await filterCombinedDiffByPatterns(fullDiff, reviewOptions.diffOptions || {});
   }
   const gitDiffResult = fullDiff;
 
@@ -1404,6 +1410,22 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
 
 const execAsync = promisify(exec);
 
+async function filterCombinedDiffByPatterns(
+  diffContent: string,
+  options: Pick<GitCommandOptions, "filter" | "positionalFilters">,
+): Promise<string> {
+  if (!diffContent.trim()) return diffContent;
+  if (getFilterPatterns(options).length === 0) return diffContent;
+
+  const { parsePatch, formatPatch } = await import("diff");
+  const parsedFiles = parseGitDiffFiles(stripSubmoduleHeaders(diffContent), parsePatch);
+  const filteredFiles = filterParsedFilesByPatterns(parsedFiles, options);
+
+  if (filteredFiles.length === 0) return "";
+
+  return filteredFiles.map((file) => formatPatch(file)).join("\n");
+}
+
 function formatPreviewExpiry(expiresInDays?: number | null): string {
   if (expiresInDays === null) {
     return "(never expires)";
@@ -1822,9 +1844,7 @@ cli
     if (!options.staged) {
       const dirtySubmodules = getDirtySubmodulePaths();
       if (dirtySubmodules.length > 0) {
-        const subCmd = buildSubmoduleDiffCommand(dirtySubmodules, {
-          filter: options.filter,
-        });
+        const subCmd = buildSubmoduleDiffCommand(dirtySubmodules, {});
         try {
           const { stdout: subDiff } = await execAsync(subCmd, { encoding: "utf-8" });
           if (subDiff.trim()) {
@@ -1834,6 +1854,11 @@ cli
           // Submodule diff failed — skip
         }
       }
+
+      fullHunksDiff = await filterCombinedDiffByPatterns(fullHunksDiff, {
+        filter: options.filter,
+        positionalFilters: options['--'],
+      });
     }
 
     if (!fullHunksDiff.trim()) {
@@ -1920,9 +1945,7 @@ cli
       let fullHunksDiff = gitDiff;
       const dirtySubmodules = getDirtySubmodulePaths();
       if (dirtySubmodules.length > 0) {
-        const subCmd = buildSubmoduleDiffCommand(dirtySubmodules, {
-          filter: filename,
-        });
+        const subCmd = buildSubmoduleDiffCommand(dirtySubmodules, {});
         try {
           const { stdout: subDiff } = await execAsync(subCmd, {
             encoding: "utf-8",
@@ -1934,6 +1957,10 @@ cli
           // Submodule diff failed — skip
         }
       }
+
+      fullHunksDiff = await filterCombinedDiffByPatterns(fullHunksDiff, {
+        filter: filename,
+      });
 
       if (!fullHunksDiff.trim()) {
         console.error(`No unstaged changes in file: ${filename}`);
@@ -2050,8 +2077,6 @@ cli
         if (dirtySubmodules.length > 0) {
           const subCmd = buildSubmoduleDiffCommand(dirtySubmodules, {
             context: options.context,
-            filter: options.filter,
-            positionalFilters: options['--'],
           });
           try {
             const { stdout: subDiff } = await execAsync(subCmd, {
@@ -2064,6 +2089,11 @@ cli
             // Submodule diff failed (e.g. submodule not initialized) — skip
           }
         }
+
+        diffContent = await filterCombinedDiffByPatterns(diffContent, {
+          filter: options.filter,
+          positionalFilters: options['--'],
+        });
       }
     }
 
@@ -2190,8 +2220,6 @@ cli
                 if (dirtySubmodules.length > 0) {
                   const subCmd = buildSubmoduleDiffCommand(dirtySubmodules, {
                     context: options.context,
-                    filter: options.filter,
-                    positionalFilters: options['--'],
                   });
                   try {
                     const { stdout: subDiff } = await execAsync(subCmd, {
@@ -2212,7 +2240,13 @@ cli
               }
 
               const files = parseGitDiffFiles(stripSubmoduleHeaders(fullDiff), parsePatch);
-              const processedFiles = processFiles(files, formatPatch);
+              const filteredFiles = isDefaultMode
+                ? filterParsedFilesByPatterns(files, {
+                    filter: options.filter,
+                    positionalFilters: options['--'],
+                  })
+                : files;
+              const processedFiles = processFiles(filteredFiles, formatPatch);
               setParsedFiles(processedFiles);
             } catch (error) {
               setParsedFiles([]);
@@ -2680,8 +2714,6 @@ cli
       if (dirtySubmodules.length > 0) {
         const subCmd = buildSubmoduleDiffCommand(dirtySubmodules, {
           context: options.context,
-          filter: options.filter,
-          positionalFilters: options['--'],
         });
         try {
           const { stdout: subDiff } = await execAsync(subCmd, { encoding: "utf-8" });
@@ -2692,6 +2724,11 @@ cli
           // Submodule diff failed — skip
         }
       }
+
+      fullWebDiff = await filterCombinedDiffByPatterns(fullWebDiff, {
+        filter: options.filter,
+        positionalFilters: options['--'],
+      });
     }
 
     if (!fullWebDiff.trim()) {
