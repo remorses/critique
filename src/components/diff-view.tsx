@@ -5,7 +5,7 @@
 import * as React from "react"
 import { SyntaxStyle } from "@opentuah/core"
 import { getSyntaxTheme, getResolvedTheme, rgbaToHex } from "../themes.ts"
-import { balanceBackticks } from "../balance-backticks.ts"
+import { balanceDelimiters } from "../balance-delimiters.ts"
 
 export interface DiffViewProps {
   diff: string
@@ -17,10 +17,11 @@ export interface DiffViewProps {
 }
 
 export function DiffView({ diff, view, filetype, themeName, wrapMode = "word" }: DiffViewProps) {
-  // Balance backticks before passing to <diff> so tree-sitter doesn't
-  // misparse hunks that start inside a template literal
+  // Balance paired delimiters (backticks, triple quotes, etc.) before
+  // passing to <diff> so tree-sitter doesn't misparse hunks that start
+  // inside a multi-line string
   const balancedDiff = React.useMemo(
-    () => balanceBackticks(diff, filetype),
+    () => balanceDelimiters(diff, filetype),
     [diff, filetype],
   )
 
