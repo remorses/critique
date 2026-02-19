@@ -334,6 +334,99 @@ describe("balanceDelimiters", () => {
     })
   })
 
+  describe("scala", () => {
+    const scalaPatch = (hunkLines: string[]) => [
+      "--- file.scala",
+      "+++ file.scala",
+      "@@ -10,4 +10,4 @@ object Main {",
+      ...hunkLines,
+    ].join("\n")
+
+    it("returns patch unchanged when triple quotes are balanced", () => {
+      const patch = scalaPatch([
+        ' val s = """multi',
+        ' line string"""',
+        "-val x = 1",
+        "+val x = 2",
+      ])
+      expect(balanceDelimiters(patch, "scala")).toBe(patch)
+    })
+
+    it("prepends balancing triple quote when count is odd", () => {
+      const patch = scalaPatch([
+        "     still inside string",
+        '     """.stripMargin',
+        "-    val x = 1",
+        "+    val x = 2",
+      ])
+      const result = balanceDelimiters(patch, "scala")
+      const lines = result.split("\n")
+      expect(lines[3]).toBe(' """    still inside string')
+    })
+  })
+
+  describe("swift", () => {
+    const swiftPatch = (hunkLines: string[]) => [
+      "--- file.swift",
+      "+++ file.swift",
+      "@@ -10,4 +10,4 @@ func foo() {",
+      ...hunkLines,
+    ].join("\n")
+
+    it("returns patch unchanged when triple quotes are balanced", () => {
+      const patch = swiftPatch([
+        ' let s = """',
+        '     multi-line string',
+        '     """',
+        "-let x = 1",
+      ])
+      expect(balanceDelimiters(patch, "swift")).toBe(patch)
+    })
+
+    it("prepends balancing triple quote when count is odd", () => {
+      const patch = swiftPatch([
+        "     still inside multi-line string",
+        '     """',
+        "-    let x = 1",
+        "+    let x = 2",
+      ])
+      const result = balanceDelimiters(patch, "swift")
+      const lines = result.split("\n")
+      expect(lines[3]).toBe(' """    still inside multi-line string')
+    })
+  })
+
+  describe("julia", () => {
+    const juliaPatch = (hunkLines: string[]) => [
+      "--- file.jl",
+      "+++ file.jl",
+      "@@ -10,4 +10,4 @@ function foo()",
+      ...hunkLines,
+    ].join("\n")
+
+    it("returns patch unchanged when triple quotes are balanced", () => {
+      const patch = juliaPatch([
+        ' s = """multi-line"""',
+        "-x = 1",
+        "+x = 2",
+        " return x",
+      ])
+      expect(balanceDelimiters(patch, "julia")).toBe(patch)
+    })
+
+    it("prepends balancing triple quote when count is odd", () => {
+      const patch = juliaPatch([
+        "     still inside string",
+        '     """',
+        "-    x = 1",
+        "+    x = 2",
+      ])
+      const result = balanceDelimiters(patch, "julia")
+      const lines = result.split("\n")
+      expect(lines[3]).toBe(' """    still inside string')
+    })
+  })
+
   describe("edge cases", () => {
     it("returns unchanged when no hunks present", () => {
       const patch = "--- file.ts\n+++ file.ts"

@@ -28,6 +28,9 @@ const LANGUAGE_DELIMITERS: Record<string, string[]> = {
   typescript: ["`"],
   python: ['"""', "'''"],
   go: ["`"],
+  scala: ['"""'],
+  swift: ['"""'],
+  julia: ['"""'],
 }
 
 /**
