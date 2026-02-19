@@ -1,3 +1,22 @@
+# 0.1.112
+
+- Syntax highlighting delimiter balancing:
+  - Add Markdown fenced code block balancing using triple backticks (```), matching existing odd-delimiter normalization used for JavaScript/TypeScript and Python
+  - Prevent markdown diff hunks that start inside an open code fence from confusing tree-sitter parsing for the rest of the hunk
+- Commands affected:
+  - `critique`
+  - `critique review`
+  - `critique --web` / `critique web`
+- Tests:
+  - Add tokenizer and patch-balancing coverage for Markdown triple-backtick fences, including unclosed-fence and inline-code regression cases
+
+# 0.1.111
+
+- End-to-end test coverage for `--filter` + submodules:
+  - Add real git repo integration tests that create a dirty submodule and run `critique --scrollback --filter ...` with user-style commands
+  - Cover common usage patterns: `--filter 'vendor/opentui/**'`, `--filter 'src'`, and `--filter '.'`
+  - Assert we do not regress to `unknown +0-0` output in filtered submodule flows
+
 # 0.1.110
 
 - `--filter` with dirty submodules:
