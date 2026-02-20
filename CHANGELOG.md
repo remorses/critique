@@ -1,3 +1,17 @@
+# 0.1.113
+
+- Web preview (`--web`):
+  - Add anchor links for each file section — shareable URLs like `critique.work/v/id#src-foo-ts` scroll directly to that file's diff
+  - File headers get `id` attributes with slugified filenames, and a `#` link appears on hover
+  - Duplicate filenames are automatically deduped (`index-ts`, `index-ts-2`, etc.)
+  - Fix mobile redirect to preserve URL hash fragment (previously `#file-id` was lost on mobile redirect)
+- `ansi-html.ts` (generic opentui HTML converter):
+  - Add `renderLine` callback to customize per-line HTML output (wrapping, adding attributes, etc.)
+  - Add `extraCss` / `extraJs` options for injecting custom styles and scripts into the document
+  - These hooks are generic and reusable by any opentui app, not tied to critique's diff logic
+- Tests:
+  - Add unit tests for `slugifyFileName`, `buildAnchorMap`, `renderLine` callback, `extraCss`/`extraJs` injection, and hash fragment preservation
+
 # 0.1.112
 
 - Syntax highlighting delimiter balancing:

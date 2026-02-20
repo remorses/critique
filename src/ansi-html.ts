@@ -20,6 +20,14 @@ export interface ToHtmlOptions {
   title?: string
   /** OG image URL for social media previews */
   ogImageUrl?: string
+  /** Custom line renderer - wraps or replaces the default <div class="line"> output per line.
+   *  Generic hook: receives the default HTML, the captured line data, and the 0-based line index.
+   *  Return a replacement HTML string. If not provided, the default <div class="line"> is used. */
+  renderLine?: (defaultHtml: string, line: CapturedLine, lineIndex: number) => string
+  /** Extra CSS injected into the document style block */
+  extraCss?: string
+  /** Extra JS injected as a separate script block before </body> */
+  extraJs?: string
 }
 
 /**
@@ -128,11 +136,14 @@ export function frameToHtml(frame: CapturedFrame, options: ToHtmlOptions = {}): 
   }
 
   // Render each line as a div
-  const htmlLines = lines.map((line) => {
+  const htmlLines = lines.map((line, lineIndex) => {
     const content = lineToHtml(line)
     // Use a div for each line to ensure proper line breaks
     // Empty lines get a span with nbsp for consistent flex behavior
-    return `<div class="line">${content || "<span>&nbsp;</span>"}</div>`
+    const defaultHtml = `<div class="line">${content || "<span>&nbsp;</span>"}</div>`
+    return options.renderLine
+      ? options.renderLine(defaultHtml, line, lineIndex)
+      : defaultHtml
   })
 
   return htmlLines.join("\n")
@@ -242,7 +253,7 @@ ${options.autoTheme ? `@media (prefers-color-scheme: light) {
   html {
     filter: invert(1) hue-rotate(180deg);
   }
-}` : ''}\nhtml{scrollbar-width:thin;scrollbar-color:#6b7280 #2d3748;}@media(prefers-color-scheme:light){html{scrollbar-color:#a0aec0 #edf2f7;}}::-webkit-scrollbar{width:12px;}::-webkit-scrollbar-track{background:#2d3748;}::-webkit-scrollbar-thumb{background:#6b7280;border-radius:6px;}::-webkit-scrollbar-thumb:hover{background:#a0aec0;}@media(prefers-color-scheme:light){::-webkit-scrollbar-track{background:#edf2f7;}::-webkit-scrollbar-thumb{background:#a0aec0;}::-webkit-scrollbar-thumb:hover{background:#cbd5e1;}}::-webkit-scrollbar {\n  width: 12px;\n}\n::-webkit-scrollbar-track {\n  background: #2d3748;\n}\n::-webkit-scrollbar-thumb {\n  background: #6b7280;\n  border-radius: 6px;\n}\n::-webkit-scrollbar-thumb:hover {\n  background: #a0aec0;\n}\n@media (prefers-color-scheme: light) {\n  ::-webkit-scrollbar-track {\n    background: #edf2f7;\n  }\n  ::-webkit-scrollbar-thumb {\n    background: #a0aec0;\n  }\n  ::-webkit-scrollbar-thumb:hover {\n    background: #cbd5e1;\n  }\n}\n</style>\n</head>\n<body>
+}` : ''}\nhtml{scrollbar-width:thin;scrollbar-color:#6b7280 #2d3748;}@media(prefers-color-scheme:light){html{scrollbar-color:#a0aec0 #edf2f7;}}::-webkit-scrollbar{width:12px;}::-webkit-scrollbar-track{background:#2d3748;}::-webkit-scrollbar-thumb{background:#6b7280;border-radius:6px;}::-webkit-scrollbar-thumb:hover{background:#a0aec0;}@media(prefers-color-scheme:light){::-webkit-scrollbar-track{background:#edf2f7;}::-webkit-scrollbar-thumb{background:#a0aec0;}::-webkit-scrollbar-thumb:hover{background:#cbd5e1;}}::-webkit-scrollbar {\n  width: 12px;\n}\n::-webkit-scrollbar-track {\n  background: #2d3748;\n}\n::-webkit-scrollbar-thumb {\n  background: #6b7280;\n  border-radius: 6px;\n}\n::-webkit-scrollbar-thumb:hover {\n  background: #a0aec0;\n}\n@media (prefers-color-scheme: light) {\n  ::-webkit-scrollbar-track {\n    background: #edf2f7;\n  }\n  ::-webkit-scrollbar-thumb {\n    background: #a0aec0;\n  }\n  ::-webkit-scrollbar-thumb:hover {\n    background: #cbd5e1;\n  }\n}\n${options.extraCss || ''}\n</style>\n</head>\n<body>
 <div id="content">
 ${content}
 </div>
@@ -254,11 +265,12 @@ ${content}
     const isMobile = /Mobile|iP(hone|od|ad)|Android|BlackBerry|IEMobile|Kindle|Opera M(obi|ini)|Windows Phone|webOS/i.test(navigator.userAgent);
     if (isMobile) {
       params.set('v', 'mobile');
-      window.location.replace(window.location.pathname + '?' + params.toString());
+      window.location.replace(window.location.pathname + '?' + params.toString() + window.location.hash);
     }
   }
 })();
 </script>
+${options.extraJs ? `<script>\n${options.extraJs}\n</script>` : ''}
 </body>
 </html>`
 }

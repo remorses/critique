@@ -11,6 +11,12 @@ import { getResolvedTheme, rgbaToHex } from "./themes.ts"
 import type { CapturedFrame, RootRenderable, CliRenderer } from "@opentuah/core"
 import type { IndexedHunk, ReviewYaml } from "./review/types.ts"
 import { loadStoredLicenseKey, loadOrCreateOwnerSecret } from "./license.ts"
+import {
+  getFileName,
+  processFiles,
+  parseGitDiffFiles,
+  stripSubmoduleHeaders,
+} from "./diff-utils.ts"
 
 const execAsync = promisify(exec)
 
@@ -287,6 +293,88 @@ export async function renderDiffToFrame(
 }
 
 /**
+ * Convert a file path to a URL-safe anchor slug.
+ * e.g. "src/components/foo-bar.tsx" → "src-components-foo-bar-tsx"
+ */
+export function slugifyFileName(name: string): string {
+  return name
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "")
+}
+
+/**
+ * Return a unique ID, appending -2, -3, etc. if the base already exists.
+ */
+function dedupeId(id: string, usedIds: Set<string>): string {
+  if (!usedIds.has(id)) return id
+  let i = 2
+  while (usedIds.has(`${id}-${i}`)) i++
+  return `${id}-${i}`
+}
+
+/**
+ * Scan a captured frame for file-header lines and map them to anchor IDs.
+ * File headers are identified by matching filename text followed by the
+ * "+N" / "-N" change-count pattern (e.g. " src/foo.ts +3-2").
+ * Files are matched in the order they appear in `fileNames` to avoid
+ * false positives from filenames that appear in diff content.
+ *
+ * Robustness:
+ *  - Falls back to basename matching when the full path is truncated by
+ *    narrow viewport widths (e.g. mobile renders).
+ *  - Requires the +N / -N stats pattern to appear AFTER the filename
+ *    portion, preventing false matches on code lines that happen to
+ *    contain a filename and digits elsewhere.
+ */
+export function buildAnchorMap(
+  frame: CapturedFrame,
+  fileNames: string[],
+): Map<number, { id: string; label: string }> {
+  const anchors = new Map<number, { id: string; label: string }>()
+  const usedIds = new Set<string>()
+  let fileIdx = 0
+
+  for (let lineIdx = 0; lineIdx < frame.lines.length && fileIdx < fileNames.length; lineIdx++) {
+    const lineText = frame.lines[lineIdx]!.spans.map((s) => s.text).join("")
+    const trimmedName = fileNames[fileIdx]!.trim()
+
+    // Try full path match, then fall back to basename for narrow-viewport truncation
+    const baseName = trimmedName.includes("/") ? trimmedName.split("/").pop()! : null
+    const matchName = lineText.includes(trimmedName)
+      ? trimmedName
+      : (baseName && lineText.includes(baseName) ? baseName : null)
+
+    if (matchName) {
+      // Require the +N / -N stats pattern to appear AFTER the filename,
+      // so code lines like "import from src/foo.ts // +3-2" don't match
+      const nameEnd = lineText.indexOf(matchName) + matchName.length
+      const afterName = lineText.slice(nameEnd)
+      if (/\+\d+/.test(afterName) && /-\d+/.test(afterName)) {
+        const slug = slugifyFileName(trimmedName)
+        const id = dedupeId(slug, usedIds)
+        usedIds.add(id)
+        anchors.set(lineIdx, { id, label: trimmedName })
+        fileIdx++
+      }
+    }
+  }
+
+  return anchors
+}
+
+// CSS for file section anchors — injected via extraCss hook
+const SECTION_ANCHOR_CSS =
+  `.file-section{scroll-margin-top:16px;}` +
+  `.file-link{color:inherit;text-decoration:none;cursor:pointer;}` +
+  `.file-link:hover{text-decoration:underline;}`
+
+// JS to scroll to hash fragment on page load — injected via extraJs hook
+const SECTION_ANCHOR_JS =
+  `if(location.hash){var el=document.getElementById(location.hash.slice(1));if(el)setTimeout(function(){el.scrollIntoView({behavior:'smooth'})},100);}`
+
+/**
  * Capture diff and convert to HTML using test renderer
  */
 export async function captureToHtml(
@@ -294,9 +382,17 @@ export async function captureToHtml(
   options: CaptureOptions
 ): Promise<string> {
   const { frameToHtmlDocument } = await import("./ansi-html.ts")
+  const { parsePatch, formatPatch } = await import("diff")
 
   // Render diff to captured frame (with notice for web uploads)
   const frame = await renderDiffToFrame(diffContent, { ...options, showNotice: true })
+
+  // Parse diff to get ordered file names for anchor generation
+  // (same parse+filter+sort as renderDiffToFrame, so order matches exactly)
+  const files = parseGitDiffFiles(stripSubmoduleHeaders(diffContent), parsePatch)
+  const orderedFiles = processFiles(files, formatPatch)
+  const fileNames = orderedFiles.map((f) => getFileName(f))
+  const anchors = buildAnchorMap(frame, fileNames)
 
   // Get theme colors for HTML output
   const theme = getResolvedTheme(options.themeName)
@@ -307,11 +403,40 @@ export async function captureToHtml(
   const { themeNames, defaultThemeName } = await import("./themes.ts")
   const customTheme = options.themeName !== defaultThemeName && themeNames.includes(options.themeName)
 
+  // Build renderLine callback that wraps file header lines with anchor IDs
+  // and makes the filename text itself a clickable link
+  const renderLineCallback = anchors.size > 0
+    ? (defaultHtml: string, _line: unknown, lineIndex: number) => {
+        const anchor = anchors.get(lineIndex)
+        if (!anchor) return defaultHtml
+        // Add id + class to the line div
+        let html = defaultHtml.replace(
+          '<div class="line">',
+          `<div id="${anchor.id}" class="line file-section">`,
+        )
+        // Wrap the filename text inside its span with an <a> link.
+        // The filename appears as escaped text content inside a styled span.
+        const escapedLabel = anchor.label
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+        html = html.replace(
+          `>${escapedLabel}</span>`,
+          `><a href="#${anchor.id}" class="file-link">${escapedLabel}</a></span>`,
+        )
+        return html
+      }
+    : undefined
+
   return frameToHtmlDocument(frame, {
     backgroundColor,
     textColor,
     autoTheme: !customTheme,
     title: options.title,
+    renderLine: renderLineCallback,
+    extraCss: anchors.size > 0 ? SECTION_ANCHOR_CSS : undefined,
+    extraJs: anchors.size > 0 ? SECTION_ANCHOR_JS : undefined,
   })
 }
 
