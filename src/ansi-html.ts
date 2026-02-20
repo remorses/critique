@@ -6,6 +6,9 @@ import { TextAttributes, rgbToHex, type RGBA } from "@opentuah/core"
 import type { CapturedFrame, CapturedLine, CapturedSpan } from "@opentuah/core"
 import dedent from "string-dedent"
 
+// Alias for syntax highlighting in editors (tagged template behaves identically)
+const html = dedent
+
 export interface ToHtmlOptions {
   /** Background color for the container */
   backgroundColor?: string
@@ -166,7 +169,7 @@ export function frameToHtmlDocument(frame: CapturedFrame, options: ToHtmlOptions
   const cols = frame.cols
   const content = frameToHtml(frame, options)
 
-  const ogTags = options.ogImageUrl ? '\n' + dedent`
+  const ogTags = options.ogImageUrl ? '\n' + html`
     <meta property="og:title" content="${escapeHtml(title)}">
     <meta property="og:type" content="website">
     <meta property="og:image" content="${escapeHtml(options.ogImageUrl)}">
@@ -177,7 +180,7 @@ export function frameToHtmlDocument(frame: CapturedFrame, options: ToHtmlOptions
     <meta name="twitter:image" content="${escapeHtml(options.ogImageUrl)}">
   ` : ''
 
-  const autoThemeCss = options.autoTheme ? '\n' + dedent`
+  const autoThemeCss = options.autoTheme ? '\n' + html`
     @media (prefers-color-scheme: light) {
       html {
         filter: invert(1) hue-rotate(180deg);
@@ -189,7 +192,7 @@ export function frameToHtmlDocument(frame: CapturedFrame, options: ToHtmlOptions
     ? `\n<script>\n${options.extraJs}\n</script>`
     : ''
 
-  return dedent`
+  return html`
     <!DOCTYPE html>
     <html>
     <head>
