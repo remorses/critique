@@ -4,6 +4,7 @@
 
 import { TextAttributes, rgbToHex, type RGBA } from "@opentuah/core"
 import type { CapturedFrame, CapturedLine, CapturedSpan } from "@opentuah/core"
+import dedent from "string-dedent"
 
 export interface ToHtmlOptions {
   /** Background color for the container */
@@ -163,116 +164,160 @@ export function frameToHtmlDocument(frame: CapturedFrame, options: ToHtmlOptions
   } = options
 
   const cols = frame.cols
-
   const content = frameToHtml(frame, options)
 
-  // Build OG meta tags
-  const ogTags = options.ogImageUrl ? `
-<meta property="og:title" content="${escapeHtml(title)}">
-<meta property="og:type" content="website">
-<meta property="og:image" content="${escapeHtml(options.ogImageUrl)}">
-<meta property="og:image:width" content="1200">
-<meta property="og:image:height" content="630">
-<meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="${escapeHtml(title)}">
-<meta name="twitter:image" content="${escapeHtml(options.ogImageUrl)}">` : ''
+  const ogTags = options.ogImageUrl ? '\n' + dedent`
+    <meta property="og:title" content="${escapeHtml(title)}">
+    <meta property="og:type" content="website">
+    <meta property="og:image" content="${escapeHtml(options.ogImageUrl)}">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="${escapeHtml(title)}">
+    <meta name="twitter:image" content="${escapeHtml(options.ogImageUrl)}">
+  ` : ''
 
-  return `<!DOCTYPE html>
-<html>
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="icon" href="/favicon-dark.png" media="(prefers-color-scheme: dark)">
-<link rel="icon" href="/favicon-light.png" media="(prefers-color-scheme: light)">
-<link rel="icon" href="/favicon-dark.png">${ogTags}
-<style>
-@font-face {
-  font-family: 'JetBrains Mono Nerd';
-  src: url('https://critique.work/jetbrains-mono-nerd.woff2') format('woff2');
-  font-weight: normal;
-  font-style: normal;
-  font-display: swap;
-}
-</style>
-<title>${escapeHtml(title)}</title>
-<style>
-* { margin: 0; padding: 0; box-sizing: border-box; }
-html {
-  -webkit-text-size-adjust: 100%;
-  text-size-adjust: 100%;
-}
-html, body {
-  min-height: 100%;
-  background-color: ${backgroundColor};
-  color: ${textColor};
-  font-family: ${fontFamily};
-  /*
-   * Font size scales to fit ${cols} columns within viewport.
-   * Formula: (viewport - padding) / (cols * char-ratio)
-   * 
-   * The 0.6 char-ratio is the approximate width of 1ch relative to font-size
-   * in monospace fonts. Most monospace fonts (JetBrains Mono, Fira Code, 
-   * Monaco, Consolas) have a ch/font-size ratio between 0.55-0.6.
-   * We use 0.6 as a safe upper bound to prevent overflow.
-   */
-  font-size: clamp(4px, calc((100vw - 32px) / (${cols} * 0.6)), 14px);
-  line-height: 1.7;
-}
-body {
-  padding: 16px;
-  overflow-x: clip;
-  overflow-y: auto;
-  max-width: 100vw;
-}
-#content {
-  width: fit-content;
-  margin: 0 auto;
-}
-.line {
-  white-space: pre;
-  display: block;
-  content-visibility: auto;
-  contain-intrinsic-block-size: auto round(down, 1.7em, 1px);
-  background-color: ${backgroundColor};
-  transform: translateZ(0);
-  backface-visibility: hidden;
-}
-.line span {
-  white-space: pre;
-  display: inline-block;
-  line-height: 1.7;
-  vertical-align: top;
-}
-/* Disable content-visibility on iOS Safari where it can cause rendering issues */
-@supports (-webkit-touch-callout: none) {
-  .line {
-    content-visibility: visible;
-  }
-}
-${options.autoTheme ? `@media (prefers-color-scheme: light) {
-  html {
-    filter: invert(1) hue-rotate(180deg);
-  }
-}` : ''}\nhtml{scrollbar-width:thin;scrollbar-color:#6b7280 #2d3748;}@media(prefers-color-scheme:light){html{scrollbar-color:#a0aec0 #edf2f7;}}::-webkit-scrollbar{width:12px;}::-webkit-scrollbar-track{background:#2d3748;}::-webkit-scrollbar-thumb{background:#6b7280;border-radius:6px;}::-webkit-scrollbar-thumb:hover{background:#a0aec0;}@media(prefers-color-scheme:light){::-webkit-scrollbar-track{background:#edf2f7;}::-webkit-scrollbar-thumb{background:#a0aec0;}::-webkit-scrollbar-thumb:hover{background:#cbd5e1;}}::-webkit-scrollbar {\n  width: 12px;\n}\n::-webkit-scrollbar-track {\n  background: #2d3748;\n}\n::-webkit-scrollbar-thumb {\n  background: #6b7280;\n  border-radius: 6px;\n}\n::-webkit-scrollbar-thumb:hover {\n  background: #a0aec0;\n}\n@media (prefers-color-scheme: light) {\n  ::-webkit-scrollbar-track {\n    background: #edf2f7;\n  }\n  ::-webkit-scrollbar-thumb {\n    background: #a0aec0;\n  }\n  ::-webkit-scrollbar-thumb:hover {\n    background: #cbd5e1;\n  }\n}\n${options.extraCss || ''}\n</style>\n</head>\n<body>
-<div id="content">
-${content}
-</div>
-<script>
-// Redirect mobile devices to ?v=mobile for optimized view
-(function() {
-  const params = new URLSearchParams(window.location.search);
-  if (!params.has('v')) {
-    const isMobile = /Mobile|iP(hone|od|ad)|Android|BlackBerry|IEMobile|Kindle|Opera M(obi|ini)|Windows Phone|webOS/i.test(navigator.userAgent);
-    if (isMobile) {
-      params.set('v', 'mobile');
-      window.location.replace(window.location.pathname + '?' + params.toString() + window.location.hash);
+  const autoThemeCss = options.autoTheme ? '\n' + dedent`
+    @media (prefers-color-scheme: light) {
+      html {
+        filter: invert(1) hue-rotate(180deg);
+      }
     }
-  }
-})();
-</script>
-${options.extraJs ? `<script>\n${options.extraJs}\n</script>` : ''}
-</body>
-</html>`
+  ` : ''
+
+  const extraJsBlock = options.extraJs
+    ? `\n<script>\n${options.extraJs}\n</script>`
+    : ''
+
+  return dedent`
+    <!DOCTYPE html>
+    <html>
+    <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="icon" href="/favicon-dark.png" media="(prefers-color-scheme: dark)">
+    <link rel="icon" href="/favicon-light.png" media="(prefers-color-scheme: light)">
+    <link rel="icon" href="/favicon-dark.png">${ogTags}
+    <style>
+    @font-face {
+      font-family: 'JetBrains Mono Nerd';
+      src: url('https://critique.work/jetbrains-mono-nerd.woff2') format('woff2');
+      font-weight: normal;
+      font-style: normal;
+      font-display: swap;
+    }
+    </style>
+    <title>${escapeHtml(title)}</title>
+    <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html {
+      -webkit-text-size-adjust: 100%;
+      text-size-adjust: 100%;
+    }
+    html, body {
+      min-height: 100%;
+      background-color: ${backgroundColor};
+      color: ${textColor};
+      font-family: ${fontFamily};
+      /*
+       * Font size scales to fit ${cols} columns within viewport.
+       * Formula: (viewport - padding) / (cols * char-ratio)
+       *
+       * The 0.6 char-ratio is the approximate width of 1ch relative to font-size
+       * in monospace fonts. Most monospace fonts (JetBrains Mono, Fira Code,
+       * Monaco, Consolas) have a ch/font-size ratio between 0.55-0.6.
+       * We use 0.6 as a safe upper bound to prevent overflow.
+       */
+      font-size: clamp(4px, calc((100vw - 32px) / (${cols} * 0.6)), 14px);
+      line-height: 1.7;
+    }
+    body {
+      padding: 16px;
+      overflow-x: clip;
+      overflow-y: auto;
+      max-width: 100vw;
+    }
+    #content {
+      width: fit-content;
+      margin: 0 auto;
+    }
+    .line {
+      white-space: pre;
+      display: block;
+      content-visibility: auto;
+      contain-intrinsic-block-size: auto round(down, 1.7em, 1px);
+      background-color: ${backgroundColor};
+      transform: translateZ(0);
+      backface-visibility: hidden;
+    }
+    .line span {
+      white-space: pre;
+      display: inline-block;
+      line-height: 1.7;
+      vertical-align: top;
+    }
+    /* Disable content-visibility on iOS Safari where it can cause rendering issues */
+    @supports (-webkit-touch-callout: none) {
+      .line {
+        content-visibility: visible;
+      }
+    }${autoThemeCss}
+    html {
+      scrollbar-width: thin;
+      scrollbar-color: #6b7280 #2d3748;
+    }
+    @media (prefers-color-scheme: light) {
+      html {
+        scrollbar-color: #a0aec0 #edf2f7;
+      }
+    }
+    ::-webkit-scrollbar {
+      width: 12px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #2d3748;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #6b7280;
+      border-radius: 6px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #a0aec0;
+    }
+    @media (prefers-color-scheme: light) {
+      ::-webkit-scrollbar-track {
+        background: #edf2f7;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #a0aec0;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #cbd5e1;
+      }
+    }
+    ${options.extraCss || ''}
+    </style>
+    </head>
+    <body>
+    <div id="content">
+    ${content}
+    </div>
+    <script>
+    // Redirect mobile devices to ?v=mobile for optimized view
+    (function() {
+      const params = new URLSearchParams(window.location.search);
+      if (!params.has('v')) {
+        const isMobile = /Mobile|iP(hone|od|ad)|Android|BlackBerry|IEMobile|Kindle|Opera M(obi|ini)|Windows Phone|webOS/i.test(navigator.userAgent);
+        if (isMobile) {
+          params.set('v', 'mobile');
+          window.location.replace(window.location.pathname + '?' + params.toString() + window.location.hash);
+        }
+      }
+    })();
+    </script>${extraJsBlock}
+    </body>
+    </html>
+  `
 }
 
 export type { CapturedFrame, CapturedLine, CapturedSpan }
