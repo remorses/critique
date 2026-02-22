@@ -604,6 +604,8 @@ export function detectFiletype(filePath: string): string | undefined {
       return "swift";
     case "nix":
       return "nix";
+    case "prisma":
+      return "prisma";
     default:
       return undefined;
   }

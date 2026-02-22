@@ -16,6 +16,7 @@ import {
   filterParsedFilesByPatterns,
   getFilterPatterns,
   matchesFileFilters,
+  detectFiletype,
 } from "./diff-utils.ts"
 
 // ============================================================================
@@ -309,6 +310,32 @@ describe("parseGitDiffFiles", () => {
     expect(files[0]!.hunks.length).toBe(1)
     expect(files[0]!.renameFrom).toBeUndefined()
     expect(files[0]!.renameTo).toBeUndefined()
+  })
+
+  it("should parse prisma schema diffs with model snippets", () => {
+    const rawDiff = [
+      "diff --git prisma/schema.prisma prisma/schema.prisma",
+      "index abc123..def456 100644",
+      "--- prisma/schema.prisma",
+      "+++ prisma/schema.prisma",
+      "@@ -1,4 +1,9 @@",
+      " datasource db {",
+      "   provider = \"postgresql\"",
+      "   url      = env(\"DATABASE_URL\")",
+      " }",
+      "+",
+      "+model User {",
+      "+  id    Int    @id @default(autoincrement())",
+      "+  email String @unique",
+      "+}",
+    ].join("\n")
+
+    const files = parseGitDiffFiles(rawDiff, parsePatch)
+
+    expect(files.length).toBe(1)
+    expect(files[0]!.newFileName).toBe("prisma/schema.prisma")
+    expect(files[0]!.hunks.length).toBe(1)
+    expect(files[0]!.hunks[0]!.lines).toContain("+model User {")
   })
 
   it("should parse formatPatch output (Index header) without losing filenames", () => {
@@ -627,6 +654,12 @@ describe("buildSubmoduleDiffCommand", () => {
     expect(cmd).toContain("--submodule=diff")
     expect(cmd).toContain("-U7")
     expect(cmd).toContain("-- 'opentui' 'errore'")
+  })
+})
+
+describe("detectFiletype", () => {
+  it("should map .prisma files to prisma", () => {
+    expect(detectFiletype("prisma/schema.prisma")).toBe("prisma")
   })
 })
 

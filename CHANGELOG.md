@@ -1,3 +1,10 @@
+# 0.1.117
+
+- Syntax highlighting (Tree-sitter language registration):
+  - `critique`, `critique --web`, `critique review`:
+    - Detect `.prisma` files as `prisma` filetype in diff syntax highlighting
+    - Register Prisma parser configuration with Tree-sitter highlights query source
+
 # 0.1.116
 
 - Web preview (`--web`):
