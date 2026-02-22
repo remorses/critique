@@ -21,6 +21,15 @@ index 1111111..2222222 100644
  keep
 `
 
+const wordHighlightDiff = `diff --git a/a.ts b/a.ts
+index 1111111..2222222 100644
+--- a/a.ts
++++ b/a.ts
+@@ -1 +1 @@
+-const value = oldName + 1
++const value = newName + 1
+`
+
 function ThemeToggleHarness() {
   const themeName = useAppStore((s) => s.themeName)
 
@@ -39,6 +48,42 @@ function extractDiffBackgroundSample(frame: any) {
     removedLineNumberBg: Array.from(frame.lines[0]!.spans[0]!.bg.buffer),
     removedContentBg: Array.from(frame.lines[0]!.spans[4]!.bg.buffer),
     contextBg: Array.from(frame.lines[2]!.spans[0]!.bg.buffer),
+  }
+}
+
+function getLineWithToken(frame: any, token: string) {
+  return frame.lines.find((line: any) =>
+    line.spans.some((span: any) => span.text.includes(token)),
+  )
+}
+
+function getWordHighlightDistance(frame: any) {
+  const removedLine = getLineWithToken(frame, "old")
+  const addedLine = getLineWithToken(frame, "new")
+
+  if (!removedLine || !addedLine) {
+    throw new Error("Expected both added and removed lines in rendered frame")
+  }
+
+  const removedWord = removedLine.spans.find((span: any) => span.text === "old")
+  const removedBase = removedLine.spans.find((span: any) => span.text.includes("Name"))
+  const addedWord = addedLine.spans.find((span: any) => span.text === "new")
+  const addedBase = addedLine.spans.find((span: any) => span.text.includes("Name"))
+
+  if (!removedWord || !removedBase || !addedWord || !addedBase) {
+    throw new Error("Expected split word/background spans for inline highlights")
+  }
+
+  const distance = (a: Float32Array, b: Float32Array) => {
+    const dr = a[0]! - b[0]!
+    const dg = a[1]! - b[1]!
+    const db = a[2]! - b[2]!
+    return Math.sqrt(dr * dr + dg * dg + db * db)
+  }
+
+  return {
+    removed: distance(removedWord.bg.buffer, removedBase.bg.buffer),
+    added: distance(addedWord.bg.buffer, addedBase.bg.buffer),
   }
 }
 
@@ -82,9 +127,9 @@ describe("DiffView", () => {
           1,
         ],
         "removedContentBg": [
-          0.07764706015586853,
-          0.04313725605607033,
-          0.04313725605607033,
+          0.21176470816135406,
+          0.11764705926179886,
+          0.11764705926179886,
           1,
         ],
         "removedLineNumberBg": [
@@ -110,9 +155,9 @@ describe("DiffView", () => {
           1,
         ],
         "removedContentBg": [
-          0.23725490272045135,
-          0.14666667580604553,
-          0.18980392813682556,
+          0.5176470875740051,
+          0.32156863808631897,
+          0.4156862795352936,
           1,
         ],
         "removedLineNumberBg": [
@@ -125,5 +170,47 @@ describe("DiffView", () => {
     `)
 
     expect(after).not.toEqual(before)
+  })
+
+  it("keeps word highlights visible on github dark theme", async () => {
+    testSetup = await setupTest(
+      <DiffView
+        diff={wordHighlightDiff}
+        view="unified"
+        filetype="ts"
+        themeName="github"
+      />,
+      {
+        width: 80,
+        height: 8,
+      },
+    )
+
+    await testSetup.renderOnce()
+
+    const highlights = getWordHighlightDistance(testSetup.captureSpans())
+    expect(highlights.removed).toBeGreaterThan(0.03)
+    expect(highlights.added).toBeGreaterThan(0.03)
+  })
+
+  it("keeps word highlights visible on near-black themes", async () => {
+    testSetup = await setupTest(
+      <DiffView
+        diff={wordHighlightDiff}
+        view="unified"
+        filetype="ts"
+        themeName="lucent-orng"
+      />,
+      {
+        width: 80,
+        height: 8,
+      },
+    )
+
+    await testSetup.renderOnce()
+
+    const highlights = getWordHighlightDistance(testSetup.captureSpans())
+    expect(highlights.removed).toBeGreaterThan(0.01)
+    expect(highlights.added).toBeGreaterThan(0.01)
   })
 })

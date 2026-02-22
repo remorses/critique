@@ -1,3 +1,22 @@
+# 0.1.115
+
+- Diff word highlights (`critique`, `critique --web`, `critique review`, `critique --pdf`, `critique --image`):
+  - Refine inline word-highlight color generation to preserve hue instead of blending toward neutral white
+  - Dark themes now use stronger hue-preserving brightening (for visibility) without producing gray patches when rendered in light mode via web auto-invert
+  - Light themes now darken slightly (`brighten(0.9)`) so inline highlights stay readable without chalky white blocks
+  - Add an additive fallback for near-black diff backgrounds so themes with pure black diff rows still show visible word-level highlights
+- Tests:
+  - Add regression coverage for a near-black theme (`lucent-orng`) to ensure inline word highlights remain visible
+
+# 0.1.114
+
+- Diff word highlights (`critique`, `critique --web`, `critique review`, `critique --pdf`, `critique --image`):
+  - Compute explicit `addedWordBg` / `removedWordBg` from each theme's diff line background with an adaptive contrast boost
+  - Fix near-invisible word-level highlights on dark themes where opentui's default `brighten(1.1)` was too subtle
+  - Keep `github-light` tuned colors as the visual baseline (`addedWordBg: #acf2bd`, `removedWordBg: #ffffff`)
+- Tests:
+  - Add a regression test that enforces a minimum visible color-distance between inline word highlight cells and their surrounding line background on the `github` dark theme
+
 # 0.1.113
 
 - Web preview (`--web`):
