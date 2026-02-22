@@ -8,15 +8,9 @@ import fs from "fs"
 import { tmpdir } from "os"
 import { join } from "path"
 import { getResolvedTheme, rgbaToHex } from "./themes.ts"
-import type { CapturedFrame, RootRenderable, CliRenderer } from "@opentuah/core"
+import type { BoxRenderable, CapturedFrame, RootRenderable, CliRenderer } from "@opentuah/core"
 import type { IndexedHunk, ReviewYaml } from "./review/types.ts"
 import { loadStoredLicenseKey, loadOrCreateOwnerSecret } from "./license.ts"
-import {
-  getFileName,
-  processFiles,
-  parseGitDiffFiles,
-  stripSubmoduleHeaders,
-} from "./diff-utils.ts"
 
 const execAsync = promisify(exec)
 
@@ -117,15 +111,25 @@ async function waitForRenderStabilization(
   }
 }
 
+interface FileSectionPosition {
+  lineIndex: number
+  fileName: string
+}
+
+interface RenderDiffFrameResult {
+  frame: CapturedFrame
+  sectionPositions: FileSectionPosition[]
+}
+
 /**
  * Render diff to CapturedFrame using opentui test renderer.
  * Uses content-fitting: renders with initial height, measures actual content,
  * then resizes to exact content height to avoid wasting memory.
  */
-export async function renderDiffToFrame(
+async function renderDiffToFrameWithSectionPositions(
   diffContent: string,
-  options: CaptureOptions
-): Promise<CapturedFrame> {
+  options: CaptureOptions,
+): Promise<RenderDiffFrameResult> {
   const { createTestRenderer } = await import("@opentuah/core/testing")
   const { createRoot } = await import("@opentuah/react")
   const { getTreeSitterClient } = await import("@opentuah/core")
@@ -156,10 +160,15 @@ export async function renderDiffToFrame(
   // Parse the diff (with rename detection support)
   const files = parseGitDiffFiles(stripSubmoduleHeaders(diffContent), parsePatch)
   const filesWithRawDiff = processFiles(files, formatPatch)
+  const fileNames = filesWithRawDiff.map((file) => getFileName(file))
 
   if (filesWithRawDiff.length === 0) {
     throw new Error("No files to display")
   }
+
+  // Store refs to each file section container so we can map file headers
+  // to exact rendered line indexes (avoids text-regex false positives).
+  const fileSectionRefs = new Map<number, BoxRenderable>()
 
   // Get theme colors
   const webTheme = getResolvedTheme(themeName)
@@ -206,7 +215,14 @@ export async function renderDiffToFrame(
 
         return React.createElement(
           "box",
-          { key: idx, style: { flexDirection: "column", marginBottom: 2 } },
+          {
+            key: idx,
+            ref: (r: BoxRenderable | null) => {
+              if (r) fileSectionRefs.set(idx, r)
+              else fileSectionRefs.delete(idx)
+            },
+            style: { flexDirection: "column", marginBottom: 2 },
+          },
           React.createElement(
             "box",
             {
@@ -278,6 +294,18 @@ export async function renderDiffToFrame(
   // Wait for async highlighting to complete (only once at the end)
   await waitForRenderStabilization(renderer, renderOnce)
 
+  const sectionPositions: FileSectionPosition[] = []
+  for (let idx = 0; idx < fileNames.length; idx++) {
+    const section = fileSectionRefs.get(idx)
+    if (!section) continue
+
+    const layout = section.getLayoutNode().getComputedLayout()
+    sectionPositions.push({
+      lineIndex: Math.max(0, Math.round(layout.top)),
+      fileName: fileNames[idx]!,
+    })
+  }
+
   // Capture the final frame
   const buffer = renderer.currentRenderBuffer
   const cursorState = renderer.getCursorState()
@@ -289,6 +317,17 @@ export async function renderDiffToFrame(
   }
   
   renderer.destroy()
+  return {
+    frame,
+    sectionPositions,
+  }
+}
+
+export async function renderDiffToFrame(
+  diffContent: string,
+  options: CaptureOptions,
+): Promise<CapturedFrame> {
+  const { frame } = await renderDiffToFrameWithSectionPositions(diffContent, options)
   return frame
 }
 
@@ -315,50 +354,25 @@ function dedupeId(id: string, usedIds: Set<string>): string {
 }
 
 /**
- * Scan a captured frame for file-header lines and map them to anchor IDs.
- * File headers are identified by matching filename text followed by the
- * "+N" / "-N" change-count pattern (e.g. " src/foo.ts +3-2").
- * Files are matched in the order they appear in `fileNames` to avoid
- * false positives from filenames that appear in diff content.
- *
- * Robustness:
- *  - Falls back to basename matching when the full path is truncated by
- *    narrow viewport widths (e.g. mobile renders).
- *  - Requires the +N / -N stats pattern to appear AFTER the filename
- *    portion, preventing false matches on code lines that happen to
- *    contain a filename and digits elsewhere.
+ * Build line-indexed anchors from file section layout positions.
+ * This avoids regex detection on rendered text, which can produce
+ * false positives when code lines mimic file-header patterns.
  */
 export function buildAnchorMap(
-  frame: CapturedFrame,
-  fileNames: string[],
+  sections: Array<{ lineIndex: number; fileName: string }>,
 ): Map<number, { id: string; label: string }> {
   const anchors = new Map<number, { id: string; label: string }>()
   const usedIds = new Set<string>()
-  let fileIdx = 0
 
-  for (let lineIdx = 0; lineIdx < frame.lines.length && fileIdx < fileNames.length; lineIdx++) {
-    const lineText = frame.lines[lineIdx]!.spans.map((s) => s.text).join("")
-    const trimmedName = fileNames[fileIdx]!.trim()
+  for (const section of sections) {
+    if (!Number.isFinite(section.lineIndex) || section.lineIndex < 0) continue
+    if (anchors.has(section.lineIndex)) continue
 
-    // Try full path match, then fall back to basename for narrow-viewport truncation
-    const baseName = trimmedName.includes("/") ? trimmedName.split("/").pop()! : null
-    const matchName = lineText.includes(trimmedName)
-      ? trimmedName
-      : (baseName && lineText.includes(baseName) ? baseName : null)
-
-    if (matchName) {
-      // Require the +N / -N stats pattern to appear AFTER the filename,
-      // so code lines like "import from src/foo.ts // +3-2" don't match
-      const nameEnd = lineText.indexOf(matchName) + matchName.length
-      const afterName = lineText.slice(nameEnd)
-      if (/\+\d+/.test(afterName) && /-\d+/.test(afterName)) {
-        const slug = slugifyFileName(trimmedName)
-        const id = dedupeId(slug, usedIds)
-        usedIds.add(id)
-        anchors.set(lineIdx, { id, label: trimmedName })
-        fileIdx++
-      }
-    }
+    const label = section.fileName.trim()
+    const baseSlug = slugifyFileName(label) || "file"
+    const id = dedupeId(baseSlug, usedIds)
+    usedIds.add(id)
+    anchors.set(section.lineIndex, { id, label })
   }
 
   return anchors
@@ -382,17 +396,14 @@ export async function captureToHtml(
   options: CaptureOptions
 ): Promise<string> {
   const { frameToHtmlDocument } = await import("./ansi-html.ts")
-  const { parsePatch, formatPatch } = await import("diff")
 
   // Render diff to captured frame (with notice for web uploads)
-  const frame = await renderDiffToFrame(diffContent, { ...options, showNotice: true })
-
-  // Parse diff to get ordered file names for anchor generation
-  // (same parse+filter+sort as renderDiffToFrame, so order matches exactly)
-  const files = parseGitDiffFiles(stripSubmoduleHeaders(diffContent), parsePatch)
-  const orderedFiles = processFiles(files, formatPatch)
-  const fileNames = orderedFiles.map((f) => getFileName(f))
-  const anchors = buildAnchorMap(frame, fileNames)
+  // and collect exact section line positions from layout metadata.
+  const { frame, sectionPositions } = await renderDiffToFrameWithSectionPositions(
+    diffContent,
+    { ...options, showNotice: true },
+  )
+  const anchors = buildAnchorMap(sectionPositions)
 
   // Get theme colors for HTML output
   const theme = getResolvedTheme(options.themeName)

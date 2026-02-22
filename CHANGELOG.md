@@ -1,3 +1,15 @@
+# 0.1.116
+
+- Web preview (`--web`):
+  - Refactor `buildAnchorMap` to accept layout-derived section positions instead of regex-scanning rendered frame text
+  - File header anchors are now resolved from opentui layout coordinates (`getComputedLayout().top`) via refs on each file section container — eliminates false positives where code lines mimicked file-header text patterns
+  - `renderDiffToFrame` now internally returns section positions alongside the frame; the public API is unchanged
+  - Update `buildAnchorMap` signature: accepts `{ lineIndex, fileName }[]` directly instead of `CapturedFrame` + `string[]`
+- Tests:
+  - Simplify `buildAnchorMap` unit tests to use the new direct-input API
+  - Drop tests that verified the now-removed regex heuristics (basename fallback, false-positive rejection, stats-before-filename rejection)
+  - Add coverage for edge cases: empty input, invalid/negative line indexes, NaN indexes, duplicate line indexes, and slugify-empty filenames
+
 # 0.1.115
 
 - Diff word highlights (`critique`, `critique --web`, `critique review`, `critique --pdf`, `critique --image`):

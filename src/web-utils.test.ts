@@ -110,9 +110,10 @@ new file mode 100644
 function mockSpan(text: string): CapturedSpan {
   return {
     text,
-    fg: { r: 0, g: 0, b: 0, a: 0 },
-    bg: { r: 0, g: 0, b: 0, a: 0 },
+    fg: RGBA.fromValues(0, 0, 0, 0),
+    bg: RGBA.fromValues(0, 0, 0, 0),
     attributes: 0,
+    width: text.length,
   }
 }
 
@@ -150,99 +151,54 @@ describe("slugifyFileName", () => {
 })
 
 describe("buildAnchorMap", () => {
-  test("maps file header lines to anchor IDs", () => {
-    const frame = mockFrame([
-      " src/foo.ts +3-2",
-      "  10 | const x = 1",
-      "  11 |+const y = 2",
-      "",
-      " src/bar.ts +1-0",
-      "   1 |+new line",
+  test("maps section line positions to anchor IDs", () => {
+    const anchors = buildAnchorMap([
+      { lineIndex: 3, fileName: "src/foo.ts" },
+      { lineIndex: 12, fileName: "src/bar.ts" },
     ])
 
-    const anchors = buildAnchorMap(frame, ["src/foo.ts", "src/bar.ts"])
-
     expect(anchors.size).toBe(2)
-    expect(anchors.get(0)).toEqual({ id: "src-foo-ts", label: "src/foo.ts" })
-    expect(anchors.get(4)).toEqual({ id: "src-bar-ts", label: "src/bar.ts" })
+    expect(anchors.get(3)).toEqual({ id: "src-foo-ts", label: "src/foo.ts" })
+    expect(anchors.get(12)).toEqual({ id: "src-bar-ts", label: "src/bar.ts" })
   })
 
   test("deduplicates IDs for same-named files", () => {
-    const frame = mockFrame([
-      " index.ts +1-0",
-      " code here",
-      " index.ts +2-1",
+    const anchors = buildAnchorMap([
+      { lineIndex: 4, fileName: "index.ts" },
+      { lineIndex: 20, fileName: "index.ts" },
     ])
-
-    const anchors = buildAnchorMap(frame, ["index.ts", "index.ts"])
 
     expect(anchors.size).toBe(2)
-    expect(anchors.get(0)!.id).toBe("index-ts")
-    expect(anchors.get(2)!.id).toBe("index-ts-2")
+    expect(anchors.get(4)!.id).toBe("index-ts")
+    expect(anchors.get(20)!.id).toBe("index-ts-2")
   })
 
-  test("skips lines that don't match the stats pattern", () => {
-    const frame = mockFrame([
-      " some random text with src/foo.ts in it",
-      " src/foo.ts +5-3",
-    ])
-
-    const anchors = buildAnchorMap(frame, ["src/foo.ts"])
-
-    // Line 0 has the filename but no +N-N pattern → skipped
-    // Line 1 matches
-    expect(anchors.size).toBe(1)
-    expect(anchors.get(1)).toEqual({ id: "src-foo-ts", label: "src/foo.ts" })
-  })
-
-  test("returns empty map when no files match", () => {
-    const frame = mockFrame(["nothing here"])
-    const anchors = buildAnchorMap(frame, ["missing.ts"])
+  test("returns empty map for empty input", () => {
+    const anchors = buildAnchorMap([])
     expect(anchors.size).toBe(0)
   })
 
-  test("falls back to basename matching when full path is truncated", () => {
-    // Simulate a narrow viewport where the full path gets clipped
-    const frame = mockFrame([
-      " src/components/very-long foo-bar.tsx +3-2",
-    ], 50)
-
-    // Full path not present, but basename "foo-bar.tsx" is
-    const anchors = buildAnchorMap(frame, ["src/components/very-long/nested/foo-bar.tsx"])
-
-    expect(anchors.size).toBe(1)
-    expect(anchors.get(0)!.id).toBe("src-components-very-long-nested-foo-bar-tsx")
-  })
-
-  test("rejects false positives where stats appear before the filename", () => {
-    // A code line could contain +N-N before the filename text
-    const frame = mockFrame([
-      " offset +3-2 in src/b.ts somewhere",
-      " src/b.ts +1-0",
+  test("uses fallback id when slugify removes all chars", () => {
+    const anchors = buildAnchorMap([
+      { lineIndex: 1, fileName: "---" },
+      { lineIndex: 2, fileName: "***" },
     ])
-
-    const anchors = buildAnchorMap(frame, ["src/b.ts"])
-
-    // Line 0 has +3 and -2 but they appear before "src/b.ts", not after
-    // Line 1 is the real header
-    expect(anchors.size).toBe(1)
-    expect(anchors.get(1)).toEqual({ id: "src-b-ts", label: "src/b.ts" })
-  })
-
-  test("does not cascade-skip files when one fails to match", () => {
-    const frame = mockFrame([
-      " first.ts +1-0",
-      " code line",
-      " second.ts +2-1",
-    ])
-
-    // If first.ts were somehow missed, second.ts should still match
-    // (but here both should match normally)
-    const anchors = buildAnchorMap(frame, ["first.ts", "second.ts"])
 
     expect(anchors.size).toBe(2)
-    expect(anchors.get(0)!.id).toBe("first-ts")
-    expect(anchors.get(2)!.id).toBe("second-ts")
+    expect(anchors.get(1)!.id).toBe("file")
+    expect(anchors.get(2)!.id).toBe("file-2")
+  })
+
+  test("ignores invalid or duplicate line indexes", () => {
+    const anchors = buildAnchorMap([
+      { lineIndex: -1, fileName: "bad.ts" },
+      { lineIndex: Number.NaN, fileName: "nan.ts" },
+      { lineIndex: 7, fileName: "first.ts" },
+      { lineIndex: 7, fileName: "second.ts" },
+    ])
+
+    expect(anchors.size).toBe(1)
+    expect(anchors.get(7)).toEqual({ id: "first-ts", label: "first.ts" })
   })
 })
 

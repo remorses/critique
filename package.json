@@ -2,7 +2,7 @@
   "name": "critique",
   "module": "src/diff.tsx",
   "type": "module",
-  "version": "0.1.115",
+  "version": "0.1.116",
   "license": "MIT",
   "private": false,
   "bin": "./src/cli.tsx",
