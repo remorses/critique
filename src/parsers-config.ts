@@ -262,9 +262,7 @@ export default {
     },
     {
       filetype: "prisma",
-      // TODO: tree-sitter-prisma does not currently publish a prebuilt WASM in npm releases.
-      // This URL is the expected location once upstream ships it.
-      wasm: "https://cdn.jsdelivr.net/npm/tree-sitter-prisma@1.6.0/tree-sitter-prisma.wasm",
+      wasm: resolve(__dirname, "parsers/tree-sitter-prisma.wasm"),
       queries: {
         highlights: [
           "https://raw.githubusercontent.com/victorhqc/tree-sitter-prisma/main/queries/highlights.scm",

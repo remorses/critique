@@ -1,3 +1,10 @@
+# 0.1.118
+
+- Syntax highlighting (Tree-sitter language registration):
+  - `critique`, `critique --web`, `critique review`:
+    - Replace the non-existent remote Prisma WASM URL with a vendored parser binary at `src/parsers/tree-sitter-prisma.wasm`
+    - Load Prisma parser from local absolute path (`resolve(__dirname, "parsers/tree-sitter-prisma.wasm")`) so Prisma highlighting works without relying on external hosting
+
 # 0.1.117
 
 - Syntax highlighting (Tree-sitter language registration):
