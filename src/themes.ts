@@ -9,6 +9,13 @@ import { fileURLToPath } from "url";
 // Other themes are loaded on-demand when selected
 import github from "./themes/github.json";
 
+// Minimal interface for terminal palette colors passed in from the renderer
+export interface TerminalPalette {
+  palette: (string | null)[];
+  defaultForeground: string | null;
+  defaultBackground: string | null;
+}
+
 type HexColor = `#${string}`;
 type RefName = string;
 type Variant = {
@@ -245,10 +252,152 @@ function resolveTheme(
   };
 }
 
+// Module-level cache for the system theme resolved from terminal palette
+let cachedSystemTheme: ResolvedTheme | null = null;
+
+export function setSystemTheme(resolved: ResolvedTheme): void {
+  cachedSystemTheme = resolved;
+}
+
+function detectColorMode(bgHex: string | null): "dark" | "light" {
+  if (!bgHex) return "dark";
+  try {
+    const rgba = parseColor(bgHex);
+    const luminance = 0.299 * rgba.r + 0.587 * rgba.g + 0.114 * rgba.b;
+    return luminance < 0.5 ? "dark" : "light";
+  } catch {
+    return "dark";
+  }
+}
+
+function safeParse(hex: string | null | undefined, fallback: string): RGBA {
+  if (!hex) return parseColor(fallback);
+  try {
+    return parseColor(hex);
+  } catch {
+    return parseColor(fallback);
+  }
+}
+
+function muteColor(fg: RGBA, bg: RGBA, amount: number): RGBA {
+  return RGBA.fromInts(
+    Math.round((fg.r * (1 - amount) + bg.r * amount) * 255),
+    Math.round((fg.g * (1 - amount) + bg.g * amount) * 255),
+    Math.round((fg.b * (1 - amount) + bg.b * amount) * 255),
+    255,
+  );
+}
+
+function tintBg(bg: RGBA, tint: RGBA, amount: number): RGBA {
+  return RGBA.fromInts(
+    Math.max(0, Math.min(255, Math.round((bg.r * (1 - amount) + tint.r * amount) * 255))),
+    Math.max(0, Math.min(255, Math.round((bg.g * (1 - amount) + tint.g * amount) * 255))),
+    Math.max(0, Math.min(255, Math.round((bg.b * (1 - amount) + tint.b * amount) * 255))),
+    255,
+  );
+}
+
+function shiftBrightness(color: RGBA, shift: number): RGBA {
+  return RGBA.fromInts(
+    Math.max(0, Math.min(255, Math.round((color.r + shift) * 255))),
+    Math.max(0, Math.min(255, Math.round((color.g + shift) * 255))),
+    Math.max(0, Math.min(255, Math.round((color.b + shift) * 255))),
+    255,
+  );
+}
+
+// Build a ResolvedTheme from terminal palette colors detected via OSC queries.
+// Color mapping follows the opencode convention:
+//   slot 1 (red)     → error, diffRemoved
+//   slot 2 (green)   → success, diffAdded, syntaxString
+//   slot 3 (yellow)  → warning, syntaxNumber
+//   slot 4 (blue)    → markdownLink, syntaxFunction
+//   slot 5 (magenta) → syntaxKeyword
+//   slot 6 (cyan)    → primary, info, syntaxType
+//   foreground       → text, syntaxVariable
+//   background       → transparent (lets terminal native bg show through)
+export function resolveSystemTheme(colors: TerminalPalette): ResolvedTheme {
+  const mode = detectColorMode(colors.defaultBackground);
+  const isDark = mode === "dark";
+
+  const fgFallback = isDark ? "#d4d4d4" : "#24292f";
+  const bgFallback = isDark ? "#1e1e1e" : "#ffffff";
+  const redFallback = isDark ? "#f85149" : "#cf222e";
+  const greenFallback = isDark ? "#3fb950" : "#1a7f37";
+  const yellowFallback = isDark ? "#e3b341" : "#bf8700";
+  const blueFallback = isDark ? "#58a6ff" : "#0550ae";
+  const magentaFallback = isDark ? "#bc8cff" : "#8250df";
+  const cyanFallback = isDark ? "#39d4be" : "#0598a3";
+
+  const p = colors.palette;
+  const fg = safeParse(colors.defaultForeground, fgFallback);
+  const bg = safeParse(colors.defaultBackground, bgFallback);
+
+  // Prefer bright variants (slots 8-15) for syntax colors — they tend to be more vivid
+  const red = safeParse(p[9] ?? p[1], redFallback);
+  const green = safeParse(p[10] ?? p[2], greenFallback);
+  const yellow = safeParse(p[11] ?? p[3], yellowFallback);
+  const blue = safeParse(p[12] ?? p[4], blueFallback);
+  const magenta = safeParse(p[13] ?? p[5], magentaFallback);
+  const cyan = safeParse(p[14] ?? p[6], cyanFallback);
+
+  const muted = muteColor(fg, bg, 0.45);
+  const comment = muteColor(fg, bg, 0.55);
+  const panelBg = shiftBrightness(bg, isDark ? 0.04 : -0.04);
+  const transparent = RGBA.fromInts(0, 0, 0, 0);
+
+  return {
+    primary: cyan,
+    success: green,
+    error: red,
+    warning: yellow,
+    info: cyan,
+    syntaxComment: comment,
+    syntaxKeyword: magenta,
+    syntaxFunction: blue,
+    syntaxVariable: fg,
+    syntaxString: green,
+    syntaxNumber: yellow,
+    syntaxType: cyan,
+    syntaxOperator: muted,
+    syntaxPunctuation: muted,
+    text: fg,
+    textMuted: muted,
+    conceal: comment,
+    diffAdded: green,
+    diffRemoved: red,
+    diffAddedBg: tintBg(bg, green, isDark ? 0.15 : 0.1),
+    diffRemovedBg: tintBg(bg, red, isDark ? 0.15 : 0.1),
+    diffContextBg: transparent,
+    diffAddedLineNumberBg: tintBg(bg, green, isDark ? 0.22 : 0.15),
+    diffRemovedLineNumberBg: tintBg(bg, red, isDark ? 0.22 : 0.15),
+    diffLineNumber: muted,
+    background: transparent,
+    backgroundPanel: panelBg,
+    markdownText: fg,
+    markdownHeading: cyan,
+    markdownLink: blue,
+    markdownLinkText: blue,
+    markdownCode: green,
+    markdownBlockQuote: comment,
+    markdownEmph: fg,
+    markdownStrong: fg,
+    markdownHorizontalRule: muted,
+    markdownListItem: magenta,
+    markdownListEnumeration: muted,
+    markdownImage: blue,
+    markdownImageText: blue,
+    markdownCodeBlock: fg,
+  };
+}
+
 export function getResolvedTheme(
   name: string,
   mode: "dark" | "light" = "dark",
 ): ResolvedTheme {
+  if (name === "system") {
+    return cachedSystemTheme ?? getResolvedTheme("github", mode);
+  }
   const themeJson = loadTheme(name);
   return resolveTheme(themeJson, mode);
 }
@@ -329,7 +478,7 @@ export function getSyntaxTheme(
   };
 }
 
-export const themeNames = Object.keys(THEME_FILES).sort();
+export const themeNames = ["system", ...Object.keys(THEME_FILES)].sort();
 
 export const defaultThemeName = "github";
 

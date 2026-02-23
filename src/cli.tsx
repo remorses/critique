@@ -63,7 +63,6 @@ import {
 import type { TreeFileInfo } from "./directory-tree.ts";
 import packageJson from "../package.json" assert { type: "json" };
 
-
 // Lazy-load watcher only when --watch is used
 let watcherModule: typeof import("@parcel/watcher") | null = null;
 async function getWatcher() {
@@ -78,11 +77,10 @@ import {
   themeNames,
   defaultThemeName,
   rgbaToHex,
+  setSystemTheme,
+  resolveSystemTheme,
 } from "./themes.ts";
-import {
-  useAppStore,
-  persistedState,
-} from "./store.ts";
+import { useAppStore, persistedState } from "./store.ts";
 
 // Web options for review mode
 interface ReviewWebOptions {
@@ -112,7 +110,13 @@ async function runReviewMode(
   gitCommand: string,
   agent: string,
   options: ReviewModeOptions = {},
-  reviewOptions?: { isDefaultMode?: boolean; diffOptions?: Pick<GitCommandOptions, "context" | "filter" | "positionalFilters"> },
+  reviewOptions?: {
+    isDefaultMode?: boolean;
+    diffOptions?: Pick<
+      GitCommandOptions,
+      "context" | "filter" | "positionalFilters"
+    >;
+  },
 ) {
   const { sessionIds, webOptions, pdfOptions, model, json } = options;
   const { tmpdir } = await import("os");
@@ -142,7 +146,9 @@ async function runReviewMode(
         context: reviewOptions.diffOptions?.context,
       });
       try {
-        const { stdout: subDiff } = await execAsync(subCmd, { encoding: "utf-8" });
+        const { stdout: subDiff } = await execAsync(subCmd, {
+          encoding: "utf-8",
+        });
         if (subDiff.trim()) {
           fullDiff = fullDiff + "\n" + subDiff;
         }
@@ -151,7 +157,10 @@ async function runReviewMode(
       }
     }
 
-    fullDiff = await filterCombinedDiffByPatterns(fullDiff, reviewOptions.diffOptions || {});
+    fullDiff = await filterCombinedDiffByPatterns(
+      fullDiff,
+      reviewOptions.diffOptions || {},
+    );
   }
   const gitDiffResult = fullDiff;
 
@@ -189,7 +198,10 @@ async function runReviewMode(
     process.exit(0);
   }
 
-  clack.log.step(`Found ${hunks.length} hunk${hunks.length === 1 ? "" : "s"} to review`, out);
+  clack.log.step(
+    `Found ${hunks.length} hunk${hunks.length === 1 ? "" : "s"} to review`,
+    out,
+  );
 
   // Create temp file for YAML output
   const yamlPath = join(tmpdir(), `critique-review-${Date.now()}.yaml`);
@@ -269,7 +281,9 @@ async function runReviewMode(
     lastToolCount = count;
   };
 
-  const printNotification = (notification: import("@agentclientprotocol/sdk").SessionNotification) => {
+  const printNotification = (
+    notification: import("@agentclientprotocol/sdk").SessionNotification,
+  ) => {
     const log = ensureAnalysisLog();
 
     const update = notification.update;
@@ -293,7 +307,10 @@ async function runReviewMode(
       return;
     }
 
-    if (update.sessionUpdate === "tool_call" || update.sessionUpdate === "tool_call_update") {
+    if (
+      update.sessionUpdate === "tool_call" ||
+      update.sessionUpdate === "tool_call_update"
+    ) {
       lastThinking = false;
       if (currentMessage) {
         log.message(pc.default.dim(currentMessage.split("\n")[0]));
@@ -319,12 +336,15 @@ async function runReviewMode(
       const isRead = kindLower.includes("read");
       const status = (tool.status || "").toLowerCase();
       const isActiveStatus = status === "pending" || status === "in_progress";
-      const isDoneStatus = status === "completed" || status === "error" || status === "cancelled";
+      const isDoneStatus =
+        status === "completed" || status === "error" || status === "cancelled";
 
       // Get file from locations or rawInput.filePath
       let file = tool.locations?.[0]?.path?.split("/").pop() || "";
       if (!file && tool.rawInput) {
-        const inputPath = (tool.rawInput.filePath || tool.rawInput.path || tool.rawInput.file) as string | undefined;
+        const inputPath = (tool.rawInput.filePath ||
+          tool.rawInput.path ||
+          tool.rawInput.file) as string | undefined;
         if (inputPath) file = inputPath.split("/").pop() || "";
       }
 
@@ -372,11 +392,15 @@ async function runReviewMode(
   try {
     // Create client and start connection in background (non-blocking)
     // This lets us list sessions while ACP server is starting
-    acpClient = createAcpClient(agent as "opencode" | "claude", (notification) => {
-      if (reviewSessionId && notification.sessionId === reviewSessionId) {
-        printNotification(notification);
-      }
-    }, true); // startConnectionNow = true
+    acpClient = createAcpClient(
+      agent as "opencode" | "claude",
+      (notification) => {
+        if (reviewSessionId && notification.sessionId === reviewSessionId) {
+          printNotification(notification);
+        }
+      },
+      true,
+    ); // startConnectionNow = true
 
     const cwd = process.cwd();
     // listSessions doesn't need ACP connection, so this runs immediately
@@ -390,7 +414,10 @@ async function runReviewMode(
       // If session IDs provided via --session, use those
       if (sessionIds && sessionIds.length > 0) {
         selectedSessionIds = sessionIds;
-        clack.log.info(`Using ${selectedSessionIds.length} specified session(s) for context`, out);
+        clack.log.info(
+          `Using ${selectedSessionIds.length} specified session(s) for context`,
+          out,
+        );
       } else {
         // Helper to format time ago
         const formatTimeAgo = (timestamp: number) => {
@@ -408,13 +435,13 @@ async function runReviewMode(
         const filteredSessions = sessions
           .filter((s) => {
             // Filter by _meta if the agent supports it
-            if (s._meta?.critique === true) return false
+            if (s._meta?.critique === true) return false;
             // Filter by title patterns
-            const title = s.title?.toLowerCase() || ""
-            if (title.includes("acp session")) return false
-            if (title.includes("reviewing a git diff")) return false
-            if (title.includes("review a git diff")) return false
-            return true
+            const title = s.title?.toLowerCase() || "";
+            if (title.includes("acp session")) return false;
+            if (title.includes("reviewing a git diff")) return false;
+            if (title.includes("review a git diff")) return false;
+            return true;
           })
           .slice(0, 25);
 
@@ -427,7 +454,10 @@ async function runReviewMode(
               const title = s.title || `Session ${s.sessionId.slice(0, 8)}`;
               clack.log.info(`  ${s.sessionId}  ${title}  ${timeAgo}`, out);
             }
-            clack.log.info("To include relevant sessions, re-run with: --session <id> (can be repeated)", out);
+            clack.log.info(
+              "To include relevant sessions, re-run with: --session <id> (can be repeated)",
+              out,
+            );
           } else {
             clack.log.info("No sessions available for context", out);
           }
@@ -438,20 +468,27 @@ async function runReviewMode(
             clack.log.info("No sessions available for context", out);
           }
 
-          const selected = filteredSessions.length > 0
-            ? await clack.multiselect({
-                message: "Select sessions to include as context (space to toggle, enter to confirm)",
-                options: filteredSessions.map((s) => {
-                  const title = s.title || `Session ${s.sessionId.slice(0, 8)}`;
-                  const timeAgo = s.updatedAt ? formatTimeAgo(s.updatedAt) : "";
-                  // Include time in label to prevent layout shift (hints only show on focus)
-                  const label = timeAgo ? `${title}  ${pc.default.dim(`(${timeAgo})`)}` : title;
-                  return { value: s.sessionId, label };
-                }),
-                required: false,
-                ...out,
-              })
-            : [];
+          const selected =
+            filteredSessions.length > 0
+              ? await clack.multiselect({
+                  message:
+                    "Select sessions to include as context (space to toggle, enter to confirm)",
+                  options: filteredSessions.map((s) => {
+                    const title =
+                      s.title || `Session ${s.sessionId.slice(0, 8)}`;
+                    const timeAgo = s.updatedAt
+                      ? formatTimeAgo(s.updatedAt)
+                      : "";
+                    // Include time in label to prevent layout shift (hints only show on focus)
+                    const label = timeAgo
+                      ? `${title}  ${pc.default.dim(`(${timeAgo})`)}`
+                      : title;
+                    return { value: s.sessionId, label };
+                  }),
+                  required: false,
+                  ...out,
+                })
+              : [];
 
           if (clack.isCancel(selected)) {
             clack.cancel("Operation cancelled", out);
@@ -460,9 +497,15 @@ async function runReviewMode(
 
           selectedSessionIds = selected as string[];
           if (selectedSessionIds.length > 0) {
-            clack.log.info(`Selected ${selectedSessionIds.length} session(s) for context`, out);
+            clack.log.info(
+              `Selected ${selectedSessionIds.length} session(s) for context`,
+              out,
+            );
           } else {
-            clack.log.info("No sessions selected, proceeding without context", out);
+            clack.log.info(
+              "No sessions selected, proceeding without context",
+              out,
+            );
           }
         }
       }
@@ -470,21 +513,32 @@ async function runReviewMode(
       // Load selected sessions
       if (selectedSessionIds.length > 0) {
         const loadSpinner = clack.spinner(out);
-        loadSpinner.start(`Loading ${selectedSessionIds.length} session${selectedSessionIds.length === 1 ? "" : "s"}...`);
+        loadSpinner.start(
+          `Loading ${selectedSessionIds.length} session${selectedSessionIds.length === 1 ? "" : "s"}...`,
+        );
 
-        const compressedSessions: Awaited<ReturnType<typeof compressSession>>[] = [];
-        const sessionsToLoad = sessions.filter((s) => selectedSessionIds.includes(s.sessionId));
+        const compressedSessions: Awaited<
+          ReturnType<typeof compressSession>
+        >[] = [];
+        const sessionsToLoad = sessions.filter((s) =>
+          selectedSessionIds.includes(s.sessionId),
+        );
 
         for (const sessionInfo of sessionsToLoad) {
           try {
-            const content = await acpClient.loadSessionContent(sessionInfo.sessionId, cwd);
+            const content = await acpClient.loadSessionContent(
+              sessionInfo.sessionId,
+              cwd,
+            );
             compressedSessions.push(compressSession(content));
           } catch {
             // Skip sessions that fail to load
           }
         }
         sessionsContext = sessionsToContextXml(compressedSessions);
-        loadSpinner.stop(`Loaded ${compressedSessions.length} session${compressedSessions.length === 1 ? "" : "s"}`);
+        loadSpinner.stop(
+          `Loaded ${compressedSessions.length} session${compressedSessions.length === 1 ? "" : "s"}`,
+        );
       }
     }
 
@@ -544,14 +598,19 @@ async function runReviewMode(
         updateToolSpinner(0);
 
         logger.error("Review session error", error);
-        const errorMessage = error instanceof Error ? error.message : String(error);
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
         clack.log.error(errorMessage, out);
         clack.outro("", out);
 
         // Save partial progress
         savePendingReview("in_progress");
         if (acpClient) await acpClient.close();
-        try { fs.unlinkSync(yamlPath); } catch (e) { logger.debug("Failed to cleanup yaml file", { error: e }); }
+        try {
+          fs.unlinkSync(yamlPath);
+        } catch (e) {
+          logger.debug("Failed to cleanup yaml file", { error: e });
+        }
         if (json) console.log(JSON.stringify({ error: errorMessage }));
         process.exit(1);
       }
@@ -584,14 +643,15 @@ async function runReviewMode(
       webSpinner.start("Generating web preview...");
 
       try {
-        const { htmlDesktop, htmlMobile, ogImage } = await captureReviewResponsiveHtml({
-          hunks,
-          reviewData,
-          desktopCols: 230,
-          mobileCols: 100,
-          baseRows,
-          themeName,
-        });
+        const { htmlDesktop, htmlMobile, ogImage } =
+          await captureReviewResponsiveHtml({
+            hunks,
+            reviewData,
+            desktopCols: 230,
+            mobileCols: 100,
+            baseRows,
+            themeName,
+          });
 
         // Clean up temp file
         cleanupTempFile(yamlPath);
@@ -604,12 +664,18 @@ async function runReviewMode(
         clack.log.success(`Preview URL: ${result.url}`, out);
         clack.log.info(formatPreviewExpiry(result.expiresInDays), out);
         if (typeof result.expiresInDays === "number") {
-          clack.log.info("Get unlimited links and support the project: https://critique.work/buy", out);
+          clack.log.info(
+            "Get unlimited links and support the project: https://critique.work/buy",
+            out,
+          );
         }
         clack.outro("", out);
         if (json) {
           // Aggregate per-file stats from hunks
-          const fileStatsMap = new Map<string, { added: number; removed: number }>();
+          const fileStatsMap = new Map<
+            string,
+            { added: number; removed: number }
+          >();
           for (const hunk of hunks) {
             let entry = fileStatsMap.get(hunk.filename);
             if (!entry) {
@@ -621,12 +687,20 @@ async function runReviewMode(
               if (line.startsWith("-")) entry.removed++;
             }
           }
-          const fileStats = Array.from(fileStatsMap.entries()).map(([filename, stats]) => ({
-            filename,
-            added: stats.added,
-            removed: stats.removed,
-          }));
-          console.log(JSON.stringify({ url: result.url, id: result.id, files: fileStats }));
+          const fileStats = Array.from(fileStatsMap.entries()).map(
+            ([filename, stats]) => ({
+              filename,
+              added: stats.added,
+              removed: stats.removed,
+            }),
+          );
+          console.log(
+            JSON.stringify({
+              url: result.url,
+              id: result.id,
+              files: fileStats,
+            }),
+          );
         }
 
         if (webOptions.open) {
@@ -637,7 +711,10 @@ async function runReviewMode(
         webSpinner.stop("Failed");
         cleanupTempFile(yamlPath);
         if (acpClient) await acpClient.close();
-        clack.log.error(`Failed to generate web preview: ${error.message}`, out);
+        clack.log.error(
+          `Failed to generate web preview: ${error.message}`,
+          out,
+        );
         clack.outro("", out);
         if (json) console.log(JSON.stringify({ error: error.message }));
         process.exit(1);
@@ -664,7 +741,9 @@ async function runReviewMode(
         // PDF defaults to github-light (better for print/reading)
         const themeName = "github-light";
         // Parse page size (default: a4-landscape for more horizontal space)
-        const [reviewPageWidth, reviewPageHeight] = parsePageSize(pdfOptions.pageSize || "a4-landscape");
+        const [reviewPageWidth, reviewPageHeight] = parsePageSize(
+          pdfOptions.pageSize || "a4-landscape",
+        );
         const cols = reviewPageWidth > reviewPageHeight ? 200 : 140;
 
         // Capture frame using opentui test renderer
@@ -678,7 +757,12 @@ async function runReviewMode(
 
         // Resolve theme colors
         const reviewTheme = getResolvedTheme(themeName);
-        const fontPath = join(import.meta.dir, "..", "public", "jetbrains-mono-nerd.ttf");
+        const fontPath = join(
+          import.meta.dir,
+          "..",
+          "public",
+          "jetbrains-mono-nerd.ttf",
+        );
 
         const result = await renderFrameToPdf(frame, {
           pageWidth: reviewPageWidth,
@@ -691,15 +775,22 @@ async function runReviewMode(
         });
 
         // Clean up temp file
-        try { fs.unlinkSync(yamlPath); } catch {}
+        try {
+          fs.unlinkSync(yamlPath);
+        } catch {}
         if (acpClient) await acpClient.close();
 
-        const outPath = pdfOptions.filename || join(getTmpdir(), `critique-review-${Date.now()}.pdf`);
+        const outPath =
+          pdfOptions.filename ||
+          join(getTmpdir(), `critique-review-${Date.now()}.pdf`);
         fs.writeFileSync(outPath, result.buffer);
         pdfSpinner.stop("PDF generated");
 
         clack.log.success(`PDF written: ${outPath}`, out);
-        clack.log.info(`${result.pageCount} page${result.pageCount === 1 ? "" : "s"}, ${result.totalLines} lines`, out);
+        clack.log.info(
+          `${result.pageCount} page${result.pageCount === 1 ? "" : "s"}, ${result.totalLines} lines`,
+          out,
+        );
         clack.outro("", out);
 
         if (pdfOptions.open) {
@@ -709,7 +800,9 @@ async function runReviewMode(
         process.exit(0);
       } catch (error: any) {
         pdfSpinner.stop("Failed");
-        try { fs.unlinkSync(yamlPath); } catch {}
+        try {
+          fs.unlinkSync(yamlPath);
+        } catch {}
         if (acpClient) await acpClient.close();
         clack.log.error(`Failed to generate PDF: ${error.message}`, out);
         clack.outro("", out);
@@ -761,8 +854,12 @@ async function runReviewMode(
     const renderApp = (isGenerating: boolean) => {
       root.render(
         <ErrorBoundary>
-          <ReviewApp hunks={hunks} yamlPath={yamlPath} isGenerating={isGenerating} />
-        </ErrorBoundary>
+          <ReviewApp
+            hunks={hunks}
+            yamlPath={yamlPath}
+            isGenerating={isGenerating}
+          />
+        </ErrorBoundary>,
       );
     };
 
@@ -823,12 +920,8 @@ interface ResumeModeOptions {
 async function runResumeMode(options: ResumeModeOptions) {
   const pc = await import("picocolors");
   const clack = await import("@clack/prompts");
-  const {
-    listReviews,
-    loadReview,
-    formatTimeAgo,
-    truncatePath,
-  } = await import("./review/index.ts");
+  const { listReviews, loadReview, formatTimeAgo, truncatePath } =
+    await import("./review/index.ts");
   const { ReviewApp } = await import("./review/review-app.tsx");
 
   clack.intro("critique review --resume");
@@ -849,7 +942,8 @@ async function runResumeMode(options: ResumeModeOptions) {
       message: "Select a review to display",
       options: reviews.slice(0, 25).map((r) => {
         // Show status and time in label to avoid layout shifts (hints only show on focus)
-        const status = r.status === "in_progress" ? pc.default.yellow(" (in progress)") : "";
+        const status =
+          r.status === "in_progress" ? pc.default.yellow(" (in progress)") : "";
         const time = formatTimeAgo(r.updatedAt);
         const timeStr = time ? pc.default.dim(`  ${time}`) : "";
         return {
@@ -880,27 +974,36 @@ async function runResumeMode(options: ResumeModeOptions) {
   if (review.status === "in_progress") {
     clack.log.info(`Resuming interrupted review: ${review.title}`);
 
-    const { createAcpClient, readReviewYaml, saveReview } = await import("./review/index.ts");
+    const { createAcpClient, readReviewYaml, saveReview } =
+      await import("./review/index.ts");
     const { tmpdir } = await import("os");
     const { join } = await import("path");
 
     // Create temp file for YAML output (continue from stored content)
     const yamlPath = join(tmpdir(), `critique-review-${Date.now()}.yaml`);
     // Write existing YAML content to temp file so AI can continue from there
-    const existingYaml = review.reviewYaml.hunks.length > 0
-      ? `title: ${JSON.stringify(review.reviewYaml.title || review.title)}\nhunks:\n` +
-        review.reviewYaml.hunks.map((h) => {
-          const lines: string[] = [];
-          if (h.hunkIds) lines.push(`- hunkIds: [${h.hunkIds.join(", ")}]`);
-          else if (h.hunkId !== undefined) {
-            lines.push(`- hunkId: ${h.hunkId}`);
-            if (h.lineRange) lines.push(`  lineRange: [${h.lineRange[0]}, ${h.lineRange[1]}]`);
-          }
-          lines.push(`  markdownDescription: |`);
-          lines.push(...h.markdownDescription.split("\n").map((l) => `    ${l}`));
-          return lines.join("\n");
-        }).join("\n")
-      : "";
+    const existingYaml =
+      review.reviewYaml.hunks.length > 0
+        ? `title: ${JSON.stringify(review.reviewYaml.title || review.title)}\nhunks:\n` +
+          review.reviewYaml.hunks
+            .map((h) => {
+              const lines: string[] = [];
+              if (h.hunkIds) lines.push(`- hunkIds: [${h.hunkIds.join(", ")}]`);
+              else if (h.hunkId !== undefined) {
+                lines.push(`- hunkId: ${h.hunkId}`);
+                if (h.lineRange)
+                  lines.push(
+                    `  lineRange: [${h.lineRange[0]}, ${h.lineRange[1]}]`,
+                  );
+              }
+              lines.push(`  markdownDescription: |`);
+              lines.push(
+                ...h.markdownDescription.split("\n").map((l) => `    ${l}`),
+              );
+              return lines.join("\n");
+            })
+            .join("\n")
+        : "";
     fs.writeFileSync(yamlPath, existingYaml);
 
     // Connect to ACP and try to resume
@@ -914,7 +1017,9 @@ async function runResumeMode(options: ResumeModeOptions) {
 
     if (!resumed) {
       resumeSpinner.stop("Session expired");
-      clack.log.warn("ACP session no longer available. Showing partial progress.");
+      clack.log.warn(
+        "ACP session no longer available. Showing partial progress.",
+      );
       await acpClient.close();
       fs.unlinkSync(yamlPath);
       // Fall through to display the partial content
@@ -945,7 +1050,9 @@ async function runResumeMode(options: ResumeModeOptions) {
         onDestroy() {
           savePendingReview("in_progress");
           acpClient.close();
-          try { fs.unlinkSync(yamlPath); } catch {}
+          try {
+            fs.unlinkSync(yamlPath);
+          } catch {}
           process.exit(0);
         },
         exitOnCtrlC: true,
@@ -960,7 +1067,7 @@ async function runResumeMode(options: ResumeModeOptions) {
             isGenerating={true}
             initialReviewData={review.reviewYaml}
           />
-        </ErrorBoundary>
+        </ErrorBoundary>,
       );
 
       // Wait for session to complete (it's already running from resume)
@@ -974,11 +1081,8 @@ async function runResumeMode(options: ResumeModeOptions) {
 
   // Web mode: generate HTML and upload
   if (options.web) {
-    const {
-      captureReviewResponsiveHtml,
-      uploadHtml,
-      openInBrowser,
-    } = await import("./web-utils.tsx");
+    const { captureReviewResponsiveHtml, uploadHtml, openInBrowser } =
+      await import("./web-utils.tsx");
 
     // For web, always use default theme (with auto dark/light inversion) unless explicitly overridden
     const themeName = defaultThemeName;
@@ -989,14 +1093,15 @@ async function runResumeMode(options: ResumeModeOptions) {
     webSpinner.start("Generating web preview...");
 
     try {
-      const { htmlDesktop, htmlMobile, ogImage } = await captureReviewResponsiveHtml({
-        hunks: review.hunks,
-        reviewData: review.reviewYaml,
-        desktopCols: 230,
-        mobileCols: 100,
-        baseRows,
-        themeName,
-      });
+      const { htmlDesktop, htmlMobile, ogImage } =
+        await captureReviewResponsiveHtml({
+          hunks: review.hunks,
+          reviewData: review.reviewYaml,
+          desktopCols: 230,
+          mobileCols: 100,
+          baseRows,
+          themeName,
+        });
 
       webSpinner.message("Uploading...");
       const result = await uploadHtml(htmlDesktop, htmlMobile, ogImage);
@@ -1005,7 +1110,9 @@ async function runResumeMode(options: ResumeModeOptions) {
       clack.log.success(`Preview URL: ${result.url}`);
       clack.log.info(formatPreviewExpiry(result.expiresInDays));
       if (typeof result.expiresInDays === "number") {
-        clack.log.info("Get unlimited links and support the project: https://critique.work/buy");
+        clack.log.info(
+          "Get unlimited links and support the project: https://critique.work/buy",
+        );
       }
       clack.outro("");
 
@@ -1033,7 +1140,9 @@ async function runResumeMode(options: ResumeModeOptions) {
 
     try {
       const themeName = "github-light";
-      const [pdfPageWidth, pdfPageHeight] = parsePageSize(options.pdfPageSize || "a4-landscape");
+      const [pdfPageWidth, pdfPageHeight] = parsePageSize(
+        options.pdfPageSize || "a4-landscape",
+      );
       const pdfCols = pdfPageWidth > pdfPageHeight ? 200 : 140;
 
       const frame = await renderReviewToFrame({
@@ -1045,7 +1154,12 @@ async function runResumeMode(options: ResumeModeOptions) {
       });
 
       const pdfTheme = getResolvedTheme(themeName);
-      const fontPath = join(import.meta.dir, "..", "public", "jetbrains-mono-nerd.ttf");
+      const fontPath = join(
+        import.meta.dir,
+        "..",
+        "public",
+        "jetbrains-mono-nerd.ttf",
+      );
 
       const result = await renderFrameToPdf(frame, {
         pageWidth: pdfPageWidth,
@@ -1057,12 +1171,16 @@ async function runResumeMode(options: ResumeModeOptions) {
         fontPath,
       });
 
-      const outPath = options.pdfFilename || join(getTmpdir(), `critique-review-${Date.now()}.pdf`);
+      const outPath =
+        options.pdfFilename ||
+        join(getTmpdir(), `critique-review-${Date.now()}.pdf`);
       fs.writeFileSync(outPath, result.buffer);
       pdfSpinner.stop("PDF generated");
 
       clack.log.success(`PDF written: ${outPath}`);
-      clack.log.info(`${result.pageCount} page${result.pageCount === 1 ? "" : "s"}, ${result.totalLines} lines`);
+      clack.log.info(
+        `${result.pageCount} page${result.pageCount === 1 ? "" : "s"}, ${result.totalLines} lines`,
+      );
       clack.outro("");
 
       if (options.open) {
@@ -1097,7 +1215,7 @@ async function runResumeMode(options: ResumeModeOptions) {
         isGenerating={false}
         initialReviewData={review.reviewYaml}
       />
-    </ErrorBoundary>
+    </ErrorBoundary>,
   );
 }
 
@@ -1111,25 +1229,22 @@ interface WebModeOptions {
   json?: boolean;
 }
 
-async function runWebMode(
-  diffContent: string,
-  options: WebModeOptions
-) {
-  const {
-    captureResponsiveHtml,
-    uploadHtml,
-    openInBrowser,
-  } = await import("./web-utils.tsx");
+async function runWebMode(diffContent: string, options: WebModeOptions) {
+  const { captureResponsiveHtml, uploadHtml, openInBrowser } =
+    await import("./web-utils.tsx");
 
   // Use stderr for progress when --json is set, stdout otherwise
-  const log = options.json ? console.error.bind(console) : console.log.bind(console);
+  const log = options.json
+    ? console.error.bind(console)
+    : console.log.bind(console);
 
   const desktopCols = options.cols || 230;
   const mobileCols = options.mobileCols || 100;
   // For web, always use default theme (with auto dark/light inversion) unless explicitly overridden via --theme
-  const themeName = options.theme && themeNames.includes(options.theme)
-    ? options.theme
-    : defaultThemeName;
+  const themeName =
+    options.theme && themeNames.includes(options.theme)
+      ? options.theme
+      : defaultThemeName;
 
   // Calculate required rows from diff content
   const { parsePatch } = await import("diff");
@@ -1144,7 +1259,7 @@ async function runWebMode(
   try {
     const { htmlDesktop, htmlMobile, ogImage } = await captureResponsiveHtml(
       diffContent,
-      { desktopCols, mobileCols, baseRows, themeName, title: options.title }
+      { desktopCols, mobileCols, baseRows, themeName, title: options.title },
     );
 
     log("Uploading...");
@@ -1154,7 +1269,9 @@ async function runWebMode(
     log(`\nPreview URL: ${result.url}`);
     log(formatPreviewExpiry(result.expiresInDays));
     if (typeof result.expiresInDays === "number") {
-      log("Get unlimited links and support the project: https://critique.work/buy");
+      log(
+        "Get unlimited links and support the project: https://critique.work/buy",
+      );
     }
     if (options.json) {
       const fileStats = files.map((file) => {
@@ -1165,7 +1282,9 @@ async function runWebMode(
           removed: deletions,
         };
       });
-      console.log(JSON.stringify({ url: result.url, id: result.id, files: fileStats }));
+      console.log(
+        JSON.stringify({ url: result.url, id: result.id, files: fileStats }),
+      );
     }
 
     if (options.open) {
@@ -1203,43 +1322,43 @@ const PAGE_SIZE_PRESETS: Record<string, [number, number]> = {
   "letter-portrait": [612, 792],
   "legal-landscape": [1008, 612],
   "legal-portrait": [612, 1008],
-}
+};
 
 /**
  * Parse a page size string into [width, height] in points.
  * Accepts presets like "a4-landscape" or custom "WxH" (e.g. "1000x600").
  */
 function parsePageSize(size: string): [number, number] {
-  const preset = PAGE_SIZE_PRESETS[size.toLowerCase()]
-  if (preset) return preset
+  const preset = PAGE_SIZE_PRESETS[size.toLowerCase()];
+  if (preset) return preset;
 
   // Try custom WxH format
-  const match = size.match(/^(\d+)x(\d+)$/i)
+  const match = size.match(/^(\d+)x(\d+)$/i);
   if (match) {
-    return [parseInt(match[1]!, 10), parseInt(match[2]!, 10)]
+    return [parseInt(match[1]!, 10), parseInt(match[2]!, 10)];
   }
 
   throw new Error(
-    `Invalid page size "${size}". Use a preset (${Object.keys(PAGE_SIZE_PRESETS).join(", ")}) or custom WxH (e.g. 1000x600)`
-  )
+    `Invalid page size "${size}". Use a preset (${Object.keys(PAGE_SIZE_PRESETS).join(", ")}) or custom WxH (e.g. 1000x600)`,
+  );
 }
 
-async function runPdfMode(
-  diffContent: string,
-  options: PdfModeOptions
-) {
+async function runPdfMode(diffContent: string, options: PdfModeOptions) {
   const { renderDiffToFrame } = await import("./web-utils.tsx");
   const { renderFrameToPdf } = await import("./opentui-pdf.ts");
   const { join } = await import("path");
   const { tmpdir } = await import("os");
 
   // PDF defaults to github-light (better for print/reading), but respects --theme
-  const themeName = options.theme && themeNames.includes(options.theme)
-    ? options.theme
-    : "github-light";
+  const themeName =
+    options.theme && themeNames.includes(options.theme)
+      ? options.theme
+      : "github-light";
 
   // Parse page size (default: a4-landscape for more horizontal space)
-  const [pageWidth, pageHeight] = parsePageSize(options.pageSize || "a4-landscape");
+  const [pageWidth, pageHeight] = parsePageSize(
+    options.pageSize || "a4-landscape",
+  );
   // Landscape default uses more cols for split diff; portrait keeps old default
   const cols = options.cols || (pageWidth > pageHeight ? 200 : 140);
 
@@ -1259,7 +1378,12 @@ async function runPdfMode(
     const theme = getResolvedTheme(themeName);
 
     // Resolve font path (shipped .ttf in public/)
-    const fontPath = join(import.meta.dir, "..", "public", "jetbrains-mono-nerd.ttf");
+    const fontPath = join(
+      import.meta.dir,
+      "..",
+      "public",
+      "jetbrains-mono-nerd.ttf",
+    );
 
     const result = await renderFrameToPdf(frame, {
       pageWidth,
@@ -1271,10 +1395,13 @@ async function runPdfMode(
       fontPath,
     });
 
-    const outPath = options.filename || join(tmpdir(), `critique-diff-${Date.now()}.pdf`);
+    const outPath =
+      options.filename || join(tmpdir(), `critique-diff-${Date.now()}.pdf`);
     fs.writeFileSync(outPath, result.buffer);
     console.log(`\nPDF written: ${outPath}`);
-    console.log(`${result.pageCount} page${result.pageCount === 1 ? "" : "s"}, ${result.totalLines} lines`);
+    console.log(
+      `${result.pageCount} page${result.pageCount === 1 ? "" : "s"}, ${result.totalLines} lines`,
+    );
 
     if (options.open) {
       const { openInBrowser } = await import("./web-utils.tsx");
@@ -1295,15 +1422,13 @@ interface ImageModeOptions {
   cols?: number;
 }
 
-async function runImageMode(
-  diffContent: string,
-  options: ImageModeOptions
-) {
+async function runImageMode(diffContent: string, options: ImageModeOptions) {
   const { renderDiffToImages } = await import("./image.ts");
 
-  const themeName = options.theme && themeNames.includes(options.theme)
-    ? options.theme
-    : persistedState.themeName ?? defaultThemeName;
+  const themeName =
+    options.theme && themeNames.includes(options.theme)
+      ? options.theme
+      : (persistedState.themeName ?? defaultThemeName);
 
   const cols = options.cols || 120;
 
@@ -1315,7 +1440,9 @@ async function runImageMode(
       themeName,
     });
 
-    console.log(`\nGenerated ${result.imageCount} image${result.imageCount === 1 ? "" : "s"}:`);
+    console.log(
+      `\nGenerated ${result.imageCount} image${result.imageCount === 1 ? "" : "s"}:`,
+    );
     for (const path of result.paths) {
       console.log(`  ${path}`);
     }
@@ -1336,15 +1463,16 @@ interface ScrollbackModeOptions {
 
 async function runScrollbackMode(
   diffContent: string,
-  options: ScrollbackModeOptions
+  options: ScrollbackModeOptions,
 ) {
   const { renderDiffToFrame } = await import("./web-utils.tsx");
   const { frameToAnsi } = await import("./ansi-output.ts");
   const { getResolvedTheme } = await import("./themes.ts");
 
-  const themeName = options.theme && themeNames.includes(options.theme)
-    ? options.theme
-    : persistedState.themeName ?? defaultThemeName;
+  const themeName =
+    options.theme && themeNames.includes(options.theme)
+      ? options.theme
+      : (persistedState.themeName ?? defaultThemeName);
 
   const cols = options.cols || process.stdout.columns || 120;
 
@@ -1377,7 +1505,10 @@ interface ErrorBoundaryState {
   error: Error | null;
 }
 
-class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
+class ErrorBoundary extends React.Component<
+  ErrorBoundaryProps,
+  ErrorBoundaryState
+> {
   state: ErrorBoundaryState = { hasError: false, error: null };
   declare props: ErrorBoundaryProps;
 
@@ -1418,7 +1549,10 @@ async function filterCombinedDiffByPatterns(
   if (getFilterPatterns(options).length === 0) return diffContent;
 
   const { parsePatch, formatPatch } = await import("diff");
-  const parsedFiles = parseGitDiffFiles(stripSubmoduleHeaders(diffContent), parsePatch);
+  const parsedFiles = parseGitDiffFiles(
+    stripSubmoduleHeaders(diffContent),
+    parsePatch,
+  );
   const filteredFiles = filterParsedFilesByPatterns(parsedFiles, options);
 
   if (filteredFiles.length === 0) return "";
@@ -1435,10 +1569,6 @@ function formatPreviewExpiry(expiresInDays?: number | null): string {
   }
   return "(expires in 7 days)";
 }
-
-
-
-
 
 function execSyncWithError(
   command: string,
@@ -1500,6 +1630,19 @@ export function App({ parsedFiles }: AppProps) {
   );
 
   const renderer = useRenderer();
+  const [, forceUpdate] = React.useReducer((n: number) => n + 1, 0);
+
+  // Re-detect terminal palette when user switches to the system theme at runtime
+  React.useEffect(() => {
+    if (themeName !== "system") return;
+    renderer
+      .getPalette({ size: 16, timeout: 1000 })
+      .then((termColors) => {
+        setSystemTheme(resolveSystemTheme(termColors));
+        forceUpdate();
+      })
+      .catch(() => {});
+  }, [themeName]);
 
   useKeyboard((key) => {
     if (showDropdown || showThemePicker) {
@@ -1543,7 +1686,10 @@ export function App({ parsedFiles }: AppProps) {
       // gg - go to top (double-tap within 300ms)
       if (key.name === "g" && !key.shift && !key.ctrl) {
         const now = Date.now();
-        if (lastKeyRef.current?.key === "g" && now - lastKeyRef.current.time < 300) {
+        if (
+          lastKeyRef.current?.key === "g" &&
+          now - lastKeyRef.current.time < 300
+        ) {
           scrollbox.scrollTo(0);
           lastKeyRef.current = null;
         } else {
@@ -1801,12 +1947,14 @@ export function App({ parsedFiles }: AppProps) {
           }}
         >
           <text fg={textColor}>p</text>
-          <text fg={mutedColor}> files ({parsedFiles.length})  </text>
+          <text fg={mutedColor}> files ({parsedFiles.length}) </text>
           <text fg={textColor}>t</text>
           <text fg={mutedColor}> theme</text>
           <box flexGrow={1} />
           <text fg={mutedColor}>run with </text>
-          <text fg={textColor}><b>--web</b></text>
+          <text fg={textColor}>
+            <b>--web</b>
+          </text>
           <text fg={mutedColor}> to share & collaborate</text>
         </box>
       )}
@@ -1818,16 +1966,17 @@ export function App({ parsedFiles }: AppProps) {
 cli
   .command("hunks list", "List all hunks with stable IDs for selective staging")
   .option("--staged", "List staged hunks instead of unstaged")
-  .option("--filter <pattern>", wrapJsonSchema({
-    type: "array",
-    items: { type: "string" },
-    description: "Filter files by glob pattern (can be used multiple times)",
-  }))
+  .option(
+    "--filter <pattern>",
+    wrapJsonSchema({
+      type: "array",
+      items: { type: "string" },
+      description: "Filter files by glob pattern (can be used multiple times)",
+    }),
+  )
   .action(async (options) => {
-    const {
-      parseHunksWithIds,
-      hunkToStableId,
-    } = await import("./review/index.ts");
+    const { parseHunksWithIds, hunkToStableId } =
+      await import("./review/index.ts");
 
     // Build git command - unstaged by default, staged with --staged
     const gitCommand = buildGitCommand({
@@ -1846,7 +1995,9 @@ cli
       if (dirtySubmodules.length > 0) {
         const subCmd = buildSubmoduleDiffCommand(dirtySubmodules, {});
         try {
-          const { stdout: subDiff } = await execAsync(subCmd, { encoding: "utf-8" });
+          const { stdout: subDiff } = await execAsync(subCmd, {
+            encoding: "utf-8",
+          });
           if (subDiff.trim()) {
             fullHunksDiff = fullHunksDiff + "\n" + subDiff;
           }
@@ -1857,7 +2008,7 @@ cli
 
       fullHunksDiff = await filterCombinedDiffByPatterns(fullHunksDiff, {
         filter: options.filter,
-        positionalFilters: options['--'],
+        positionalFilters: options["--"],
       });
     }
 
@@ -1919,7 +2070,9 @@ cli
       const parsed = parseHunkId(id);
       if (!parsed) {
         console.error(`Invalid hunk ID format: ${id}`);
-        console.error("Expected format: file:@-oldStart,oldLines+newStart,newLines");
+        console.error(
+          "Expected format: file:@-oldStart,oldLines+newStart,newLines",
+        );
         process.exit(1);
       }
       const existing = fileGroups.get(parsed.filename);
@@ -1967,13 +2120,17 @@ cli
         process.exit(1);
       }
 
-      const hunks = await parseHunksWithIds(stripSubmoduleHeaders(fullHunksDiff));
+      const hunks = await parseHunksWithIds(
+        stripSubmoduleHeaders(fullHunksDiff),
+      );
 
       for (const stableId of fileIds) {
         const hunk = findHunkByStableId(hunks, stableId);
         if (!hunk) {
           console.error(`Hunk not found: ${stableId}`);
-          console.error("The diff may have changed. Run 'critique hunks list' to see current hunks.");
+          console.error(
+            "The diff may have changed. Run 'critique hunks list' to see current hunks.",
+          );
           process.exit(1);
         }
         resolvedHunks.push(hunk);
@@ -2012,22 +2169,40 @@ cli
   .option("--commit <ref>", "Show changes from a specific commit")
   .option("--watch", "Watch for file changes and refresh diff")
   .option("--context <lines>", "Number of context lines (default: 3)")
-  .option("--filter <pattern>", wrapJsonSchema({
-    type: "array",
-    items: { type: "string" },
-    description: "Filter files by glob pattern (can be used multiple times)",
-  }))
+  .option(
+    "--filter <pattern>",
+    wrapJsonSchema({
+      type: "array",
+      items: { type: "string" },
+      description: "Filter files by glob pattern (can be used multiple times)",
+    }),
+  )
   .option("--theme <name>", "Theme to use for rendering")
   .option("--web [title]", "Generate web preview instead of TUI")
-  .option("--pdf [filename]", "Generate PDF instead of TUI (default: /tmp/critique-diff-*.pdf)")
-  .option("--pdf-page-size <size>", "PDF page size: a4-landscape (default), a4-portrait, a3-landscape, letter-landscape, or WxH in points")
+  .option(
+    "--pdf [filename]",
+    "Generate PDF instead of TUI (default: /tmp/critique-diff-*.pdf)",
+  )
+  .option(
+    "--pdf-page-size <size>",
+    "PDF page size: a4-landscape (default), a4-portrait, a3-landscape, letter-landscape, or WxH in points",
+  )
   .option("--open", "Open in browser (with --web/--pdf)")
   .option("--json", "Output JSON to stdout (with --web)")
   .option("--image", "Generate images instead of TUI (saved to /tmp)")
-  .option("--cols <cols>", "Desktop columns for web/image render (default: 240)")
-  .option("--mobile-cols <cols>", "Mobile columns for web render (default: 100)")
+  .option(
+    "--cols <cols>",
+    "Desktop columns for web/image render (default: 240)",
+  )
+  .option(
+    "--mobile-cols <cols>",
+    "Mobile columns for web render (default: 100)",
+  )
   .option("--stdin", "Read diff from stdin (for use as a pager)")
-  .option("--scrollback", "Output to terminal scrollback instead of TUI (auto-enabled when non-TTY)")
+  .option(
+    "--scrollback",
+    "Output to terminal scrollback instead of TUI (auto-enabled when non-TTY)",
+  )
   .action(async (base, head, options) => {
     // Apply theme if specified (zustand subscription auto-persists)
     if (options.theme && themeNames.includes(options.theme)) {
@@ -2042,11 +2217,12 @@ cli
       head,
       context: options.context,
       filter: options.filter,
-      positionalFilters: options['--'],
+      positionalFilters: options["--"],
     });
 
     // Detect default mode (no args): submodule diffs are handled separately
-    const isDefaultMode = !options.staged && !options.commit && !base && !head && !options.stdin;
+    const isDefaultMode =
+      !options.staged && !options.commit && !base && !head && !options.stdin;
 
     // Get diff content - from stdin or git
     let diffContent: string;
@@ -2092,7 +2268,7 @@ cli
 
         diffContent = await filterCombinedDiffByPatterns(diffContent, {
           filter: options.filter,
-          positionalFilters: options['--'],
+          positionalFilters: options["--"],
         });
       }
     }
@@ -2101,10 +2277,13 @@ cli
     const cleanedDiff = stripSubmoduleHeaders(diffContent);
 
     // Check for empty diff (except for --watch mode which may get content later)
-    const shouldWatch = options.watch && !base && !head && !options.commit && !options.stdin;
+    const shouldWatch =
+      options.watch && !base && !head && !options.commit && !options.stdin;
     if (!cleanedDiff.trim() && !shouldWatch) {
       // Use stderr for --json mode
-      const log = options.json ? console.error.bind(console) : console.log.bind(console);
+      const log = options.json
+        ? console.error.bind(console)
+        : console.log.bind(console);
       log("No changes to display");
       if (options.json) {
         console.log(JSON.stringify({ error: "No changes to display" }));
@@ -2114,7 +2293,7 @@ cli
 
     // Dispatch to appropriate handler with diff content
     if (options.web !== undefined) {
-      const title = typeof options.web === 'string' ? options.web : undefined;
+      const title = typeof options.web === "string" ? options.web : undefined;
       await runWebMode(cleanedDiff, {
         title,
         open: options.open,
@@ -2127,7 +2306,8 @@ cli
     }
 
     if (options.pdf !== undefined) {
-      const filename = typeof options.pdf === 'string' ? options.pdf : undefined;
+      const filename =
+        typeof options.pdf === "string" ? options.pdf : undefined;
       await runPdfMode(cleanedDiff, {
         filename,
         open: options.open,
@@ -2148,7 +2328,8 @@ cli
 
     if (options.scrollback || options.stdin || !process.stdout.isTTY) {
       // For scrollback, prefer terminal width over --cols default (240 is for web)
-      const scrollbackCols = process.stdout.columns || parseInt(options.cols) || 120;
+      const scrollbackCols =
+        process.stdout.columns || parseInt(options.cols) || 120;
       await runScrollbackMode(cleanedDiff, {
         theme: options.theme,
         cols: scrollbackCols,
@@ -2172,6 +2353,20 @@ cli
       ]);
       const { parsePatch, formatPatch } = diffModule;
 
+      // Detect terminal palette for system theme before first render
+      const initialTheme = useAppStore.getState().themeName;
+      if (initialTheme === "system") {
+        try {
+          const termColors = await renderer.getPalette({
+            size: 16,
+            timeout: 1000,
+          });
+          setSystemTheme(resolveSystemTheme(termColors));
+        } catch {
+          // Fall back to github if palette detection fails
+        }
+      }
+
       // Parse initial diff (already have it, no need to fetch again)
       const initialParsedFiles = cleanedDiff.trim()
         ? processFiles(parseGitDiffFiles(cleanedDiff, parsePatch), formatPatch)
@@ -2179,9 +2374,9 @@ cli
 
       function AppWithWatch() {
         // Use initial parsed files, only re-fetch if watching
-        const [parsedFiles, setParsedFiles] = React.useState<ParsedFile[] | null>(
-          shouldWatch ? null : initialParsedFiles
-        );
+        const [parsedFiles, setParsedFiles] = React.useState<
+          ParsedFile[] | null
+        >(shouldWatch ? null : initialParsedFiles);
         const themeName = useAppStore((s) => s.themeName);
 
         const watchRenderer = useRenderer();
@@ -2239,11 +2434,14 @@ cli
                 return;
               }
 
-              const files = parseGitDiffFiles(stripSubmoduleHeaders(fullDiff), parsePatch);
+              const files = parseGitDiffFiles(
+                stripSubmoduleHeaders(fullDiff),
+                parsePatch,
+              );
               const filteredFiles = isDefaultMode
                 ? filterParsedFilesByPatterns(files, {
                     filter: options.filter,
-                    positionalFilters: options['--'],
+                    positionalFilters: options["--"],
                   })
                 : files;
               const processedFiles = processFiles(filteredFiles, formatPatch);
@@ -2294,7 +2492,10 @@ cli
 
         if (parsedFiles === null) {
           return (
-            <box onMouseUp={onMouseUp} style={{ padding: 1, backgroundColor: defaultBg }}>
+            <box
+              onMouseUp={onMouseUp}
+              style={{ padding: 1, backgroundColor: defaultBg }}
+            >
               <text>Loading...</text>
             </box>
           );
@@ -2302,7 +2503,10 @@ cli
 
         if (parsedFiles.length === 0) {
           return (
-            <box onMouseUp={onMouseUp} style={{ padding: 1, backgroundColor: defaultBg }}>
+            <box
+              onMouseUp={onMouseUp}
+              style={{ padding: 1, backgroundColor: defaultBg }}
+            >
               <text>No changes to display</text>
             </box>
           );
@@ -2314,7 +2518,7 @@ cli
       createRoot(renderer).render(
         <ErrorBoundary>
           <AppWithWatch />
-        </ErrorBoundary>
+        </ErrorBoundary>,
       );
     } catch (error) {
       console.error("Error getting git diff:", error);
@@ -2325,35 +2529,55 @@ cli
 cli
   .command("review [base] [head]", "AI-powered diff review")
   .option("--agent <name>", "AI agent to use (default: opencode)")
-  .option("--model <id>", "Model to use for review (e.g., anthropic/claude-sonnet-4-20250514 for opencode, claude-sonnet-4-20250514 for claude)")
+  .option(
+    "--model <id>",
+    "Model to use for review (e.g., anthropic/claude-sonnet-4-20250514 for opencode, claude-sonnet-4-20250514 for claude)",
+  )
   .option("--staged", "Review staged changes")
   .option("--commit <ref>", "Review changes from a specific commit")
   .option("--context <lines>", "Number of context lines (default: 3)")
-  .option("--filter <pattern>", wrapJsonSchema({
-    type: "array",
-    items: { type: "string" },
-    description: "Filter files by glob pattern (can be used multiple times)",
-  }))
-  .option("--session <id>", wrapJsonSchema({
-    type: "array",
-    items: { type: "string" },
-    description: "Session ID(s) to include as context (can be repeated)",
-  }))
+  .option(
+    "--filter <pattern>",
+    wrapJsonSchema({
+      type: "array",
+      items: { type: "string" },
+      description: "Filter files by glob pattern (can be used multiple times)",
+    }),
+  )
+  .option(
+    "--session <id>",
+    wrapJsonSchema({
+      type: "array",
+      items: { type: "string" },
+      description: "Session ID(s) to include as context (can be repeated)",
+    }),
+  )
   .option("--web", "Generate web preview instead of TUI")
-  .option("--pdf [filename]", "Generate PDF instead of TUI (default: /tmp/critique-review-*.pdf)")
-  .option("--pdf-page-size <size>", "PDF page size: a4-landscape (default), a4-portrait, a3-landscape, letter-landscape, or WxH in points")
+  .option(
+    "--pdf [filename]",
+    "Generate PDF instead of TUI (default: /tmp/critique-review-*.pdf)",
+  )
+  .option(
+    "--pdf-page-size <size>",
+    "PDF page size: a4-landscape (default), a4-portrait, a3-landscape, letter-landscape, or WxH in points",
+  )
   .option("--open", "Open in browser/viewer (with --web/--pdf)")
   .option("--json", "Output JSON to stdout (implies --web)")
-  .option("--resume [id]", "Resume a previous review (shows select if no ID provided)")
+  .option(
+    "--resume [id]",
+    "Resume a previous review (shows select if no ID provided)",
+  )
   .action(async (base, head, options) => {
     try {
       // Handle resume mode
       if (options.resume !== undefined) {
         await runResumeMode({
-          reviewId: typeof options.resume === "string" ? options.resume : undefined,
+          reviewId:
+            typeof options.resume === "string" ? options.resume : undefined,
           web: options.web,
           pdf: options.pdf !== undefined,
-          pdfFilename: typeof options.pdf === 'string' ? options.pdf : undefined,
+          pdfFilename:
+            typeof options.pdf === "string" ? options.pdf : undefined,
           pdfPageSize: options.pdfPageSize,
           open: options.open,
         });
@@ -2374,39 +2598,49 @@ cli
         head,
         context: options.context,
         filter: options.filter,
-        positionalFilters: options['--'],
+        positionalFilters: options["--"],
       });
 
       // Normalize session option to array (goke array schema always yields string[])
       const sessionIds = options.session
-        ? Array.isArray(options.session) ? options.session : [options.session]
+        ? Array.isArray(options.session)
+          ? options.session
+          : [options.session]
         : undefined;
 
       // --json implies --web
       const useWeb = options.web || options.json;
       const webOptions = useWeb ? { web: true, open: options.open } : undefined;
       const usePdf = options.pdf !== undefined;
-      const pdfOptions = usePdf ? {
-        pdf: true,
-        filename: typeof options.pdf === 'string' ? options.pdf : undefined,
-        open: options.open,
-        pageSize: options.pdfPageSize,
-      } : undefined;
-      const isDefaultMode = !options.staged && !options.commit && !base && !head;
-      await runReviewMode(gitCommand, agent, {
-        sessionIds,
-        webOptions,
-        pdfOptions,
-        model: options.model,
-        json: options.json,
-      }, {
-        isDefaultMode,
-        diffOptions: {
-          context: options.context,
-          filter: options.filter,
-          positionalFilters: options['--'],
+      const pdfOptions = usePdf
+        ? {
+            pdf: true,
+            filename: typeof options.pdf === "string" ? options.pdf : undefined,
+            open: options.open,
+            pageSize: options.pdfPageSize,
+          }
+        : undefined;
+      const isDefaultMode =
+        !options.staged && !options.commit && !base && !head;
+      await runReviewMode(
+        gitCommand,
+        agent,
+        {
+          sessionIds,
+          webOptions,
+          pdfOptions,
+          model: options.model,
+          json: options.json,
         },
-      });
+        {
+          isDefaultMode,
+          diffOptions: {
+            context: options.context,
+            filter: options.filter,
+            positionalFilters: options["--"],
+          },
+        },
+      );
     } catch (error) {
       console.error("Error running review:", error);
       process.exit(1);
@@ -2452,7 +2686,7 @@ cli
       createRoot(renderer).render(
         <ErrorBoundary>
           <App parsedFiles={[patchWithRawDiff]} />
-        </ErrorBoundary>
+        </ErrorBoundary>,
       );
     } catch (error) {
       console.error("Error displaying diff:", error);
@@ -2552,7 +2786,9 @@ cli
                 Array.from(state.selectedFiles).filter((f) => f !== value),
               ),
               appliedFiles: new Map(
-                Array.from(state.appliedFiles.entries()).filter(([k]) => k !== value),
+                Array.from(state.appliedFiles.entries()).filter(
+                  ([k]) => k !== value,
+                ),
               ),
             }));
           } else {
@@ -2679,16 +2915,25 @@ cli
   .command("web [base] [head]", "DEPRECATED: Use --web flag instead")
   .option("--staged", "Show staged changes")
   .option("--commit <ref>", "Show changes from a specific commit")
-  .option("--cols <cols>", "Number of columns for desktop rendering (default: 240)")
-  .option("--mobile-cols <cols>", "Number of columns for mobile rendering (default: 100)")
+  .option(
+    "--cols <cols>",
+    "Number of columns for desktop rendering (default: 240)",
+  )
+  .option(
+    "--mobile-cols <cols>",
+    "Number of columns for mobile rendering (default: 100)",
+  )
   .option("--open", "Open in browser after generating")
   .option("--context <lines>", "Number of context lines (default: 3)")
   .option("--theme <name>", "Theme to use for rendering")
-  .option("--filter <pattern>", wrapJsonSchema({
-    type: "array",
-    items: { type: "string" },
-    description: "Filter files by glob pattern (can be used multiple times)",
-  }))
+  .option(
+    "--filter <pattern>",
+    wrapJsonSchema({
+      type: "array",
+      items: { type: "string" },
+      description: "Filter files by glob pattern (can be used multiple times)",
+    }),
+  )
   .option("--title <title>", "HTML document title")
   .action(async (base, head, options) => {
     // Build git command and get diff
@@ -2699,7 +2944,7 @@ cli
       head,
       context: options.context,
       filter: options.filter,
-      positionalFilters: options['--'],
+      positionalFilters: options["--"],
     });
 
     const { stdout: gitDiff } = await execAsync(gitCommand, {
@@ -2708,7 +2953,8 @@ cli
 
     // In default mode, append dirty submodule diffs
     let fullWebDiff = gitDiff;
-    const isWebDefaultMode = !options.staged && !options.commit && !base && !head;
+    const isWebDefaultMode =
+      !options.staged && !options.commit && !base && !head;
     if (isWebDefaultMode) {
       const dirtySubmodules = getDirtySubmodulePaths();
       if (dirtySubmodules.length > 0) {
@@ -2716,7 +2962,9 @@ cli
           context: options.context,
         });
         try {
-          const { stdout: subDiff } = await execAsync(subCmd, { encoding: "utf-8" });
+          const { stdout: subDiff } = await execAsync(subCmd, {
+            encoding: "utf-8",
+          });
           if (subDiff.trim()) {
             fullWebDiff = fullWebDiff + "\n" + subDiff;
           }
@@ -2727,7 +2975,7 @@ cli
 
       fullWebDiff = await filterCombinedDiffByPatterns(fullWebDiff, {
         filter: options.filter,
-        positionalFilters: options['--'],
+        positionalFilters: options["--"],
       });
     }
 
@@ -2750,31 +2998,33 @@ cli
 cli
   .command("login <key>", "Store a Critique license key for unlimited links")
   .action((key: string) => {
-    saveStoredLicenseKey(key)
-    process.stdout.write("Saved license key to ~/.critique/license.json\n")
+    saveStoredLicenseKey(key);
+    process.stdout.write("Saved license key to ~/.critique/license.json\n");
   });
 
 cli
   .command("unpublish <url>", "Delete a published diff by URL or ID")
   .action(async (url: string) => {
-    const { deleteUpload, extractDiffId } = await import("./web-utils.tsx")
+    const { deleteUpload, extractDiffId } = await import("./web-utils.tsx");
 
-    const id = extractDiffId(url)
+    const id = extractDiffId(url);
     if (!id) {
-      process.stderr.write("Error: Invalid URL or ID format.\n")
-      process.stderr.write("Expected: https://critique.work/v/<id> or a 16-32 character hex ID\n")
-      process.exit(1)
+      process.stderr.write("Error: Invalid URL or ID format.\n");
+      process.stderr.write(
+        "Expected: https://critique.work/v/<id> or a 16-32 character hex ID\n",
+      );
+      process.exit(1);
     }
 
-    process.stdout.write(`Deleting diff ${id}...\n`)
+    process.stdout.write(`Deleting diff ${id}...\n`);
 
-    const result = await deleteUpload(url)
+    const result = await deleteUpload(url);
 
     if (result.success) {
-      process.stdout.write(`${result.message}\n`)
+      process.stdout.write(`${result.message}\n`);
     } else {
-      process.stderr.write(`Error: ${result.message}\n`)
-      process.exit(1)
+      process.stderr.write(`Error: ${result.message}\n`);
+      process.exit(1);
     }
   });
 
