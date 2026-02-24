@@ -36,8 +36,8 @@
   "dependencies": {
     "@agentclientprotocol/sdk": "^0.13.1",
     "@clack/prompts": "1.0.0-alpha.9",
-    "@opentuah/core": "0.1.95",
-    "@opentuah/react": "0.1.95",
+    "@opentuah/core": "0.1.96",
+    "@opentuah/react": "0.1.96",
     "@parcel/watcher": "^2.5.6",
     "diff": "^8.0.2",
     "goke": "^6.1.3",

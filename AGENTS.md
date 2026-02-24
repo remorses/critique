@@ -136,6 +136,8 @@ npx opensrc <owner>/<repo>      # GitHub repo (e.g., npx opensrc vercel/ai)
 
 we are using an opentui fork published as `@opentuah`. imports use `@opentuah/core` and `@opentuah/react` directly (no npm alias remapping).
 
+ALWAYS keep `@opentuah/core` and `@opentuah/react` versions pinned to exact versions in package.json (no `^` or `~` prefix). When updating, use `bun add @opentuah/core@x.y.z @opentuah/react@x.y.z` with the exact version number.
+
 To find my opentui folder with that fork see kimaki projects via kimaki cli, the one named opentui.
 
 To apply fixes there you must create a new branch and then merge it in the branch called opentuah. then publish and update the versions here. to publish there is a script specifically for opentuah.
