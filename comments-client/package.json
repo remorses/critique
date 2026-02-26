@@ -1,0 +1,23 @@
+{
+  "name": "@critique.work/client",
+  "version": "0.0.1",
+  "type": "module",
+  "license": "MIT",
+  "main": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./styles.css": "./src/styles.css"
+  },
+  "dependencies": {
+    "agents": "^0.6.0",
+    "@critique.work/server": "workspace:*"
+  },
+  "peerDependencies": {
+    "react": "^18.0.0 || ^19.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.14",
+    "react": "^19.2.0",
+    "typescript": "^5.9.3"
+  }
+}
