@@ -37,7 +37,7 @@ index 1234567..abcdefg 100644
       return
     }
 
-    const { renderDiffToImages } = await import("./image.ts")
+    const { renderDiffToImages } = await import("./image.js")
 
     const result = await renderDiffToImages(sampleDiff, {
       cols: 80,
@@ -69,8 +69,8 @@ index 1234567..abcdefg 100644
       return
     }
 
-    const { renderDiffToFrame } = await import("./web-utils.tsx")
-    const { renderFrameToImages } = await import("./image.ts")
+    const { renderDiffToFrame } = await import("./web-utils.js")
+    const { renderFrameToImages } = await import("./image.js")
 
     // Create a frame with enough lines to split
     const longDiff = `diff --git a/long.ts b/long.ts
@@ -108,7 +108,7 @@ ${Array.from({ length: 100 }, (_, i) => `+line ${i + 1}: some content here`).joi
       return
     }
 
-    const { renderDiffToImages } = await import("./image.ts")
+    const { renderDiffToImages } = await import("./image.js")
 
     // Test PNG format
     const pngResult = await renderDiffToImages(sampleDiff, {
@@ -131,7 +131,7 @@ ${Array.from({ length: 100 }, (_, i) => `+line ${i + 1}: some content here`).joi
       return
     }
 
-    const { renderFrameToImages } = await import("./image.ts")
+    const { renderFrameToImages } = await import("./image.js")
 
     // Empty frame
     const emptyFrame = {
@@ -150,7 +150,7 @@ ${Array.from({ length: 100 }, (_, i) => `+line ${i + 1}: some content here`).joi
       return
     }
 
-    const { renderDiffToOgImage } = await import("./image.ts")
+    const { renderDiffToOgImage } = await import("./image.js")
 
     const result = await renderDiffToOgImage(sampleDiff, {
       themeName: "tokyonight",
@@ -171,7 +171,7 @@ ${Array.from({ length: 100 }, (_, i) => `+line ${i + 1}: some content here`).joi
       return
     }
 
-    const { renderDiffToOgImage } = await import("./image.ts")
+    const { renderDiffToOgImage } = await import("./image.js")
 
     const result = await renderDiffToOgImage(sampleDiff, {
       width: 800,
@@ -189,8 +189,8 @@ ${Array.from({ length: 100 }, (_, i) => `+line ${i + 1}: some content here`).joi
       return
     }
 
-    const { renderDiffToFrame } = await import("./web-utils.tsx")
-    const { calculateOgImageLayout } = await import("./image.ts")
+    const { renderDiffToFrame } = await import("./web-utils.js")
+    const { calculateOgImageLayout } = await import("./image.js")
 
     // Use a realistic diff with enough lines to fill the OG image
     const longDiff = `diff --git a/auth.ts b/auth.ts
@@ -283,7 +283,7 @@ index 846e706..ca0bb64 100644
       return
     }
 
-    const { renderDiffToOgImage } = await import("./image.ts")
+    const { renderDiffToOgImage } = await import("./image.js")
 
     const exampleDiff = `diff --git a/src/auth.ts b/src/auth.ts
 index 846e706..ca0bb64 100644

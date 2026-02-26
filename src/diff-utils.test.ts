@@ -17,7 +17,7 @@ import {
   getFilterPatterns,
   matchesFileFilters,
   detectFiletype,
-} from "./diff-utils.ts"
+} from "./diff-utils.js"
 
 // ============================================================================
 // preprocessDiff
@@ -669,7 +669,7 @@ describe("detectFiletype", () => {
 
 describe("parseHunksWithIds with renames", () => {
   it("should parse hunks from rename with changes", async () => {
-    const { parseHunksWithIds } = await import("./review/hunk-parser.ts")
+    const { parseHunksWithIds } = await import("./review/hunk-parser.js")
 
     const rawDiff = [
       "diff --git old-name.ts new-name.ts",
@@ -694,7 +694,7 @@ describe("parseHunksWithIds with renames", () => {
   })
 
   it("should produce no hunks for a pure rename", async () => {
-    const { parseHunksWithIds } = await import("./review/hunk-parser.ts")
+    const { parseHunksWithIds } = await import("./review/hunk-parser.js")
 
     const rawDiff = [
       "diff --git old-name.ts new-name.ts",
@@ -710,7 +710,7 @@ describe("parseHunksWithIds with renames", () => {
   })
 
   it("should handle pure rename followed by normal file", async () => {
-    const { parseHunksWithIds } = await import("./review/hunk-parser.ts")
+    const { parseHunksWithIds } = await import("./review/hunk-parser.js")
 
     const rawDiff = [
       "diff --git old.ts new.ts",

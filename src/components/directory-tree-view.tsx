@@ -4,8 +4,8 @@
 // Supports click-to-scroll via onFileSelect callback.
 
 import * as React from "react"
-import { buildDirectoryTree, type TreeFileInfo, type TreeNode } from "../directory-tree.ts"
-import { getResolvedTheme, rgbaToHex } from "../themes.ts"
+import { buildDirectoryTree, type TreeFileInfo, type TreeNode } from "../directory-tree.js"
+import { getResolvedTheme, rgbaToHex } from "../themes.js"
 
 export interface DirectoryTreeViewProps {
   /** Files to display in the tree */

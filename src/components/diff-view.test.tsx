@@ -4,8 +4,8 @@ import * as React from "react"
 import { afterEach, describe, expect, it } from "bun:test"
 import { testRender } from "@opentuah/react/test-utils"
 import { getDataPaths } from "@opentuah/core"
-import { DiffView } from "./diff-view.tsx"
-import { useAppStore } from "../store.ts"
+import { DiffView } from "./diff-view.js"
+import { useAppStore } from "../store.js"
 
 // Suppress EventTarget memory leak warning from opentui DataPathsManager —
 // each DiffView registers a paths:changed listener during tree-sitter init

@@ -1,7 +1,7 @@
 // Tests for delimiter balancing: tokenizer pass (countDelimiter) and fix pass (balanceDelimiters).
 
 import { describe, expect, it } from "bun:test"
-import { countDelimiter, balanceDelimiters } from "./balance-delimiters.ts"
+import { countDelimiter, balanceDelimiters } from "./balance-delimiters.js"
 
 // ============================================================================
 // countDelimiter — tokenizer pass

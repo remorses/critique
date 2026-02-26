@@ -5,7 +5,7 @@
   "version": "0.1.118",
   "license": "MIT",
   "private": false,
-  "bin": "./src/cli.tsx",
+  "bin": "./dist/cli.js",
   "files": [
     "dist",
     "src",
@@ -14,7 +14,8 @@
   "scripts": {
     "cli": "bun src/cli.tsx",
     "cli:watch": "bun --watch src/cli.tsx",
-    "prepublishonly": "tsc",
+    "build": "rm -rf dist && tsc",
+    "prepublishonly": "bun run build",
     "example": "bun --watch src/example.tsx",
     "worker:dev": "wrangler dev",
     "worker:deploy": "wrangler deploy",

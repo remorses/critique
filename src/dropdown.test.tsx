@@ -2,8 +2,8 @@ import * as React from "react"
 import { afterEach, describe, expect, it } from "bun:test"
 import { act } from "react"
 import { testRender } from "@opentuah/react/test-utils"
-import Dropdown, { filterDropdownOptions } from "./dropdown.tsx"
-import { getResolvedTheme } from "./themes.ts"
+import Dropdown, { filterDropdownOptions } from "./dropdown.js"
+import { getResolvedTheme } from "./themes.js"
 
 const themeOptions = [
   { title: "GitHub", value: "github" },

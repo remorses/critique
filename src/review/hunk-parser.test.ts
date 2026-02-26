@@ -14,8 +14,8 @@ import {
   getUncoveredPortions,
   formatUncoveredMessage,
   combineHunkPatches,
-} from "./hunk-parser.ts"
-import type { ReviewGroup } from "./types.ts"
+} from "./hunk-parser.js"
+import type { ReviewGroup } from "./types.js"
 
 describe("calculateLineOffsets", () => {
   it("should return zero offsets for index 0", () => {
@@ -886,7 +886,7 @@ describe("Edge cases: minimal and boundary conditions", () => {
 
 describe("Round-trip: parseHunksWithIds produces valid patches", () => {
   it("should produce parseable patches from parseHunksWithIds", async () => {
-    const { parseHunksWithIds } = await import("./hunk-parser.ts")
+    const { parseHunksWithIds } = await import("./hunk-parser.js")
     
     // Simulate a real git diff output
     // Context: 4 lines (const x, const y, // end, })
@@ -918,7 +918,7 @@ describe("Round-trip: parseHunksWithIds produces valid patches", () => {
   })
 
   it("should handle multi-hunk file from parseHunksWithIds", async () => {
-    const { parseHunksWithIds } = await import("./hunk-parser.ts")
+    const { parseHunksWithIds } = await import("./hunk-parser.js")
     
     // Hunk 1: 4 context + 1 add = old:4, new:5
     // Hunk 2: 5 context + 1 add = old:5, new:6
@@ -953,7 +953,7 @@ describe("Round-trip: parseHunksWithIds produces valid patches", () => {
   })
 
   it("should handle sub-hunks from real parseHunksWithIds output", async () => {
-    const { parseHunksWithIds } = await import("./hunk-parser.ts")
+    const { parseHunksWithIds } = await import("./hunk-parser.js")
     
     // 10 context + 4 removed + 6 added = old:14, new:16
     const gitDiff = [
@@ -1268,7 +1268,7 @@ describe("combineHunkPatches", () => {
 
 describe("combineHunkPatches with formatPatch-style rawDiff", () => {
   it("should handle rawDiff from parseHunksWithIds (Index: header format)", async () => {
-    const { parseHunksWithIds } = await import("./hunk-parser.ts")
+    const { parseHunksWithIds } = await import("./hunk-parser.js")
 
     const gitDiff = [
       "diff --git a/src/api.ts b/src/api.ts",

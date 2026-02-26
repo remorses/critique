@@ -224,7 +224,7 @@ describe("OG image layout", () => {
     if (!takumiAvailable) return
 
     // Import the actual OG image rendering function's frame
-    const { renderDiffToFrame } = await import("./web-utils.tsx")
+    const { renderDiffToFrame } = await import("./web-utils.js")
     
     const sampleDiff = `diff --git a/test.ts b/test.ts
 index 1234567..abcdefg 100644

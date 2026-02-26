@@ -20,12 +20,12 @@ export {
   parseHunkId,
   findHunkByStableId,
   combineHunkPatches,
-} from "./hunk-parser.ts"
-export { AcpClient, OpencodeAcpClient, createAcpClient, type AgentType } from "./acp-client.ts"
-export { compressSession, sessionsToContextXml } from "./session-context.ts"
-export { watchReviewYaml, readReviewYaml, waitForFirstValidGroup } from "./yaml-watcher.ts"
-export { StreamDisplay } from "./stream-display.tsx"
-export { formatNotifications, formatNotification, type StreamLine } from "./acp-stream-display.ts"
+} from "./hunk-parser.js"
+export { AcpClient, OpencodeAcpClient, createAcpClient, type AgentType } from "./acp-client.js"
+export { compressSession, sessionsToContextXml } from "./session-context.js"
+export { watchReviewYaml, readReviewYaml, waitForFirstValidGroup } from "./yaml-watcher.js"
+export { StreamDisplay } from "./stream-display.js"
+export { formatNotifications, formatNotification, type StreamLine } from "./acp-stream-display.js"
 export type {
   IndexedHunk,
   ReviewYaml,
@@ -37,7 +37,7 @@ export type {
   CompressedSession,
   SessionInfo,
   SessionContent,
-} from "./types.ts"
+} from "./types.js"
 export {
   saveReview,
   listReviews,
@@ -45,5 +45,5 @@ export {
   deleteReview,
   formatTimeAgo,
   truncatePath,
-} from "./storage.ts"
-export type { StoredReview, ReviewMetadata, ReviewStatus } from "./storage.ts"
+} from "./storage.js"
+export type { StoredReview, ReviewMetadata, ReviewStatus } from "./storage.js"

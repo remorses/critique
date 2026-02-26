@@ -3,8 +3,8 @@
 
 import { afterEach, describe, expect, it } from "bun:test"
 import { testRender } from "@opentuah/react/test-utils"
-import { buildDirectoryTree, type TreeFileInfo, type TreeNode } from "./directory-tree.ts"
-import { DirectoryTreeView } from "./components/directory-tree-view.tsx"
+import { buildDirectoryTree, type TreeFileInfo, type TreeNode } from "./directory-tree.js"
+import { DirectoryTreeView } from "./components/directory-tree-view.js"
 
 /**
  * Simple component to render tree nodes as text for testing

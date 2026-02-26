@@ -4,8 +4,8 @@ import * as React from "react"
 import { afterEach, describe, expect, it } from "bun:test"
 import { act } from "react"
 import { testRender } from "@opentuah/react/test-utils"
-import { App } from "./cli.tsx"
-import type { ParsedFile } from "./diff-utils.ts"
+import { App } from "./cli.js"
+import type { ParsedFile } from "./diff-utils.js"
 
 function createParsedFile(index: number): ParsedFile {
   const path = `src/file-${index.toString().padStart(2, "0")}.ts`

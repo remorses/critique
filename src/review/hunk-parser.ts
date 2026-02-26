@@ -2,8 +2,8 @@
 // Supports hunk splitting for progressive disclosure, coverage tracking,
 // and generates context XML for AI prompts with cat -n style line numbers.
 
-import type { IndexedHunk, HunkCoverage, ReviewCoverage, UncoveredPortion, ReviewGroup } from "./types.ts"
-import { IGNORED_FILES, stripSubmoduleHeaders, parseGitDiffFiles } from "../diff-utils.ts"
+import type { IndexedHunk, HunkCoverage, ReviewCoverage, UncoveredPortion, ReviewGroup } from "./types.js"
+import { IGNORED_FILES, stripSubmoduleHeaders, parseGitDiffFiles } from "../diff-utils.js"
 
 /**
  * Additional patterns for auto-generated files that should be skipped in reviews

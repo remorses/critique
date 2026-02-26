@@ -4,8 +4,8 @@
 
 import * as React from "react"
 import { RGBA, SyntaxStyle } from "@opentuah/core"
-import { getSyntaxTheme, getResolvedTheme, rgbaToHex } from "../themes.ts"
-import { balanceDelimiters } from "../balance-delimiters.ts"
+import { getSyntaxTheme, getResolvedTheme, rgbaToHex } from "../themes.js"
+import { balanceDelimiters } from "../balance-delimiters.js"
 
 export interface DiffViewProps {
   diff: string

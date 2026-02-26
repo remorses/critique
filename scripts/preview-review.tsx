@@ -4,17 +4,17 @@
 // Run with: bun run scripts/preview-review.tsx (TUI) or --web (HTML upload).
 
 import { createCliRenderer, addDefaultParsers } from "@opentuah/core"
-import parsersConfig from "../src/parsers-config.ts"
+import parsersConfig from "../src/parsers-config.js"
 
 // Register custom syntax highlighting parsers
 addDefaultParsers(parsersConfig.parsers)
 import { createRoot } from "@opentuah/react"
 import * as React from "react"
-import { ReviewApp, ReviewAppView } from "../src/review/review-app.tsx"
-import { createHunk } from "../src/review/hunk-parser.ts"
-import type { ReviewYaml } from "../src/review/types.ts"
-import { captureReviewResponsiveHtml, renderReviewToFrame, uploadHtml } from "../src/web-utils.tsx"
-import { renderFrameToPdf, type PdfTheme } from "../src/opentui-pdf.ts"
+import { ReviewApp, ReviewAppView } from "../src/review/review-app.js"
+import { createHunk } from "../src/review/hunk-parser.js"
+import type { ReviewYaml } from "../src/review/types.js"
+import { captureReviewResponsiveHtml, renderReviewToFrame, uploadHtml } from "../src/web-utils.js"
+import { renderFrameToPdf, type PdfTheme } from "../src/opentui-pdf.js"
 import fs from "fs"
 import { tmpdir } from "os"
 import { join, resolve } from "path"
@@ -285,7 +285,7 @@ async function main() {
 
   // PDF mode: capture frame and render to PDF
   if (pdfMode) {
-    const { getResolvedTheme, rgbaToHex } = await import("../src/themes.ts")
+    const { getResolvedTheme, rgbaToHex } = await import("../src/themes.js")
 
     const themeName = "github-light"
     const cols = 140

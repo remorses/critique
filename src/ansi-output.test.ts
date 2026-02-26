@@ -1,5 +1,5 @@
 import { describe, test, expect } from "bun:test"
-import { spanToAnsi, frameToAnsi } from "./ansi-output.ts"
+import { spanToAnsi, frameToAnsi } from "./ansi-output.js"
 import { RGBA } from "@opentuah/core"
 import type { CapturedFrame, CapturedSpan, CapturedLine } from "@opentuah/core"
 

@@ -3,7 +3,7 @@
 import { afterEach, describe, expect, it } from "bun:test"
 import { testRender } from "@opentuah/react/test-utils"
 import type { SessionNotification } from "@agentclientprotocol/sdk"
-import { StreamDisplay } from "./stream-display.tsx"
+import { StreamDisplay } from "./stream-display.js"
 
 // Load realistic fixture data
 import simpleResponse from "./fixtures/simple-response.json"

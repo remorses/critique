@@ -4,8 +4,8 @@
 
 import fs from "fs"
 import YAML from "js-yaml"
-import type { ReviewYaml, ReviewGroup } from "./types.ts"
-import { logger } from "../logger.ts"
+import type { ReviewYaml, ReviewGroup } from "./types.js"
+import { logger } from "../logger.js"
 
 /**
  * Watch a YAML file for changes and parse it as it updates

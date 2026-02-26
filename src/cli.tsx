@@ -5,7 +5,7 @@
 
 // Must be first import: patches process.stdout.columns/rows for Bun compiled binaries
 // where they incorrectly return 0 instead of actual terminal dimensions.
-import "./patch-terminal-dimensions.ts";
+import "./patch-terminal-dimensions.js";
 
 import { goke, wrapJsonSchema } from "goke";
 import {
@@ -16,7 +16,7 @@ import {
   useRenderer,
   useTerminalDimensions,
 } from "@opentuah/react";
-import { useCopySelection } from "./hooks/use-copy-selection.ts";
+import { useCopySelection } from "./hooks/use-copy-selection.js";
 import * as React from "react";
 import { exec, execSync } from "child_process";
 import { promisify } from "util";
@@ -27,7 +27,7 @@ import {
   BoxRenderable,
   addDefaultParsers,
 } from "@opentuah/core";
-import parsersConfig from "./parsers-config.ts";
+import parsersConfig from "./parsers-config.js";
 
 // Register custom syntax highlighting parsers
 addDefaultParsers(parsersConfig.parsers);
@@ -36,11 +36,11 @@ import fs from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import { create } from "zustand";
-import Dropdown from "./dropdown.tsx";
-import { debounce } from "./utils.ts";
-import { DiffView, DirectoryTreeView } from "./components/index.ts";
-import { logger } from "./logger.ts";
-import { saveStoredLicenseKey } from "./license.ts";
+import Dropdown from "./dropdown.js";
+import { debounce } from "./utils.js";
+import { DiffView, DirectoryTreeView } from "./components/index.js";
+import { logger } from "./logger.js";
+import { saveStoredLicenseKey } from "./license.js";
 import {
   buildGitCommand,
   filterParsedFilesByPatterns,
@@ -59,8 +59,8 @@ import {
   IGNORED_FILES,
   type ParsedFile,
   type GitCommandOptions,
-} from "./diff-utils.ts";
-import type { TreeFileInfo } from "./directory-tree.ts";
+} from "./diff-utils.js";
+import type { TreeFileInfo } from "./directory-tree.js";
 import packageJson from "../package.json" assert { type: "json" };
 
 
@@ -78,11 +78,11 @@ import {
   themeNames,
   defaultThemeName,
   rgbaToHex,
-} from "./themes.ts";
+} from "./themes.js";
 import {
   useAppStore,
   persistedState,
-} from "./store.ts";
+} from "./store.js";
 
 // Web options for review mode
 interface ReviewWebOptions {
@@ -174,9 +174,9 @@ async function runReviewMode(
     waitForFirstValidGroup,
     readReviewYaml,
     saveReview,
-  } = await import("./review/index.ts");
-  const { ReviewApp } = await import("./review/review-app.tsx");
-  type StoredReview = import("./review/index.ts").StoredReview;
+  } = await import("./review/index.js");
+  const { ReviewApp } = await import("./review/review-app.js");
+  type StoredReview = import("./review/index.js").StoredReview;
 
   // Parse hunks with IDs
   const hunks = await parseHunksWithIds(gitDiffResult);
@@ -565,7 +565,7 @@ async function runReviewMode(
         uploadHtml,
         openInBrowser,
         cleanupTempFile,
-      } = await import("./web-utils.tsx");
+      } = await import("./web-utils.js");
 
       // Read review data from YAML
       const reviewData = readReviewYaml(yamlPath);
@@ -646,8 +646,8 @@ async function runReviewMode(
 
     // PDF mode: generate PDF after review completes
     if (pdfOptions) {
-      const { renderReviewToFrame } = await import("./web-utils.tsx");
-      const { renderFrameToPdf } = await import("./opentui-pdf.ts");
+      const { renderReviewToFrame } = await import("./web-utils.js");
+      const { renderFrameToPdf } = await import("./opentui-pdf.js");
       const { join } = await import("path");
       const { tmpdir: getTmpdir } = await import("os");
 
@@ -703,7 +703,7 @@ async function runReviewMode(
         clack.outro("", out);
 
         if (pdfOptions.open) {
-          const { openInBrowser } = await import("./web-utils.tsx");
+          const { openInBrowser } = await import("./web-utils.js");
           await openInBrowser(outPath);
         }
         process.exit(0);
@@ -828,8 +828,8 @@ async function runResumeMode(options: ResumeModeOptions) {
     loadReview,
     formatTimeAgo,
     truncatePath,
-  } = await import("./review/index.ts");
-  const { ReviewApp } = await import("./review/review-app.tsx");
+  } = await import("./review/index.js");
+  const { ReviewApp } = await import("./review/review-app.js");
 
   clack.intro("critique review --resume");
 
@@ -880,7 +880,7 @@ async function runResumeMode(options: ResumeModeOptions) {
   if (review.status === "in_progress") {
     clack.log.info(`Resuming interrupted review: ${review.title}`);
 
-    const { createAcpClient, readReviewYaml, saveReview } = await import("./review/index.ts");
+    const { createAcpClient, readReviewYaml, saveReview } = await import("./review/index.js");
     const { tmpdir } = await import("os");
     const { join } = await import("path");
 
@@ -978,7 +978,7 @@ async function runResumeMode(options: ResumeModeOptions) {
       captureReviewResponsiveHtml,
       uploadHtml,
       openInBrowser,
-    } = await import("./web-utils.tsx");
+    } = await import("./web-utils.js");
 
     // For web, always use default theme (with auto dark/light inversion) unless explicitly overridden
     const themeName = defaultThemeName;
@@ -1023,8 +1023,8 @@ async function runResumeMode(options: ResumeModeOptions) {
 
   // PDF mode: render to PDF and exit
   if (options.pdf) {
-    const { renderReviewToFrame } = await import("./web-utils.tsx");
-    const { renderFrameToPdf } = await import("./opentui-pdf.ts");
+    const { renderReviewToFrame } = await import("./web-utils.js");
+    const { renderFrameToPdf } = await import("./opentui-pdf.js");
     const { join } = await import("path");
     const { tmpdir: getTmpdir } = await import("os");
 
@@ -1066,7 +1066,7 @@ async function runResumeMode(options: ResumeModeOptions) {
       clack.outro("");
 
       if (options.open) {
-        const { openInBrowser } = await import("./web-utils.tsx");
+        const { openInBrowser } = await import("./web-utils.js");
         await openInBrowser(outPath);
       }
       process.exit(0);
@@ -1119,7 +1119,7 @@ async function runWebMode(
     captureResponsiveHtml,
     uploadHtml,
     openInBrowser,
-  } = await import("./web-utils.tsx");
+  } = await import("./web-utils.js");
 
   // Use stderr for progress when --json is set, stdout otherwise
   const log = options.json ? console.error.bind(console) : console.log.bind(console);
@@ -1228,8 +1228,8 @@ async function runPdfMode(
   diffContent: string,
   options: PdfModeOptions
 ) {
-  const { renderDiffToFrame } = await import("./web-utils.tsx");
-  const { renderFrameToPdf } = await import("./opentui-pdf.ts");
+  const { renderDiffToFrame } = await import("./web-utils.js");
+  const { renderFrameToPdf } = await import("./opentui-pdf.js");
   const { join } = await import("path");
   const { tmpdir } = await import("os");
 
@@ -1277,7 +1277,7 @@ async function runPdfMode(
     console.log(`${result.pageCount} page${result.pageCount === 1 ? "" : "s"}, ${result.totalLines} lines`);
 
     if (options.open) {
-      const { openInBrowser } = await import("./web-utils.tsx");
+      const { openInBrowser } = await import("./web-utils.js");
       await openInBrowser(outPath);
     }
 
@@ -1299,7 +1299,7 @@ async function runImageMode(
   diffContent: string,
   options: ImageModeOptions
 ) {
-  const { renderDiffToImages } = await import("./image.ts");
+  const { renderDiffToImages } = await import("./image.js");
 
   const themeName = options.theme && themeNames.includes(options.theme)
     ? options.theme
@@ -1338,9 +1338,9 @@ async function runScrollbackMode(
   diffContent: string,
   options: ScrollbackModeOptions
 ) {
-  const { renderDiffToFrame } = await import("./web-utils.tsx");
-  const { frameToAnsi } = await import("./ansi-output.ts");
-  const { getResolvedTheme } = await import("./themes.ts");
+  const { renderDiffToFrame } = await import("./web-utils.js");
+  const { frameToAnsi } = await import("./ansi-output.js");
+  const { getResolvedTheme } = await import("./themes.js");
 
   const themeName = options.theme && themeNames.includes(options.theme)
     ? options.theme
@@ -1827,7 +1827,7 @@ cli
     const {
       parseHunksWithIds,
       hunkToStableId,
-    } = await import("./review/index.ts");
+    } = await import("./review/index.js");
 
     // Build git command - unstaged by default, staged with --staged
     const gitCommand = buildGitCommand({
@@ -1911,7 +1911,7 @@ cli
       findHunkByStableId,
       parseHunkId,
       combineHunkPatches,
-    } = await import("./review/index.ts");
+    } = await import("./review/index.js");
 
     // Step 1: Parse all IDs upfront, group by filename
     const fileGroups = new Map<string, string[]>();
@@ -2757,7 +2757,7 @@ cli
 cli
   .command("unpublish <url>", "Delete a published diff by URL or ID")
   .action(async (url: string) => {
-    const { deleteUpload, extractDiffId } = await import("./web-utils.tsx")
+    const { deleteUpload, extractDiffId } = await import("./web-utils.js")
 
     const id = extractDiffId(url)
     if (!id) {

@@ -3,7 +3,7 @@
 // Adds theme resolution and diff/review-specific rendering.
 
 import type { CapturedFrame } from "@opentuah/core"
-import { getResolvedTheme, rgbaToHex } from "./themes.ts"
+import { getResolvedTheme, rgbaToHex } from "./themes.js"
 import {
   renderFrameToImage,
   renderFrameToPaginatedImages,
@@ -14,7 +14,7 @@ import {
   type PaginatedRenderResult,
   type ImageTheme,
   type FrameLayout,
-} from "./opentui-image.ts"
+} from "./opentui-image.js"
 
 // Re-export types from opentui-image for convenience
 export type { ImageTheme, FrameLayout }
@@ -166,7 +166,7 @@ export async function renderDiffToImages(
     themeName?: string
   } & RenderToImagesOptions = {}
 ): Promise<RenderResult> {
-  const { renderDiffToFrame } = await import("./web-utils.tsx")
+  const { renderDiffToFrame } = await import("./web-utils.js")
 
   const cols = options.cols ?? 120
   const maxRows = options.maxRows ?? 10000
@@ -202,7 +202,7 @@ export async function renderReviewToImages(
     themeName?: string
   } & RenderToImagesOptions
 ): Promise<RenderResult> {
-  const { renderReviewToFrame } = await import("./web-utils.tsx")
+  const { renderReviewToFrame } = await import("./web-utils.js")
 
   const cols = options.cols ?? 120
   const maxRows = options.maxRows ?? 10000
@@ -321,7 +321,7 @@ export async function renderDiffToOgImage(
   diffContent: string,
   options: OgImageOptions & { cols?: number } = {}
 ): Promise<Buffer> {
-  const { renderDiffToFrame } = await import("./web-utils.tsx")
+  const { renderDiffToFrame } = await import("./web-utils.js")
 
   const width = options.width ?? 1200
   const fontSize = options.fontSize ?? 20

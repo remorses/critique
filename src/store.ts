@@ -6,7 +6,7 @@ import { create } from "zustand"
 import fs from "fs"
 import { join } from "path"
 import { homedir } from "os"
-import { defaultThemeName } from "./themes.ts"
+import { defaultThemeName } from "./themes.js"
 
 // State persistence
 const STATE_DIR = join(homedir(), ".critique")

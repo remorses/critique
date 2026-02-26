@@ -7,10 +7,10 @@ import { promisify } from "util"
 import fs from "fs"
 import { tmpdir } from "os"
 import { join } from "path"
-import { getResolvedTheme, rgbaToHex } from "./themes.ts"
+import { getResolvedTheme, rgbaToHex } from "./themes.js"
 import type { BoxRenderable, CapturedFrame, RootRenderable, CliRenderer } from "@opentuah/core"
-import type { IndexedHunk, ReviewYaml } from "./review/types.ts"
-import { loadStoredLicenseKey, loadOrCreateOwnerSecret } from "./license.ts"
+import type { IndexedHunk, ReviewYaml } from "./review/types.js"
+import { loadStoredLicenseKey, loadOrCreateOwnerSecret } from "./license.js"
 
 const execAsync = promisify(exec)
 
@@ -140,7 +140,7 @@ async function renderDiffToFrameWithSectionPositions(
   const tsClient = getTreeSitterClient()
   await tsClient.initialize()
   
-  const { DiffView } = await import("./components/index.ts")
+  const { DiffView } = await import("./components/index.js")
   const {
     getFileName,
     getOldFileName,
@@ -150,8 +150,8 @@ async function renderDiffToFrameWithSectionPositions(
     detectFiletype,
     stripSubmoduleHeaders,
     parseGitDiffFiles,
-  } = await import("./diff-utils.ts")
-  const { themeNames, defaultThemeName } = await import("./themes.ts")
+  } = await import("./diff-utils.js")
+  const { themeNames, defaultThemeName } = await import("./themes.js")
 
   const themeName = options.themeName && themeNames.includes(options.themeName)
     ? options.themeName
@@ -395,7 +395,7 @@ export async function captureToHtml(
   diffContent: string,
   options: CaptureOptions
 ): Promise<string> {
-  const { frameToHtmlDocument } = await import("./ansi-html.ts")
+  const { frameToHtmlDocument } = await import("./ansi-html.js")
 
   // Render diff to captured frame (with notice for web uploads)
   // and collect exact section line positions from layout metadata.
@@ -411,7 +411,7 @@ export async function captureToHtml(
   const textColor = rgbaToHex(theme.text)
 
   // Check if theme was explicitly set (not default)
-  const { themeNames, defaultThemeName } = await import("./themes.ts")
+  const { themeNames, defaultThemeName } = await import("./themes.js")
   const customTheme = options.themeName !== defaultThemeName && themeNames.includes(options.themeName)
 
   // Build renderLine callback that wraps file header lines with anchor IDs
@@ -472,7 +472,7 @@ export async function captureResponsiveHtml(
   // Try to generate OG image (takumi is optional)
   let ogImage: Buffer | null = null
   try {
-    const { renderDiffToOgImage } = await import("./image.ts")
+    const { renderDiffToOgImage } = await import("./image.js")
     ogImage = await renderDiffToOgImage(diffContent, {
       // Always use github-light for OG images (no dark mode support in OG protocol)
       themeName: "github-light",
@@ -522,8 +522,8 @@ export async function renderReviewToFrame(
   const tsClient = getTreeSitterClient()
   await tsClient.initialize()
   
-  const { ReviewAppView } = await import("./review/review-app.tsx")
-  const { themeNames, defaultThemeName } = await import("./themes.ts")
+  const { ReviewAppView } = await import("./review/review-app.js")
+  const { themeNames, defaultThemeName } = await import("./themes.js")
 
   const themeName = options.themeName && themeNames.includes(options.themeName)
     ? options.themeName
@@ -624,7 +624,7 @@ export async function renderReviewToFrame(
 export async function captureReviewToHtml(
   options: ReviewRenderOptions
 ): Promise<string> {
-  const { frameToHtmlDocument } = await import("./ansi-html.ts")
+  const { frameToHtmlDocument } = await import("./ansi-html.js")
 
   // Render review to captured frame (with notice for web uploads)
   const frame = await renderReviewToFrame({ ...options, showNotice: true })
@@ -635,7 +635,7 @@ export async function captureReviewToHtml(
   const textColor = rgbaToHex(theme.text)
 
   // Check if theme was explicitly set (not default)
-  const { themeNames, defaultThemeName } = await import("./themes.ts")
+  const { themeNames, defaultThemeName } = await import("./themes.js")
   const customTheme = options.themeName !== defaultThemeName && themeNames.includes(options.themeName)
 
   return frameToHtmlDocument(frame, {
@@ -668,7 +668,7 @@ export async function captureReviewResponsiveHtml(
   // Generate OG image from first few hunks' raw diff
   let ogImage: Buffer | null = null
   try {
-    const { renderDiffToOgImage } = await import("./image.ts")
+    const { renderDiffToOgImage } = await import("./image.js")
     // Extract raw diff from hunks (they have rawDiff field)
     const diffContent = options.hunks
       .slice(0, 5) // Take first 5 hunks max

@@ -6,7 +6,7 @@ import {
   parseDiagramLine,
   diagramToDebugString,
   convertAsciiToUnicode,
-} from "./diagram-parser.ts"
+} from "./diagram-parser.js"
 
 describe("parseDiagramLine", () => {
   it("should parse empty line", () => {

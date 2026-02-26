@@ -4,8 +4,8 @@ import { createRoot } from "@opentuah/react"
 import React from "react"
 import { RGBA } from "@opentuah/core"
 import type { CapturedFrame, CapturedLine, CapturedSpan } from "@opentuah/core"
-import { slugifyFileName, buildAnchorMap } from "./web-utils.tsx"
-import { frameToHtml, frameToHtmlDocument } from "./ansi-html.ts"
+import { slugifyFileName, buildAnchorMap } from "./web-utils.js"
+import { frameToHtml, frameToHtmlDocument } from "./ansi-html.js"
 
 describe("getSpanLines rendering", () => {
   let renderer: Awaited<ReturnType<typeof createTestRenderer>>["renderer"] | null = null
@@ -69,7 +69,7 @@ describe("getSpanLines rendering", () => {
 
   test("renderDiffToFrame uses getSpanLines for correct character decoding", async () => {
     // Import the function we're testing
-    const { renderDiffToFrame } = await import("./web-utils.tsx")
+    const { renderDiffToFrame } = await import("./web-utils.js")
     
     const diffContent = `diff --git a/test.ts b/test.ts
 new file mode 100644

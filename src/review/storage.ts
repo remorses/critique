@@ -5,7 +5,7 @@
 import fs from "fs"
 import { join } from "path"
 import { homedir } from "os"
-import type { IndexedHunk, ReviewYaml } from "./types.ts"
+import type { IndexedHunk, ReviewYaml } from "./types.js"
 
 const REVIEWS_DIR = join(homedir(), ".critique", "reviews")
 const MAX_REVIEWS = 50

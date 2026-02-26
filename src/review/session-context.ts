@@ -3,7 +3,7 @@
 // and formats them as XML context to help the AI understand why changes were made.
 
 import type { SessionNotification } from "@agentclientprotocol/sdk"
-import type { CompressedSession, SessionContent } from "./types.ts"
+import type { CompressedSession, SessionContent } from "./types.js"
 
 /**
  * Compress a session's notifications into a summary string

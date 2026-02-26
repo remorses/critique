@@ -2,9 +2,9 @@
 
 import { afterEach, describe, expect, it } from "bun:test"
 import { testRender } from "@opentuah/react/test-utils"
-import { ReviewAppView } from "./review-app.tsx"
-import { createHunk } from "./hunk-parser.ts"
-import type { ReviewYaml } from "./types.ts"
+import { ReviewAppView } from "./review-app.js"
+import { createHunk } from "./hunk-parser.js"
+import type { ReviewYaml } from "./types.js"
 
 // Example hunks using createHunk helper - generates valid rawDiff automatically
 const exampleHunks = [

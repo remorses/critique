@@ -3,6 +3,7 @@
 // and provides both UI colors and Tree-sitter compatible syntax styles.
 
 import { parseColor, RGBA } from "@opentuah/core";
+import path from "path";
 import { fileURLToPath } from "url";
 
 // Only import the default theme statically for fast startup
@@ -140,11 +141,9 @@ function loadTheme(name: string): ThemeJson {
   }
 
   try {
-    // Use dynamic import with synchronous pattern for JSON
-    // This works because JSON imports are resolved at bundle time by Bun
-    const themeUrl = new URL(`./themes/${fileName}`, import.meta.url);
-    // Read file synchronously using Node fs (works in Bun)
-    const themePath = fileURLToPath(themeUrl);
+    // Resolve to src/themes/ — when built, import.meta.url is dist/, so ../src/ gets back to source
+    const srcDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../src");
+    const themePath = path.resolve(srcDir, "themes", fileName);
     const fs = require("fs");
     const content = fs.readFileSync(themePath, "utf-8");
     const themeJson = JSON.parse(content) as ThemeJson;

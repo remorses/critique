@@ -9,8 +9,8 @@ import {
   type SessionInfo as AcpSessionInfo,
 
 } from "@agentclientprotocol/sdk"
-import type { SessionInfo, SessionContent } from "./types.ts"
-import { logger } from "../logger.ts"
+import type { SessionInfo, SessionContent } from "./types.js"
+import { logger } from "../logger.js"
 import fs from "fs"
 import path from "path"
 import os from "os"

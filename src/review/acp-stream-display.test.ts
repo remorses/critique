@@ -8,7 +8,7 @@ import {
   formatNotifications,
   formatLinesToString,
   type StreamLine,
-} from "./acp-stream-display.ts"
+} from "./acp-stream-display.js"
 
 // Load realistic fixture data
 import simpleResponse from "./fixtures/simple-response.json"
