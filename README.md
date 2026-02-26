@@ -274,6 +274,8 @@ critique web --title "Fix authentication bug"
 
 - The URL is based on a SHA-256 hash of the content, so identical diffs produce the same URL (deduplication)
 - Use `?v=desktop` or `?v=mobile` query params to force a specific version
+- Enable web review comments by opening with `?mode=review&review_callback_url=https://your-callback` (or `callback_url` fallback). You can submit a single inline comment or queue multiple comments and submit one grouped review.
+- Optional: pass `callback_json_template` (URL-encoded JSON string) with required `{{text}}` placeholder to customize callback body format for external systems.
 - If upload fails, critique automatically saves the HTML locally as a fallback
 
 ## E-Ink Reading
