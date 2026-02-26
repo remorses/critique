@@ -2,15 +2,16 @@
 // Renders diff components using opentui test renderer, converts to HTML with responsive layout,
 // and uploads desktop/mobile versions for shareable diff viewing.
 
-import { exec } from "child_process"
-import { promisify } from "util"
-import fs from "fs"
-import { tmpdir } from "os"
-import { join } from "path"
+import { exec } from "node:child_process"
+import { promisify } from "node:util"
+import fs from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 import { getResolvedTheme, rgbaToHex } from "./themes.ts"
 import type { BoxRenderable, CapturedFrame, RootRenderable, CliRenderer } from "@opentuah/core"
 import type { IndexedHunk, ReviewYaml } from "./review/types.ts"
 import { loadStoredLicenseKey, loadOrCreateOwnerSecret } from "./license.ts"
+import { buildReviewModeScript, REVIEW_MODE_CSS } from "./review/web-review-mode.ts"
 
 const execAsync = promisify(exec)
 
@@ -96,11 +97,11 @@ function getContentHeight(root: RootRenderable): number {
 async function waitForRenderStabilization(
   renderer: CliRenderer,
   renderOnce: () => Promise<void>,
-  stabilizeMs: number = 500
+  stabilizeMs = 500
 ): Promise<void> {
   let lastRenderTime = Date.now()
   const originalRequestRender = renderer.root.requestRender.bind(renderer.root)
-  renderer.root.requestRender = function() {
+  renderer.root.requestRender = () => {
     lastRenderTime = Date.now()
     originalRequestRender()
   }
@@ -300,9 +301,11 @@ async function renderDiffToFrameWithSectionPositions(
     if (!section) continue
 
     const layout = section.getLayoutNode().getComputedLayout()
+    const fileName = fileNames[idx]
+    if (!fileName) continue
     sectionPositions.push({
       lineIndex: Math.max(0, Math.round(layout.top)),
-      fileName: fileNames[idx]!,
+      fileName,
     })
   }
 
@@ -380,13 +383,90 @@ export function buildAnchorMap(
 
 // CSS for file section anchors — injected via extraCss hook
 const SECTION_ANCHOR_CSS =
-  `.file-section{scroll-margin-top:16px;}` +
-  `.file-link{color:inherit;text-decoration:none;cursor:pointer;}` +
-  `.file-link:hover{text-decoration:underline;}`
+  ".file-section{scroll-margin-top:16px;}" +
+  ".file-link{color:inherit;text-decoration:none;cursor:pointer;}" +
+  ".file-link:hover{text-decoration:underline;}"
 
 // JS to scroll to hash fragment on page load — injected via extraJs hook
 const SECTION_ANCHOR_JS =
   `if(location.hash){var el=document.getElementById(location.hash.slice(1));if(el)setTimeout(function(){el.scrollIntoView({behavior:'smooth'})},100);}`
+
+function joinInlineCss(...parts: Array<string | undefined>): string | undefined {
+  const value = parts.filter(Boolean).join("\n")
+  return value.length > 0 ? value : undefined
+}
+
+function joinInlineJs(...parts: Array<string | undefined>): string | undefined {
+  const value = parts.filter(Boolean).join("\n")
+  return value.length > 0 ? value : undefined
+}
+
+function escapeAttribute(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\"/g, "&quot;")
+}
+
+function buildSectionRenderLineCallback(
+  anchors: Map<number, { id: string; label: string }>,
+): ((defaultHtml: string, _line: unknown, lineIndex: number) => string) | undefined {
+  if (anchors.size < 1) {
+    return undefined
+  }
+
+  return (defaultHtml: string, _line: unknown, lineIndex: number) => {
+    const anchor = anchors.get(lineIndex)
+    if (!anchor) return defaultHtml
+
+    const escapedLabel = escapeAttribute(anchor.label)
+    let html = defaultHtml.replace(
+      '<div class="line"',
+      `<div id="${anchor.id}" class="line file-section" data-file-path="${escapedLabel}"`,
+    )
+    html = html.replace(
+      `>${escapedLabel}</span>`,
+      `><a href="#${anchor.id}" class="file-link">${escapedLabel}</a></span>`,
+    )
+    return html
+  }
+}
+
+function toLineText(frameLine: CapturedFrame["lines"][number]): string {
+  return frameLine.spans.map((span) => span.text).join("")
+}
+
+function buildReviewSectionPositions(frame: CapturedFrame, hunks: IndexedHunk[]): FileSectionPosition[] {
+  const uniqueFileNames = Array.from(
+    new Set(
+      hunks
+        .map((hunk) => hunk.filename.trim())
+        .filter((name) => name.length > 0),
+    ),
+  ).sort((a, b) => b.length - a.length)
+
+  const sections: FileSectionPosition[] = []
+  for (let lineIndex = 0; lineIndex < frame.lines.length; lineIndex++) {
+    const line = frame.lines[lineIndex]
+    if (!line) continue
+    const trimmed = toLineText(line).trim()
+    if (!trimmed) continue
+
+    const fileName = uniqueFileNames.find((name) => (
+      trimmed === name ||
+      trimmed.startsWith(`${name} +`) ||
+      trimmed.startsWith(`${name} -`) ||
+      trimmed.startsWith(`${name}\t+`) ||
+      trimmed.startsWith(`${name}\t-`)
+    ))
+
+    if (!fileName) continue
+    sections.push({ lineIndex, fileName })
+  }
+
+  return sections
+}
 
 /**
  * Capture diff and convert to HTML using test renderer
@@ -414,31 +494,8 @@ export async function captureToHtml(
   const { themeNames, defaultThemeName } = await import("./themes.ts")
   const customTheme = options.themeName !== defaultThemeName && themeNames.includes(options.themeName)
 
-  // Build renderLine callback that wraps file header lines with anchor IDs
-  // and makes the filename text itself a clickable link
-  const renderLineCallback = anchors.size > 0
-    ? (defaultHtml: string, _line: unknown, lineIndex: number) => {
-        const anchor = anchors.get(lineIndex)
-        if (!anchor) return defaultHtml
-        // Add id + class to the line div
-        let html = defaultHtml.replace(
-          '<div class="line">',
-          `<div id="${anchor.id}" class="line file-section">`,
-        )
-        // Wrap the filename text inside its span with an <a> link.
-        // The filename appears as escaped text content inside a styled span.
-        const escapedLabel = anchor.label
-          .replace(/&/g, "&amp;")
-          .replace(/</g, "&lt;")
-          .replace(/>/g, "&gt;")
-          .replace(/"/g, "&quot;")
-        html = html.replace(
-          `>${escapedLabel}</span>`,
-          `><a href="#${anchor.id}" class="file-link">${escapedLabel}</a></span>`,
-        )
-        return html
-      }
-    : undefined
+  const renderLineCallback = buildSectionRenderLineCallback(anchors)
+  const reviewModeJs = buildReviewModeScript()
 
   return frameToHtmlDocument(frame, {
     backgroundColor,
@@ -446,8 +503,8 @@ export async function captureToHtml(
     autoTheme: !customTheme,
     title: options.title,
     renderLine: renderLineCallback,
-    extraCss: anchors.size > 0 ? SECTION_ANCHOR_CSS : undefined,
-    extraJs: anchors.size > 0 ? SECTION_ANCHOR_JS : undefined,
+    extraCss: joinInlineCss(anchors.size > 0 ? SECTION_ANCHOR_CSS : undefined, REVIEW_MODE_CSS),
+    extraJs: joinInlineJs(anchors.size > 0 ? SECTION_ANCHOR_JS : undefined, reviewModeJs),
   })
 }
 
@@ -531,7 +588,6 @@ export async function renderReviewToFrame(
 
   const theme = getResolvedTheme(themeName)
   const webBg = theme.background
-  const webText = rgbaToHex(theme.text)
   const webMuted = rgbaToHex(theme.textMuted)
   const showExpiryNotice = shouldShowExpiryNotice()
   const showNotice = options.showNotice === true
@@ -628,6 +684,10 @@ export async function captureReviewToHtml(
 
   // Render review to captured frame (with notice for web uploads)
   const frame = await renderReviewToFrame({ ...options, showNotice: true })
+  const reviewSections = buildReviewSectionPositions(frame, options.hunks)
+  const anchors = buildAnchorMap(reviewSections)
+  const renderLineCallback = buildSectionRenderLineCallback(anchors)
+  const reviewModeJs = buildReviewModeScript()
 
   // Get theme colors for HTML output
   const theme = getResolvedTheme(options.themeName)
@@ -643,6 +703,9 @@ export async function captureReviewToHtml(
     textColor,
     autoTheme: !customTheme,
     title: options.title,
+    renderLine: renderLineCallback,
+    extraCss: joinInlineCss(anchors.size > 0 ? SECTION_ANCHOR_CSS : undefined, REVIEW_MODE_CSS),
+    extraJs: joinInlineJs(anchors.size > 0 ? SECTION_ANCHOR_JS : undefined, reviewModeJs),
   })
 }
 
@@ -807,7 +870,7 @@ export function extractDiffId(urlOrId: string): string | null {
   
   // Try to extract from URL path
   const urlMatch = trimmed.match(/\/v\/([a-f0-9]{16,32})(?:\?|$|#)?/i)
-  if (urlMatch && urlMatch[1]) {
+  if (urlMatch?.[1]) {
     return urlMatch[1].toLowerCase()
   }
   

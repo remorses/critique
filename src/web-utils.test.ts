@@ -169,8 +169,10 @@ describe("buildAnchorMap", () => {
     ])
 
     expect(anchors.size).toBe(2)
-    expect(anchors.get(4)!.id).toBe("index-ts")
-    expect(anchors.get(20)!.id).toBe("index-ts-2")
+    const first = anchors.get(4)
+    const second = anchors.get(20)
+    expect(first?.id).toBe("index-ts")
+    expect(second?.id).toBe("index-ts-2")
   })
 
   test("returns empty map for empty input", () => {
@@ -185,8 +187,10 @@ describe("buildAnchorMap", () => {
     ])
 
     expect(anchors.size).toBe(2)
-    expect(anchors.get(1)!.id).toBe("file")
-    expect(anchors.get(2)!.id).toBe("file-2")
+    const first = anchors.get(1)
+    const second = anchors.get(2)
+    expect(first?.id).toBe("file")
+    expect(second?.id).toBe("file-2")
   })
 
   test("ignores invalid or duplicate line indexes", () => {
@@ -210,8 +214,8 @@ describe("ansi-html renderLine callback", () => {
       renderLine: (defaultHtml, _line, lineIndex) => {
         if (lineIndex === 0) {
           return defaultHtml.replace(
-            '<div class="line">',
-            '<div id="my-section" class="line file-section">',
+            '<div class="line" data-line-index="0">',
+            '<div id="my-section" class="line file-section" data-line-index="0">',
           )
         }
         return defaultHtml
@@ -221,13 +225,13 @@ describe("ansi-html renderLine callback", () => {
     expect(html).toContain('id="my-section"')
     expect(html).toContain('class="line file-section"')
     // Other lines unchanged
-    expect(html).toContain('<div class="line"><span>code line</span></div>')
+    expect(html).toContain('<div class="line" data-line-index="1"><span>code line</span></div>')
   })
 
   test("without renderLine, output is default divs", () => {
     const frame = mockFrame(["hello"])
     const html = frameToHtml(frame)
-    expect(html).toBe('<div class="line"><span>hello</span></div>')
+    expect(html).toBe('<div class="line" data-line-index="0"><span>hello</span></div>')
   })
 })
 

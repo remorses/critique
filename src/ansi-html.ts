@@ -134,7 +134,11 @@ export function frameToHtml(frame: CapturedFrame, options: ToHtmlOptions = {}): 
 
   // Trim empty lines from the end
   if (trimEmptyLines) {
-    while (lines.length > 0 && isLineEmpty(lines[lines.length - 1]!)) {
+    while (lines.length > 0) {
+      const lastLine = lines[lines.length - 1]
+      if (!lastLine || !isLineEmpty(lastLine)) {
+        break
+      }
       lines = lines.slice(0, -1)
     }
   }
@@ -144,7 +148,7 @@ export function frameToHtml(frame: CapturedFrame, options: ToHtmlOptions = {}): 
     const content = lineToHtml(line)
     // Use a div for each line to ensure proper line breaks
     // Empty lines get a span with nbsp for consistent flex behavior
-    const defaultHtml = `<div class="line">${content || "<span>&nbsp;</span>"}</div>`
+    const defaultHtml = `<div class="line" data-line-index="${lineIndex}">${content || "<span>&nbsp;</span>"}</div>`
     return options.renderLine
       ? options.renderLine(defaultHtml, line, lineIndex)
       : defaultHtml
@@ -169,7 +173,7 @@ export function frameToHtmlDocument(frame: CapturedFrame, options: ToHtmlOptions
   const cols = frame.cols
   const content = frameToHtml(frame, options)
 
-  const ogTags = options.ogImageUrl ? '\n' + html`
+  const ogTags = options.ogImageUrl ? html`
     <meta property="og:title" content="${escapeHtml(title)}">
     <meta property="og:type" content="website">
     <meta property="og:image" content="${escapeHtml(options.ogImageUrl)}">
@@ -178,15 +182,15 @@ export function frameToHtmlDocument(frame: CapturedFrame, options: ToHtmlOptions
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="${escapeHtml(title)}">
     <meta name="twitter:image" content="${escapeHtml(options.ogImageUrl)}">
-  ` : ''
+  ` : ""
 
-  const autoThemeCss = options.autoTheme ? '\n' + html`
+  const autoThemeCss = options.autoTheme ? html`
     @media (prefers-color-scheme: light) {
       html {
         filter: invert(1) hue-rotate(180deg);
       }
     }
-  ` : ''
+  ` : ""
 
   const extraJsBlock = options.extraJs
     ? `\n<script>\n${options.extraJs}\n</script>`
