@@ -39,3 +39,7 @@ opensrc/
 
 # local test repo
 test-repo/
+
+# built comments widget (regenerate with: bun run build:comments-widget)
+cli/public/comments.js
+cli/public/comments.css

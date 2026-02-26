@@ -36,6 +36,8 @@
   },
   "dependencies": {
     "@agentclientprotocol/sdk": "^0.13.1",
+    "@critique.work/server": "workspace:*",
+    "agents": "^0.6.0",
     "@clack/prompts": "1.0.0-alpha.9",
     "@opentuah/core": "0.1.96",
     "@opentuah/react": "0.1.96",

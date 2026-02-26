@@ -6,7 +6,7 @@
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": true,
 
-  // Static assets (fonts, etc.)
+  // Static assets (fonts, comments widget, etc.)
   "assets": {
     "directory": "./public"
   },
@@ -16,6 +16,24 @@
     {
       "binding": "CRITIQUE_KV",
       "id": "844b10c9fea049c8b20fa4a8c5cae44e"
+    }
+  ],
+
+  // CommentRoom Durable Object for real-time threaded comments
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "CommentRoom",
+        "class_name": "CommentRoom"
+      }
+    ]
+  },
+
+  // Durable Object migrations (SQLite storage for comments)
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["CommentRoom"]
     }
   ],
 

@@ -1,15 +1,19 @@
 /** @jsxImportSource hono/jsx */
 // Cloudflare Worker for hosting HTML diff previews at critique.work.
-// Handles upload, storage (KV), Stripe checkout, and responsive serving.
-// Endpoints: POST /upload, GET /v/:id (view), GET /raw/:id (debug).
+// Handles upload, storage (KV), Stripe checkout, responsive serving, and real-time comments.
+// Endpoints: POST /upload, GET /v/:id (view), GET /raw/:id (debug), ALL /agents/* (comments).
 // Payments: GET /buy, GET /success, POST /stripe/webhook.
 
 import { Hono } from "hono"
 import { cors } from "hono/cors"
 import { stream } from "hono/streaming"
+import { routeAgentRequest } from "agents"
 import type { KVNamespace } from "@cloudflare/workers-types"
 import Stripe from "stripe"
 import { Resend } from "resend"
+
+// Re-export CommentRoom so wrangler can discover the Durable Object class
+export { CommentRoom } from "@critique.work/server"
 
 type Bindings = {
   CRITIQUE_KV: KVNamespace
@@ -18,6 +22,7 @@ type Bindings = {
   PUBLIC_URL?: string
   RESEND_API_KEY?: string
   RESEND_FROM?: string
+  CommentRoom: { idFromName(name: string): { toString(): string }; get(id: any): { fetch(request: Request): Promise<Response> } }
 }
 
 type LicenseRecord = {
@@ -28,7 +33,7 @@ type LicenseRecord = {
   updatedAt?: number
 }
 
-const app = new Hono<{ Bindings: Bindings }>()
+const app = new Hono<{ Bindings: Bindings; Variables: { userId: string } }>()
 
 const SEVEN_DAYS = 60 * 60 * 24 * 7
 const LICENSE_HEADER = "X-Critique-License"
@@ -47,6 +52,31 @@ const logger = {
 
 // Enable CORS for all routes
 app.use("*", cors())
+
+// Cookie-based identity for comments: assign a persistent user ID on first visit
+app.use("*", async (c, next) => {
+  const cookieHeader = c.req.header("Cookie") || ""
+  const cookies = parseCookies(cookieHeader)
+  let userId = cookies["cw_user_id"]
+
+  if (!userId) {
+    userId = crypto.randomUUID()
+    c.header(
+      "Set-Cookie",
+      `cw_user_id=${userId}; Path=/; Max-Age=${60 * 60 * 24 * 365 * 10}; SameSite=Lax`,
+    )
+  }
+
+  c.set("userId", userId)
+  await next()
+})
+
+// Route all agent requests (WebSocket upgrades, RPC, state sync for comments)
+app.all("/agents/*", async (c) => {
+  const response = await routeAgentRequest(c.req.raw, c.env as any)
+  if (response) return response
+  return c.text("Not found", 404)
+})
 
 // Redirect to GitHub repo
 app.get("/", (c) => {
@@ -667,6 +697,16 @@ async function handleView(c: any) {
     return c.text("Not found", 404)
   }
 
+  // Inject comments widget before </body>
+  const userId = c.get("userId") || "anonymous"
+  const origin = new URL(c.req.url).origin
+  // Escape < to \u003c to prevent XSS via </script> sequences in JSON values
+  const configJson = JSON.stringify({ roomKey: id, host: origin, userId }).replace(/</g, "\\u003c")
+  const commentsSnippet = `
+<link rel="stylesheet" href="/comments.css">
+<script>window.__CRITIQUE_COMMENTS__=${configJson}</script>
+<script src="/comments.js"></script>`
+  html = html.replace("</body>", `${commentsSnippet}\n</body>`)
 
   // Stream the HTML content for faster initial load
   return stream(c, async (s) => {
@@ -796,5 +836,18 @@ async function handleHead(c: any) {
 
 app.on("HEAD", "/v/:id", handleHead)
 app.on("HEAD", "/view/:id", handleHead)
+
+// --- Cookie parser ---
+
+function parseCookies(header: string): Record<string, string> {
+  const cookies: Record<string, string> = {}
+  for (const part of header.split(";")) {
+    const [key, ...rest] = part.trim().split("=")
+    if (key) {
+      cookies[key.trim()] = rest.join("=").trim()
+    }
+  }
+  return cookies
+}
 
 export default app
