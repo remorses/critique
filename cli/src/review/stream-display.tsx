@@ -27,7 +27,7 @@ export function StreamDisplay({
   notifications,
   themeName = "github",
   width = 80,
-}: StreamDisplayProps) {
+}: StreamDisplayProps): React.ReactElement {
   const lines = React.useMemo(
     () => formatNotifications(notifications),
     [notifications],

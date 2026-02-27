@@ -70,7 +70,7 @@ function getWordHighlightBg(base: RGBA): string {
   return rgbaToHex(candidate)
 }
 
-export function DiffView({ diff, view, filetype, themeName, wrapMode = "word" }: DiffViewProps) {
+export function DiffView({ diff, view, filetype, themeName, wrapMode = "word" }: DiffViewProps): React.ReactElement {
   // Balance paired delimiters (backticks, triple quotes, etc.) before
   // passing to <diff> so tree-sitter doesn't misparse hunks that start
   // inside a multi-line string

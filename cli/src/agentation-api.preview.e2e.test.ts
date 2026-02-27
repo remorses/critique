@@ -338,10 +338,10 @@ describe("preview worker Agentation API", () => {
     expect(getDeleted.response.status).toBe(404)
 
     const sseEvents = await sseEventsPromise
-    const createdEvent = asObject(sseEvents[0].data, "sse.created")
-    const updatedEvent = asObject(sseEvents[1].data, "sse.updated")
-    const actionEvent = asObject(sseEvents[2].data, "sse.action")
-    const deletedEvent = asObject(sseEvents[3].data, "sse.deleted")
+    const createdEvent = asObject(sseEvents[0]!.data, "sse.created")
+    const updatedEvent = asObject(sseEvents[1]!.data, "sse.updated")
+    const actionEvent = asObject(sseEvents[2]!.data, "sse.action")
+    const deletedEvent = asObject(sseEvents[3]!.data, "sse.deleted")
 
     expect(getString(createdEvent, "sessionId", "sse.created")).toBe(sessionId)
     expect(getString(updatedEvent, "sessionId", "sse.updated")).toBe(sessionId)

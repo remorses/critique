@@ -45,7 +45,7 @@ export function filterDropdownOptions(options: DropdownOption[], searchText: str
   });
 }
 
-const Dropdown = (props: DropdownProps) => {
+const Dropdown = (props: DropdownProps): React.ReactElement => {
   const {
     tooltip,
     onChange,

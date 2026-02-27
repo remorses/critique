@@ -47,7 +47,7 @@ export function ReviewApp({
   yamlPath,
   isGenerating,
   initialReviewData,
-}: ReviewAppProps) {
+}: ReviewAppProps): React.ReactElement {
   const { width } = useTerminalDimensions()
   const renderer = useRenderer()
   const [reviewData, setReviewData] = React.useState<ReviewYaml | null>(initialReviewData ?? null)
@@ -300,7 +300,7 @@ export function ReviewAppView({
   renderer,
   gap = 2,
   scrollboxRef,
-}: ReviewAppViewProps) {
+}: ReviewAppViewProps): React.ReactElement {
   const [scrollAcceleration] = React.useState(() => new ScrollAcceleration())
 
   // Create a map of hunk ID to hunk for quick lookup
@@ -734,7 +734,7 @@ export interface HunkViewProps {
   isLast: boolean
 }
 
-export function HunkView({ hunk, themeName, width, isLast }: HunkViewProps) {
+export function HunkView({ hunk, themeName, width, isLast }: HunkViewProps): React.ReactElement {
   const resolvedTheme = getResolvedTheme(themeName)
   const filetype = detectFiletype(hunk.filename)
   const { additions, deletions } = countChanges([{ lines: hunk.lines }])

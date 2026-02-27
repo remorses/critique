@@ -760,6 +760,7 @@ async function runReviewMode(
     // Helper to render with current isGenerating state
     const renderApp = (isGenerating: boolean) => {
       root.render(
+        // @ts-ignore - ErrorBoundary class is incompatible with @opentuah/react's ElementClass + React 19 types; works correctly at runtime
         <ErrorBoundary>
           <ReviewApp hunks={hunks} yamlPath={yamlPath} isGenerating={isGenerating} />
         </ErrorBoundary>
@@ -953,6 +954,7 @@ async function runResumeMode(options: ResumeModeOptions) {
 
       const root = createRoot(renderer);
       root.render(
+        // @ts-ignore - ErrorBoundary class is incompatible with @opentuah/react's ElementClass + React 19 types; works correctly at runtime
         <ErrorBoundary>
           <ReviewApp
             hunks={review.hunks}
@@ -1090,6 +1092,7 @@ async function runResumeMode(options: ResumeModeOptions) {
 
   const root = createRoot(renderer);
   root.render(
+    // @ts-ignore - ErrorBoundary class is incompatible with @opentuah/react's ElementClass + React 19 types; works correctly at runtime
     <ErrorBoundary>
       <ReviewApp
         hunks={review.hunks}
@@ -1381,19 +1384,14 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
   state: ErrorBoundaryState = { hasError: false, error: null };
   declare props: ErrorBoundaryProps;
 
-  constructor(props: ErrorBoundaryProps) {
-    super(props);
-    this.componentDidCatch = this.componentDidCatch.bind(this);
-  }
-
   static getDerivedStateFromError(error: Error): ErrorBoundaryState {
     return { hasError: true, error };
   }
 
-  componentDidCatch(error: Error, errorInfo: React.ErrorInfo): void {
-    console.error("Error caught by boundary:", error);
-    console.error("Component stack:", errorInfo.componentStack);
-  }
+  componentDidCatch = (error: Error, errorInfo: React.ErrorInfo): void => {
+    logger.log("Error caught by boundary:", error);
+    logger.log("Component stack:", errorInfo.componentStack);
+  };
 
   render(): React.ReactNode {
     if (this.state.hasError && this.state.error) {
@@ -1474,7 +1472,7 @@ export interface AppProps {
   parsedFiles: ParsedFile[];
 }
 
-export function App({ parsedFiles }: AppProps) {
+export function App({ parsedFiles }: AppProps): React.ReactElement {
   const { width: initialWidth } = useTerminalDimensions();
   const [width, setWidth] = React.useState(initialWidth);
   const [scrollAcceleration] = React.useState(() => new ScrollAcceleration());
@@ -2312,6 +2310,7 @@ cli
       }
 
       createRoot(renderer).render(
+        // @ts-ignore - ErrorBoundary class is incompatible with @opentuah/react's ElementClass + React 19 types; works correctly at runtime
         <ErrorBoundary>
           <AppWithWatch />
         </ErrorBoundary>
@@ -2450,6 +2449,7 @@ cli
 
       const renderer = await createCliRenderer();
       createRoot(renderer).render(
+        // @ts-ignore - ErrorBoundary class is incompatible with @opentuah/react's ElementClass + React 19 types; works correctly at runtime
         <ErrorBoundary>
           <App parsedFiles={[patchWithRawDiff]} />
         </ErrorBoundary>

@@ -99,7 +99,7 @@ export function DirectoryTreeView({
   files,
   onFileSelect,
   themeName,
-}: DirectoryTreeViewProps) {
+}: DirectoryTreeViewProps): React.ReactElement | null {
   const nodes = React.useMemo(() => buildDirectoryTree(files), [files])
   const resolvedTheme = getResolvedTheme(themeName)
   const mutedColor = rgbaToHex(resolvedTheme.textMuted)
