@@ -60,17 +60,20 @@ async function init() {
   container.id = "critique-agentation"
   document.body.appendChild(container)
 
-  const [{ Agentation }, { createRoot }] = await Promise.all([
+  // Use preact's render() directly since the build aliases react → preact/compat.
+  // preact/compat does not export createRoot from react-dom/client.
+  const [{ Agentation }, { render, h }] = await Promise.all([
     import("@critique.work/agentation"),
-    import("react-dom/client"),
+    import("preact"),
   ])
 
-  createRoot(container).render(
-    <Agentation
-      endpoint={config.endpoint}
-      sessionId={config.sessionId}
-      showFreezeButton={config.showFreezeButton}
-    />,
+  render(
+    h(Agentation, {
+      endpoint: config.endpoint,
+      sessionId: config.sessionId,
+      showFreezeButton: config.showFreezeButton,
+    }),
+    container,
   )
 }
 

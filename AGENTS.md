@@ -99,6 +99,12 @@ NEVER update existing changelog bullet points for previous version unless you ad
 
 - do not consider local state truthful when interacting with server. when interacting with the server with rpc or api calls never use state from the render function as input for the api call. this state can easily become stale or not get updated in the closure context. instead prefer using zustand `useStore.getState().stateValue`. notice that useLoaderData or useParams should be fine in this case.
 
+## worker dependencies
+
+worker code (worker.tsx, agentation-api.ts, comments-server) is bundled by wrangler at deploy time. all their dependencies must be **devDependencies** in cli/package.json, not production dependencies. wrangler bundles everything into the worker output, so they don't need to be installed at runtime. production dependencies are only for the CLI tool itself (what users install with `bun install -g critique`).
+
+this includes: `@critique.work/server`, `agents`, `hono`, `stripe`, `resend`, `@critique.work/agentation`, `preact`, and all `@cloudflare/*` types.
+
 ## preview worker
 
 when working on the worker, agentation widget, or HTML page styles, use the preview worker to test changes before deploying to production.

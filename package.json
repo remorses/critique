@@ -3,7 +3,7 @@
   "private": true,
   "workspaces": ["./*"],
   "scripts": {
-    "build:comments-widget": "bun build cli/src/agentation-widget.tsx --outfile cli/public/agentation-widget.js --minify --target browser",
+    "build:comments-widget": "bun run cli/scripts/build-widget.ts",
     "build:comments-server": "bun run --filter '@critique.work/server' build"
   }
 }
