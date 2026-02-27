@@ -61,7 +61,7 @@ async function init() {
   document.body.appendChild(container)
 
   const [{ Agentation }, { createRoot }] = await Promise.all([
-    import("agentation"),
+    import("@critique.work/agentation"),
     import("react-dom/client"),
   ])
 
