@@ -2,7 +2,7 @@
   "name": "critique",
   "module": "src/diff.tsx",
   "type": "module",
-  "version": "0.1.118",
+  "version": "0.1.119",
   "license": "MIT",
   "private": false,
   "bin": "./dist/cli.js",
@@ -18,10 +18,11 @@
     "prepublishOnly": "bun run build",
     "example": "bun --watch src/example.tsx",
     "worker:dev": "wrangler dev",
-    "worker:deploy": "wrangler deploy --env preview",
-    "worker:deploy:prod": "wrangler deploy",
+    "worker:deploy": "bun run --cwd .. build:comments-widget && wrangler deploy --env preview",
+    "worker:deploy:prod": "bun run --cwd .. build:comments-widget && wrangler deploy",
     "worker:secrets": "wrangler secret bulk ../.env --env preview",
-    "worker:secrets:prod": "wrangler secret bulk ../.env"
+    "worker:secrets:prod": "wrangler secret bulk ../.env",
+    "test:agentation-preview": "bun test src/agentation-api.preview.e2e.test.ts"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20250525.0",

@@ -96,9 +96,9 @@ app.get("/api/comments", async (c) => {
 
   const id = c.env.CommentRoom.idFromName(key)
   const stub = c.env.CommentRoom.get(id)
-  const response = await stub.fetch(
-    new Request("https://internal/api/comments", { method: "GET" }),
-  )
+  const request = new Request("https://internal/api/comments", { method: "GET" })
+  request.headers.set("x-partykit-room", key)
+  const response = await stub.fetch(request)
   const data = await response.json()
   return c.json(data)
 })

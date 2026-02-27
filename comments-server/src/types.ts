@@ -49,6 +49,11 @@ export interface ThreadMessage {
   timestamp: number
 }
 
+export interface ActionRequestedPayload {
+  output: string
+  annotationCount: number
+}
+
 export interface Session {
   id: string // = diff ID
   url?: string
@@ -64,6 +69,7 @@ export interface AgentationEvent {
     | "annotation.created"
     | "annotation.updated"
     | "annotation.deleted"
+    | "action.requested"
     | "session.created"
     | "session.updated"
     | "session.closed"
@@ -71,7 +77,7 @@ export interface AgentationEvent {
   timestamp: string
   sessionId: string
   sequence: number
-  payload: Annotation | Session | ThreadMessage
+  payload: Annotation | Session | ThreadMessage | ActionRequestedPayload
 }
 
 // Agent state synced via WebSocket (lightweight)

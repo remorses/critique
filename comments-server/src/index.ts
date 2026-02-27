@@ -11,6 +11,7 @@ export type {
   AnnotationSeverity,
   AnnotationStatus,
   ThreadMessage,
+  ActionRequestedPayload,
   Session,
   AgentationEvent,
   RoomState,

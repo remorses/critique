@@ -80,7 +80,7 @@ api.post("/sessions/:id/annotations", async (c) => {
   const body = await c.req.json<Record<string, unknown>>()
 
   // Prefix annotation ID with session ID for routing
-  if (!body.id) {
+  if (typeof body.id !== "string" || !body.id.startsWith(`${sessionId}_`)) {
     body.id = `${sessionId}_${crypto.randomUUID()}`
   }
   body.createdBy = body.createdBy || c.get("userId")
@@ -90,6 +90,18 @@ api.post("/sessions/:id/annotations", async (c) => {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
+  })
+  return new Response(resp.body, resp)
+})
+
+// Submit action request for a session
+api.post("/sessions/:id/action", async (c) => {
+  const sessionId = c.req.param("id")
+  const body = await c.req.text()
+  const resp = await proxyToDO(c.env, sessionId, "https://internal/api/action", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body,
   })
   return new Response(resp.body, resp)
 })
@@ -160,13 +172,15 @@ api.get("/pending", (c) => c.json({ count: 0, annotations: [] }))
 api.get("/sessions/:id/events", async (c) => {
   const sessionId = c.req.param("id")
   const resp = await proxyToDO(c.env, sessionId, "https://internal/api/events")
+  const headers = new Headers(resp.headers)
+  headers.set("Content-Type", "text/event-stream")
+  headers.set("Cache-Control", "no-cache")
+  headers.set("Connection", "keep-alive")
+  headers.set("Access-Control-Allow-Origin", "*")
   return new Response(resp.body, {
-    headers: {
-      "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache",
-      "Connection": "keep-alive",
-      "Access-Control-Allow-Origin": "*",
-    },
+    status: resp.status,
+    statusText: resp.statusText,
+    headers,
   })
 })
 

@@ -12,6 +12,7 @@ import type {
   Annotation,
   ThreadMessage,
   AgentationEvent,
+  ActionRequestedPayload,
 } from "./types.js"
 
 interface CommentRoomEnv {
@@ -34,6 +35,7 @@ export class CommentRoom extends Agent<CommentRoomEnv, RoomState> {
     this.handleAnnotationDelete = this.handleAnnotationDelete.bind(this)
     this.handleThreadPost = this.handleThreadPost.bind(this)
     this.handlePending = this.handlePending.bind(this)
+    this.handleActionPost = this.handleActionPost.bind(this)
     this.handleSession = this.handleSession.bind(this)
     this.handleEvents = this.handleEvents.bind(this)
   }
@@ -310,22 +312,28 @@ export class CommentRoom extends Agent<CommentRoomEnv, RoomState> {
 
   // --- SSE ---
 
-  private emitSSE(type: string, payload: unknown) {
+  private emitSSE(
+    type: AgentationEvent["type"],
+    payload: AgentationEvent["payload"],
+  ): number {
     this.sequence++
     const event: AgentationEvent = {
-      type: type as AgentationEvent["type"],
+      type,
       timestamp: new Date().toISOString(),
       sessionId: this.name,
       sequence: this.sequence,
-      payload: payload as Annotation,
+      payload,
     }
     const data = `event: ${type}\ndata: ${JSON.stringify(event)}\nid: ${this.sequence}\n\n`
     const encoded = new TextEncoder().encode(data)
-    for (const writer of this.sseClients) {
+    const activeWriters = Array.from(this.sseClients)
+    for (const writer of activeWriters) {
       writer.write(encoded).catch(() => {
         this.sseClients.delete(writer)
+        writer.close().catch(() => undefined)
       })
     }
+    return activeWriters.length
   }
 
   // --- HTTP API (onRequest) ---
@@ -372,6 +380,11 @@ export class CommentRoom extends Agent<CommentRoomEnv, RoomState> {
       return this.handlePending()
     }
 
+    // POST /api/action
+    if (path === "/api/action" && method === "POST") {
+      return this.handleActionPost(request)
+    }
+
     // GET /api/session
     if (path === "/api/session" && method === "GET") {
       return this.handleSession()
@@ -379,7 +392,7 @@ export class CommentRoom extends Agent<CommentRoomEnv, RoomState> {
 
     // GET /api/events — SSE
     if (path === "/api/events" && method === "GET") {
-      return this.handleEvents()
+      return this.handleEvents(request)
     }
 
     // Legacy: GET /api/comments — backwards compat for old API consumers
@@ -444,6 +457,35 @@ export class CommentRoom extends Agent<CommentRoomEnv, RoomState> {
     return Response.json({ count: pending.length, annotations: pending })
   }
 
+  private async handleActionPost(request: Request): Promise<Response> {
+    let output = ""
+    try {
+      const body = await request.json() as { output?: unknown }
+      if (typeof body.output === "string") {
+        output = body.output
+      }
+    } catch {
+      // Empty or malformed JSON body is treated as empty output.
+    }
+
+    const annotationCount = this.state.annotations.length
+    const payload: ActionRequestedPayload = {
+      output,
+      annotationCount,
+    }
+    const sseListeners = this.emitSSE("action.requested", payload)
+
+    return Response.json({
+      success: true,
+      annotationCount,
+      delivered: {
+        sseListeners,
+        webhooks: 0,
+        total: sseListeners,
+      },
+    })
+  }
+
   private handleSession(): Response {
     const now = new Date().toISOString()
     return Response.json({
@@ -455,20 +497,24 @@ export class CommentRoom extends Agent<CommentRoomEnv, RoomState> {
     })
   }
 
-  private handleEvents(): Response {
+  private handleEvents(request: Request): Response {
     const { readable, writable } = new TransformStream()
     const writer = writable.getWriter()
     this.sseClients.add(writer)
 
+    let cleanedUp = false
+    const cleanup = () => {
+      if (cleanedUp) return
+      cleanedUp = true
+      this.sseClients.delete(writer)
+      writer.close().catch(() => undefined)
+    }
+    request.signal.addEventListener("abort", cleanup, { once: true })
+
     // Send initial connection event
     const connectEvent = `event: connected\ndata: ${JSON.stringify({ sessionId: this.name })}\n\n`
     writer.write(new TextEncoder().encode(connectEvent)).catch(() => {
-      this.sseClients.delete(writer)
-    })
-
-    // Clean up when client disconnects
-    readable.pipeTo(new WritableStream()).catch(() => {
-      this.sseClients.delete(writer)
+      cleanup()
     })
 
     return new Response(readable, {
