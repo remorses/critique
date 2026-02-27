@@ -12,6 +12,7 @@ import Stripe from "stripe"
 import { Resend } from "resend"
 import { agentationApi } from "./agentation-api.js"
 import { annotationsContextRoute } from "./routes/annotations-context.js"
+import { version as pkgVersion } from "../package.json"
 
 // Re-export CommentRoom so wrangler can discover the Durable Object class
 export { CommentRoom } from "@critique.work/server"
@@ -708,10 +709,11 @@ async function handleView(c: any) {
       endpoint: origin + "/a",
       sessionId: id,
       userId,
+      showFreezeButton: false,
     }).replace(/</g, "\\u003c")
     const commentsSnippet = `
 <script>window.__CRITIQUE_CONFIG__=${configJson}</script>
-<script src="/agentation-widget.js"></script>`
+<script src="/agentation-widget.js?v=${pkgVersion}"></script>`
     html = html.replace("</body>", `${commentsSnippet}\n</body>`)
   }
 

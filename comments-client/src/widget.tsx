@@ -13,49 +13,13 @@
 //   containing many spans). We inject content-visibility: auto on .line elements
 //   so the browser only renders visible lines, skipping layout/paint for the
 //   ~6,400 off-screen lines. This brings page load from ~16s to <2s on large diffs.
-//
-// CSS scope isolation:
-//   Agentation injects ~365 CSS rules into document.head at module load time.
-//   On pages with large DOMs, Safari re-evaluates all elements against these
-//   rules even though they use CSS Modules class names that don't match diff
-//   elements. We wrap agentation's CSS in @scope (body) to (#content) so the
-//   browser excludes the diff subtree from selector matching entirely.
-//   All agentation DOM (toolbar, markers, popups) lives outside #content,
-//   so scoping doesn't break anything. Falls back to unscoped CSS on
-//   browsers without @scope support (Safari < 17.4).
 
 interface CritiqueConfig {
   endpoint: string
   sessionId: string
   userId: string
-}
-
-// IDs of agentation's injected <style> elements
-const AGENTATION_STYLE_IDS = new Set([
-  "feedback-tool-styles-annotation-popup-css-styles",
-  "feedback-tool-styles-page-toolbar-css-styles",
-])
-
-// Check if @scope is supported (Safari 17.4+, Chrome 118+, Firefox 128+)
-let scopeSupported: boolean | null = null
-function isScopeSupported(): boolean {
-  if (scopeSupported !== null) return scopeSupported
-  try {
-    // Test by creating a stylesheet with @scope and checking if it parses
-    const sheet = new CSSStyleSheet()
-    sheet.replaceSync("@scope (body) { .test { color: red } }")
-    scopeSupported = sheet.cssRules.length > 0
-  } catch {
-    scopeSupported = false
-  }
-  return scopeSupported
-}
-
-// Wrap CSS in @scope to exclude #content subtree from selector matching.
-// All agentation DOM elements are outside #content (toolbar portals to body,
-// markers are body-level divs), so scoping doesn't affect them.
-function wrapInScope(css: string): string {
-  return `@scope (body) to (#content) {\n${css}\n}`
+  /** Whether to show the pause/resume animations button. Defaults to true. */
+  showFreezeButton?: boolean
 }
 
 function injectContentVisibility() {
@@ -75,6 +39,15 @@ async function init() {
   // Inject content-visibility optimization before anything else
   injectContentVisibility()
 
+  // Seed agentation theme from system preference before it reads localStorage.
+  // Agentation reads localStorage["feedback-toolbar-theme"] on mount and
+  // defaults to dark if absent. We set it to match the OS color scheme so
+  // the widget looks correct on light-mode systems from the first render.
+  if (!localStorage.getItem("feedback-toolbar-theme")) {
+    const isLight = window.matchMedia("(prefers-color-scheme: light)").matches
+    localStorage.setItem("feedback-toolbar-theme", isLight ? "light" : "dark")
+  }
+
   if (document.getElementById("critique-agentation")) return
 
   const config = (window as any).__CRITIQUE_CONFIG__ as CritiqueConfig | undefined
@@ -87,42 +60,16 @@ async function init() {
   container.id = "critique-agentation"
   document.body.appendChild(container)
 
-  // Monkey-patch Node.prototype.appendChild to intercept agentation's style
-  // injection. Wraps CSS in @scope so Safari doesn't re-evaluate 185K+ diff
-  // elements against agentation's 365 CSS rules.
-  const useScope = isScopeSupported() && !!document.getElementById("content")
-  const origAppendChild = Node.prototype.appendChild
-  if (useScope) {
-    Node.prototype.appendChild = function <T extends Node>(node: T): T {
-      if (
-        this === document.head &&
-        node instanceof HTMLStyleElement &&
-        node.id &&
-        AGENTATION_STYLE_IDS.has(node.id) &&
-        node.textContent
-      ) {
-        node.textContent = wrapInScope(node.textContent)
-      }
-      return origAppendChild.call(this, node) as T
-    }
-  }
-
-  // Dynamic import ensures monkey-patch is active before agentation's
-  // module-level code runs (static imports would hoist and execute first)
   const [{ Agentation }, { createRoot }] = await Promise.all([
     import("agentation"),
     import("react-dom/client"),
   ])
 
-  // Restore original appendChild
-  if (useScope) {
-    Node.prototype.appendChild = origAppendChild
-  }
-
   createRoot(container).render(
     <Agentation
       endpoint={config.endpoint}
       sessionId={config.sessionId}
+      showFreezeButton={config.showFreezeButton}
     />,
   )
 }

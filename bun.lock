@@ -51,7 +51,7 @@
       "name": "@critique.work/client",
       "version": "0.1.0",
       "dependencies": {
-        "@critique.work/agentation": "^2.4.0",
+        "@critique.work/agentation": "^2.5.0",
         "react": "^19.2.0",
         "react-dom": "^19.2.0",
       },
@@ -112,7 +112,7 @@
 
     "@cloudflare/workers-types": ["@cloudflare/workers-types@4.20260210.0", "", {}, "sha512-zHaF0RZVYUQwNCJCECnNAJdMur72Lk3FMiD6wU78Dx3Bv7DQRcuXNmPNuJmsGnosVZCcWintHlPTQ/4BEiDG5w=="],
 
-    "@critique.work/agentation": ["@critique.work/agentation@2.4.0", "", { "dependencies": { "preact": "^10.28.4" } }, "sha512-KGNMLF5YnSornUATViDQscVLBS26TzPolJvphuNAYWqocwjYwHu3xfpOoqF5klgeRA2ZKmekO3r7953n8K6egg=="],
+    "@critique.work/agentation": ["@critique.work/agentation@2.5.0", "", { "dependencies": { "preact": "^10.28.4" } }, "sha512-j38a8xgBOirxweIsv0OmXKXZQBg/z815tTUhs3M5foVZqfHMVplPepmnMMpoSK8D+6APwXw4Q7+6IZ4/orAHQA=="],
 
     "@critique.work/client": ["@critique.work/client@workspace:comments-client"],
 

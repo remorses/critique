@@ -213,7 +213,10 @@ export function frameToHtmlDocument(frame: CapturedFrame, options: ToHtmlOptions
 
   const autoThemeCss = options.autoTheme ? '\n' + html`
     @media (prefers-color-scheme: light) {
-      html {
+      html, body {
+        background-color: #ffffff;
+      }
+      #content {
         filter: invert(1) hue-rotate(180deg);
       }
     }
@@ -235,7 +238,7 @@ export function frameToHtmlDocument(frame: CapturedFrame, options: ToHtmlOptions
     <style>
     @font-face {
       font-family: 'JetBrains Mono Nerd';
-      src: url('https://critique.work/jetbrains-mono-nerd.woff2') format('woff2');
+      src: url('/jetbrains-mono-nerd.woff2') format('woff2');
       font-weight: normal;
       font-style: normal;
       font-display: swap;
@@ -243,14 +246,42 @@ export function frameToHtmlDocument(frame: CapturedFrame, options: ToHtmlOptions
     </style>
     <title>${escapeHtml(title)}</title>
     <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
+    /* Tailwind-style global defaults (safe for agentation widget) */
+    *, ::before, ::after {
+      box-sizing: border-box;
+      border-width: 0;
+      border-style: solid;
+      border-color: currentColor;
+    }
     html {
       -webkit-text-size-adjust: 100%;
       text-size-adjust: 100%;
+      line-height: 1.5;
+      tab-size: 4;
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     }
     html, body {
       min-height: 100%;
+      margin: 0;
       background-color: ${backgroundColor};
+    }
+    body {
+      overflow-x: clip;
+      overflow-y: auto;
+      max-width: 100vw;
+    }
+    img, video, svg {
+      display: block;
+      max-width: 100%;
+    }
+    /*
+     * Diff content styles scoped to #content so they don't interfere
+     * with the agentation widget which lives outside #content.
+     */
+    #content {
+      width: fit-content;
+      margin: 0 auto;
+      padding: 16px;
       color: ${textColor};
       font-family: ${fontFamily};
       /*
@@ -264,16 +295,6 @@ export function frameToHtmlDocument(frame: CapturedFrame, options: ToHtmlOptions
        */
       font-size: clamp(4px, calc((100vw - 32px) / (${cols} * 0.6)), 14px);
       line-height: 1.7;
-    }
-    body {
-      padding: 16px;
-      overflow-x: clip;
-      overflow-y: auto;
-      max-width: 100vw;
-    }
-    #content {
-      width: fit-content;
-      margin: 0 auto;
     }
     .line {
       white-space: pre;

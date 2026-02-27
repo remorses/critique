@@ -99,6 +99,30 @@ NEVER update existing changelog bullet points for previous version unless you ad
 
 - do not consider local state truthful when interacting with server. when interacting with the server with rpc or api calls never use state from the render function as input for the api call. this state can easily become stale or not get updated in the closure context. instead prefer using zustand `useStore.getState().stateValue`. notice that useLoaderData or useParams should be fine in this case.
 
+## preview worker
+
+when working on the worker, agentation widget, or HTML page styles, use the preview worker to test changes before deploying to production.
+
+deploy the preview worker from the `cli/` directory:
+
+```bash
+bun run worker:deploy    # deploys to preview.critique.work
+```
+
+to upload diffs to the preview worker instead of production, set `CRITIQUE_WORKER_URL`:
+
+```bash
+CRITIQUE_WORKER_URL=https://preview.critique.work bun run cli/src/cli.tsx web --filter "cli/src/ansi-html.ts"
+```
+
+this uploads to `preview.critique.work` so you can test HTML/CSS/widget changes without affecting production. use this whenever changing `ansi-html.ts`, `web-utils.tsx`, `worker.tsx`, or `comments-client/`.
+
+production deploy (critique.work):
+
+```bash
+bun run worker:deploy:prod
+```
+
 ## cli
 
 the main cli functionality is in src/cli.tsx
