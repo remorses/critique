@@ -5,7 +5,7 @@
   "license": "MIT",
   "private": true,
   "dependencies": {
-    "agentation": "^2.2.1",
+    "@critique.work/agentation": "^2.4.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
   },
