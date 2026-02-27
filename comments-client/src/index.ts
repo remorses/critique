@@ -25,7 +25,7 @@ export type { ThreadViewProps } from "./components/thread-view.js"
 export { Composer } from "./components/composer.js"
 export type { ComposerProps } from "./components/composer.js"
 export { NewThread } from "./components/new-thread.js"
-export type { NewThreadProps, PlacementState } from "./components/new-thread.js"
+export type { NewThreadProps, CommentingState } from "./components/new-thread.js"
 
 // Coordinate system (for custom overlay implementations)
 export {

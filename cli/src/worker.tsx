@@ -78,6 +78,23 @@ app.all("/agents/*", async (c) => {
   return c.text("Not found", 404)
 })
 
+// HTTP API: get all comments for a room (for agents/bots)
+// GET /api/comments?key=<roomKey> — roomKey is the diff ID
+app.get("/api/comments", async (c) => {
+  const key = c.req.query("key")
+  if (!key) {
+    return c.json({ error: "Missing ?key parameter. Use the diff ID as the key." }, 400)
+  }
+
+  const id = c.env.CommentRoom.idFromName(key)
+  const stub = c.env.CommentRoom.get(id)
+  const response = await stub.fetch(
+    new Request("https://internal/api/comments", { method: "GET" }),
+  )
+  const data = await response.json()
+  return c.json(data)
+})
+
 // Redirect to GitHub repo
 app.get("/", (c) => {
   return c.redirect("https://github.com/remorses/critique")

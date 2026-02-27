@@ -36,12 +36,23 @@
   }
 }
 
-/* --- Placing mode cursor --- */
+/* --- Commenting mode cursor --- */
 [data-cw-placing] {
   cursor: crosshair !important;
 }
 [data-cw-placing] * {
   cursor: crosshair !important;
+}
+
+/* --- Highlight overlay (shown when hovering in commenting mode) --- */
+.cw-highlight-overlay {
+  position: fixed;
+  pointer-events: none;
+  border: 2px solid var(--cw-primary);
+  background: rgba(0, 102, 255, 0.06);
+  border-radius: 3px;
+  transition: top 80ms ease-out, left 80ms ease-out, width 80ms ease-out, height 80ms ease-out;
+  z-index: 99998;
 }
 
 /* --- Overlay container --- */
@@ -215,6 +226,11 @@
 
 .cw-btn-active {
   background: rgba(0, 0, 0, 0.08);
+}
+
+.cw-btn-commenting {
+  background: var(--cw-primary) !important;
+  color: #fff !important;
 }
 
 /* --- Sidebar --- */

@@ -46,6 +46,7 @@ export function CommentsToolbar() {
         {/* Sidebar toggle */}
         <div className="cw-toolbar-actions">
           <button
+            type="button"
             className={`cw-btn cw-btn-ghost cw-btn-square ${sidebarOpen ? "cw-btn-active" : ""}`}
             onClick={() => setSidebarOpen((prev) => !prev)}
             aria-label={sidebarOpen ? "Close sidebar" : "Open sidebar"}
