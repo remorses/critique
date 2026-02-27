@@ -722,14 +722,6 @@ async function handleView(c: any) {
     return c.text("Not found", 404)
   }
 
-  // Inject content-visibility CSS into <head> so the browser applies it BEFORE
-  // parsing the 6,500+ .line elements. This skips layout/paint for off-screen
-  // lines, reducing initial render from ~16s to <2s on large diffs.
-  const cvStyles = `<style id="critique-cv-styles">
-#content > .line { content-visibility: auto; contain-intrinsic-height: auto 20px; }
-</style>`
-  html = html.replace("</head>", `${cvStyles}\n</head>`)
-
   // Only inject agentation widget for small diffs (< 1MB HTML).
   // Large diffs have 185K+ DOM nodes and agentation's CSS causes Safari
   // to choke on style recalculation. Small diffs load fine with it.
