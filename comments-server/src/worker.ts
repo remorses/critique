@@ -1,6 +1,6 @@
-// Hono worker for the comments system.
+// Hono worker for the annotation system.
 // Handles cookie-based user identity, routes agent WebSocket/RPC requests,
-// and provides an HTTP API for fetching comments (for agents/bots).
+// and provides an HTTP API for fetching annotations (for agents/bots).
 
 import { Hono } from "hono"
 import { cors } from "hono/cors"
@@ -44,8 +44,8 @@ export function createCommentsWorker() {
   // Health check
   app.get("/health", (c) => c.json({ ok: true }))
 
-  // HTTP API: get all comments for a room key
-  app.get("/api/comments", async (c) => {
+  // HTTP API: get all annotations for a room key
+  app.get("/api/annotations", async (c) => {
     const key = c.req.query("key")
     if (!key) {
       return c.json({ error: "Missing ?key parameter" }, 400)
@@ -54,7 +54,7 @@ export function createCommentsWorker() {
     const id = c.env.CommentRoom.idFromName(key)
     const stub = c.env.CommentRoom.get(id)
     const response = await stub.fetch(
-      new Request("https://internal/api/comments", { method: "GET" }),
+      new Request("https://internal/api/annotations", { method: "GET" }),
     )
     const data = await response.json()
     return c.json(data)

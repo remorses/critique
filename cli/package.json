@@ -18,8 +18,10 @@
     "prepublishOnly": "bun run build",
     "example": "bun --watch src/example.tsx",
     "worker:dev": "wrangler dev",
-    "worker:deploy": "wrangler deploy",
-    "worker:secrets": "wrangler secret bulk .env"
+    "worker:deploy": "wrangler deploy --env preview",
+    "worker:deploy:prod": "wrangler deploy",
+    "worker:secrets": "wrangler secret bulk ../.env --env preview",
+    "worker:secrets:prod": "wrangler secret bulk ../.env"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20250525.0",

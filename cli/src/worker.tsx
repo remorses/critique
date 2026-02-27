@@ -11,6 +11,8 @@ import { routeAgentRequest } from "agents"
 import type { KVNamespace } from "@cloudflare/workers-types"
 import Stripe from "stripe"
 import { Resend } from "resend"
+import { agentationApi } from "./agentation-api.js"
+import { annotationsContextRoute } from "./routes/annotations-context.js"
 
 // Re-export CommentRoom so wrangler can discover the Durable Object class
 export { CommentRoom } from "@critique.work/server"
@@ -78,7 +80,13 @@ app.all("/agents/*", async (c) => {
   return c.text("Not found", 404)
 })
 
-// HTTP API: get all comments for a room (for agents/bots)
+// Agentation HTTP API (annotations, sessions, SSE)
+app.route("/a", agentationApi)
+
+// Annotations context page (HTML/JSON view of all annotations for a diff)
+app.route("", annotationsContextRoute)
+
+// HTTP API: get all annotations for a room (for agents/bots)
 // GET /api/comments?key=<roomKey> — roomKey is the diff ID
 app.get("/api/comments", async (c) => {
   const key = c.req.query("key")
@@ -714,16 +722,31 @@ async function handleView(c: any) {
     return c.text("Not found", 404)
   }
 
-  // Inject comments widget before </body>
-  const userId = c.get("userId") || "anonymous"
-  const origin = new URL(c.req.url).origin
-  // Escape < to \u003c to prevent XSS via </script> sequences in JSON values
-  const configJson = JSON.stringify({ roomKey: id, host: origin, userId }).replace(/</g, "\\u003c")
-  const commentsSnippet = `
-<link rel="stylesheet" href="/comments.css">
-<script>window.__CRITIQUE_COMMENTS__=${configJson}</script>
-<script src="/comments.js"></script>`
-  html = html.replace("</body>", `${commentsSnippet}\n</body>`)
+  // Inject content-visibility CSS into <head> so the browser applies it BEFORE
+  // parsing the 6,500+ .line elements. This skips layout/paint for off-screen
+  // lines, reducing initial render from ~16s to <2s on large diffs.
+  const cvStyles = `<style id="critique-cv-styles">
+#content > .line { content-visibility: auto; contain-intrinsic-height: auto 20px; }
+</style>`
+  html = html.replace("</head>", `${cvStyles}\n</head>`)
+
+  // Only inject agentation widget for small diffs (< 1MB HTML).
+  // Large diffs have 185K+ DOM nodes and agentation's CSS causes Safari
+  // to choke on style recalculation. Small diffs load fine with it.
+  if (html.length < 1_000_000) {
+    const userId = c.get("userId") || "anonymous"
+    const origin = new URL(c.req.url).origin
+    // Escape < to \u003c to prevent XSS via </script> sequences in JSON values
+    const configJson = JSON.stringify({
+      endpoint: origin + "/a",
+      sessionId: id,
+      userId,
+    }).replace(/</g, "\\u003c")
+    const commentsSnippet = `
+<script>window.__CRITIQUE_CONFIG__=${configJson}</script>
+<script src="/agentation-widget.js"></script>`
+    html = html.replace("</body>", `${commentsSnippet}\n</body>`)
+  }
 
   // Stream the HTML content for faster initial load
   return stream(c, async (s) => {

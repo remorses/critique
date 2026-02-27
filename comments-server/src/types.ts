@@ -1,79 +1,80 @@
-// Shared types for the comment system.
-// Used by both server (CommentRoom Agent) and client (React components).
+// Shared types for the Agentation-based annotation system.
+// Used by both server (CommentRoom Durable Object) and client (widget).
+// Based on AFS (Agentation Feedback Spec) annotation format.
 
-export interface ThreadMetadata {
-  /** Comma-separated CSS selector fallbacks for pinning position */
-  cursorSelectors: string
-  /** 0-1 fraction across the target element width */
-  cursorX: number
-  /** 0-1 fraction down the target element height */
-  cursorY: number
-  /** Stacking order among pins */
-  zIndex: number
-  /** Optional application-specific anchor (e.g. "file:line" for diff comments) */
-  anchor?: string
-}
-
-export interface CommentPreview {
-  body: string
-  createdBy: string
-  userName?: string
-}
-
-export interface Thread {
+// AFS Annotation — the core data type
+export interface Annotation {
   id: string
-  createdAt: string
-  createdBy: string
-  resolved: boolean
-  metadata: ThreadMetadata
-  commentCount: number
-  /** The first comment in the thread (used for preview display) */
-  firstComment?: CommentPreview
-}
-
-export interface Comment {
-  id: string
-  threadId: string
-  body: string
-  createdAt: string
-  createdBy: string
+  comment: string
+  elementPath: string
+  timestamp: number
+  x: number // % viewport width 0-100
+  y: number // px from document top
+  element: string // tag name
+  url?: string
+  boundingBox?: { x: number; y: number; width: number; height: number }
+  reactComponents?: string
+  cssClasses?: string
+  computedStyles?: string
+  accessibility?: string
+  nearbyText?: string
+  selectedText?: string
+  fullPath?: string
+  nearbyElements?: string
+  isFixed?: boolean
+  isMultiSelect?: boolean
+  intent?: AnnotationIntent
+  severity?: AnnotationSeverity
+  status?: AnnotationStatus
+  resolvedAt?: string
+  resolvedBy?: "human" | "agent"
+  thread?: ThreadMessage[]
+  // Our extensions for multi-user
+  createdBy?: string
   userName?: string
+  anchor?: string // file:line for diff code context
+  sessionId?: string
+  createdAt?: string
+  updatedAt?: string
 }
 
-/** Lightweight state synced to all connected clients via WebSocket */
+export type AnnotationIntent = "fix" | "change" | "question" | "approve"
+export type AnnotationSeverity = "blocking" | "important" | "suggestion"
+export type AnnotationStatus = "pending" | "acknowledged" | "resolved" | "dismissed"
+
+export interface ThreadMessage {
+  id: string
+  role: "human" | "agent"
+  content: string
+  timestamp: number
+}
+
+export interface Session {
+  id: string // = diff ID
+  url?: string
+  status: "active" | "approved" | "closed"
+  createdAt: string
+  updatedAt: string
+  annotations: Annotation[]
+}
+
+// SSE event envelope (matches AFS spec)
+export interface AgentationEvent {
+  type:
+    | "annotation.created"
+    | "annotation.updated"
+    | "annotation.deleted"
+    | "session.created"
+    | "session.updated"
+    | "session.closed"
+    | "thread.message"
+  timestamp: string
+  sessionId: string
+  sequence: number
+  payload: Annotation | Session | ThreadMessage
+}
+
+// Agent state synced via WebSocket (lightweight)
 export interface RoomState {
-  threads: Thread[]
+  annotations: Annotation[]
 }
-
-/** Input for creating a new thread */
-export interface CreateThreadInput {
-  metadata: ThreadMetadata
-  body: string
-  userId: string
-  userName?: string
-}
-
-/** Input for adding a comment to an existing thread */
-export interface AddCommentInput {
-  threadId: string
-  body: string
-  userId: string
-  userName?: string
-}
-
-/** Input for updating thread metadata (e.g. repositioning a pin) */
-export interface UpdateThreadMetadataInput {
-  threadId: string
-  metadata: Partial<ThreadMetadata>
-}
-
-/** Response for the comments API (agent-consumable) */
-export interface CommentsApiResponse {
-  threads: Thread[]
-  comments: Record<string, Comment[]>
-}
-
-/** WebSocket message types for presence */
-export type PresenceMessage =
-  | { type: "cursor"; x: number; y: number; selectors: string; userId: string }
-  | { type: "cursor-leave"; userId: string }

@@ -206,7 +206,7 @@ describe("ansi-html renderLine callback", () => {
   test("renderLine wraps matching lines with custom HTML", () => {
     const frame = mockFrame(["file header", "code line", "another line"])
 
-    const html = frameToHtml(frame, {
+    const { html } = frameToHtml(frame, {
       renderLine: (defaultHtml, _line, lineIndex) => {
         if (lineIndex === 0) {
           return defaultHtml.replace(
@@ -226,7 +226,7 @@ describe("ansi-html renderLine callback", () => {
 
   test("without renderLine, output is default divs", () => {
     const frame = mockFrame(["hello"])
-    const html = frameToHtml(frame)
+    const { html } = frameToHtml(frame)
     expect(html).toBe('<div class="line"><span>hello</span></div>')
   })
 })

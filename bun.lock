@@ -49,20 +49,16 @@
     },
     "comments-client": {
       "name": "@critique.work/client",
-      "version": "0.0.1",
+      "version": "0.1.0",
       "dependencies": {
-        "@critique.work/server": "workspace:*",
-        "agents": "^0.6.0",
+        "agentation": "^2.2.1",
+        "react": "^19.2.0",
         "react-dom": "^19.2.0",
       },
       "devDependencies": {
         "@types/react": "^19.2.14",
         "@types/react-dom": "^19.0.0",
-        "react": "^19.2.0",
         "typescript": "^5.9.3",
-      },
-      "peerDependencies": {
-        "react": "^18.0.0 || ^19.0.0",
       },
     },
     "comments-server": {
@@ -408,6 +404,8 @@
 
     "accepts": ["accepts@2.0.0", "", { "dependencies": { "mime-types": "^3.0.0", "negotiator": "^1.0.0" } }, "sha512-5cvg6CtKwfgdmVqY1WIiXKc3Q1bkRqGLi+2W/6ao+6Y7gu/RCwRuAhGEzh5B4KlszSuTLgZYuqFqo5bImjNKng=="],
 
+    "agentation": ["agentation@2.2.1", "", { "peerDependencies": { "react": ">=18.0.0", "react-dom": ">=18.0.0" }, "optionalPeers": ["react", "react-dom"] }, "sha512-yV9P1DggI7M3SRaRwLwt+xqE5lXqg5l8xtqCr8KzEkbnH8Wa6eRATU97uKnD7cC8FrsJP62Mmw0Xf5Xi5KV50Q=="],
+
     "agents": ["agents@0.6.0", "", { "dependencies": { "@cfworker/json-schema": "^4.1.1", "@modelcontextprotocol/sdk": "1.26.0", "cron-schedule": "^6.0.0", "json-schema": "^0.4.0", "json-schema-to-typescript": "^15.0.4", "mimetext": "^3.0.28", "nanoid": "^5.1.6", "partyserver": "^0.3.0", "partysocket": "1.1.15", "yargs": "^18.0.0" }, "peerDependencies": { "@ai-sdk/openai": "^3.0.0", "@ai-sdk/react": "^3.0.0", "@cloudflare/ai-chat": "^0.1.4", "@cloudflare/codemode": "^0.1.1", "@x402/core": "^2.0.0", "@x402/evm": "^2.0.0", "ai": "^6.0.0", "react": "^19.0.0", "viem": ">=2.0.0", "zod": "^3.25.0 || ^4.0.0" }, "optionalPeers": ["@ai-sdk/openai", "@ai-sdk/react", "@cloudflare/ai-chat", "@cloudflare/codemode", "@x402/core", "@x402/evm", "viem"], "bin": { "agents": "dist/cli/index.js" } }, "sha512-BUqYwtTyNp0ksAJo0b4uSn4lmIDYkLAeXDnu3VaCHyLUPI5C/1PECOVrD0xHzHkGkbE/yL79Eaasuuk9U7kGwQ=="],
 
     "ai": ["ai@6.0.103", "", { "dependencies": { "@ai-sdk/gateway": "3.0.57", "@ai-sdk/provider": "3.0.8", "@ai-sdk/provider-utils": "4.0.15", "@opentelemetry/api": "1.9.0" }, "peerDependencies": { "zod": "^3.25.76 || ^4.1.8" } }, "sha512-4eY6Ut4u41zKH+P2S/oLlZrwxeWQh4kIV1FjE34Jhoiwg+v1AyfSYM8FslXk9rTAtIIaOBimrCUqXacC5RBqJw=="],
@@ -466,7 +464,7 @@
 
     "content-type": ["content-type@1.0.5", "", {}, "sha512-nTjqfcBFEipKdXCv4YDQWCfmcLZKm81ldF0pAopTvyrFGVbcR6P/VAAd5G7N+0tTr8QqiU0tFadD6FK4NtJwOA=="],
 
-    "cookie": ["cookie@0.7.2", "", {}, "sha512-yki5XnKuf750l50uGTllt6kKILY4nQ1eNIQatoXEByZ5dWgnKqbnqmTrBE5B4N7lrMJKQ2ytWMiTO2o0v6Ew/w=="],
+    "cookie": ["cookie@1.1.1", "", {}, "sha512-ei8Aos7ja0weRpFzJnEA9UHJ/7XQmqglbRwnf2ATjcB9Wq874VKH9kfjjirM6UhU2/E5fFYadylyhFldcqSidQ=="],
 
     "cookie-signature": ["cookie-signature@1.2.2", "", {}, "sha512-D76uU73ulSXrD1UXF4KE2TMxVVwhsnCgfAyTg9k8P6KGZjlXKrOLe4dJQKI3Bxi5wjesZoFXJWElNWBjPZMbhg=="],
 
@@ -942,6 +940,8 @@
 
     "execa/cross-spawn": ["cross-spawn@5.1.0", "", { "dependencies": { "lru-cache": "^4.0.1", "shebang-command": "^1.2.0", "which": "^1.2.9" } }, "sha512-pTgQJ5KC0d2hcY8eyL1IzlBPYjTkyH72XRZPnLyKus2mBfNjQs3klqbJU2VILqZryAZUt9JOb3h/mWMy23/f5A=="],
 
+    "express/cookie": ["cookie@0.7.2", "", {}, "sha512-yki5XnKuf750l50uGTllt6kKILY4nQ1eNIQatoXEByZ5dWgnKqbnqmTrBE5B4N7lrMJKQ2ytWMiTO2o0v6Ew/w=="],
+
     "express/mime-types": ["mime-types@3.0.2", "", { "dependencies": { "mime-db": "^1.54.0" } }, "sha512-Lbgzdk0h4juoQ9fCKXW4by0UJqj+nOOrI9MJ1sSj4nI8aI2eo1qmvQEie4VD1glsS250n15LsWsYtCugiStS5A=="],
 
     "image-q/@types/node": ["@types/node@16.9.1", "", {}, "sha512-QpLcX9ZSsq3YYUUnD3nFDY8H7wctAhQj/TFKL8Ya8v5fMm3CFXxo8zStsLAl780ltoYoo1WvKUVGBQK+1ifr7g=="],
@@ -963,8 +963,6 @@
     "unicode-properties/base64-js": ["base64-js@1.5.1", "", {}, "sha512-AKpaYlHn8t4SVbOHCy+b5+KKgvR4vrsD8vbvrbiQJps7fKDTkjkDry6ji0rUJjC0kzbNePLwzxq8iypo41qeWA=="],
 
     "utif2/pako": ["pako@1.0.11", "", {}, "sha512-4hLB8Py4zZce5s4yd9XzopqwVv/yGNhV1Bl8NTmCq1763HeK2+EwVTv+leGeL13Dnh2wfbqowVPXCIO0z4taYw=="],
-
-    "youch/cookie": ["cookie@1.1.1", "", {}, "sha512-ei8Aos7ja0weRpFzJnEA9UHJ/7XQmqglbRwnf2ATjcB9Wq874VKH9kfjjirM6UhU2/E5fFYadylyhFldcqSidQ=="],
 
     "accepts/mime-types/mime-db": ["mime-db@1.54.0", "", {}, "sha512-aU5EJuIN2WDemCcAp2vFBfp/m4EAhWJnUNSSw0ixs7/kXbd6Pg64EmwJkNdFhB8aWt1sH2CTXrLxo/iAGV3oPQ=="],
 

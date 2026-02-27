@@ -3,7 +3,7 @@
   "private": true,
   "workspaces": ["./*"],
   "scripts": {
-    "build:comments-widget": "bun build comments-client/src/widget.tsx --outfile cli/public/comments.js --minify --target browser && cp comments-client/src/styles.css cli/public/comments.css",
-    "build:comments": "bun run --filter '@critique.work/server' build && bun run --filter '@critique.work/client' build"
+    "build:comments-widget": "bun build comments-client/src/widget.tsx --outfile cli/public/agentation-widget.js --minify --target browser",
+    "build:comments-server": "bun run --filter '@critique.work/server' build"
   }
 }

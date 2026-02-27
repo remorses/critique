@@ -61,57 +61,83 @@ function rgbaToHexOrNull(rgba: RGBA): string | null {
 }
 
 /**
- * Convert a single span to HTML
- * Always wraps in span for consistent inline-block sizing
+ * Build a CSS style key string from a span's visual properties.
+ * Used as the dedup key for the class map.
  */
-function spanToHtml(span: CapturedSpan): string {
-  const styles: string[] = []
-  
+function spanStyleKey(span: CapturedSpan): string {
+  const parts: string[] = []
+
   const fg = rgbaToHexOrNull(span.fg)
   const bg = rgbaToHexOrNull(span.bg)
-  
-  if (fg) {
-    styles.push(`color:${fg}`)
+
+  if (fg) parts.push(`color:${fg}`)
+  if (bg) parts.push(`background-color:${bg}`)
+  if (span.attributes & TextAttributes.BOLD) parts.push("font-weight:bold")
+  if (span.attributes & TextAttributes.ITALIC) parts.push("font-style:italic")
+  if (span.attributes & TextAttributes.UNDERLINE) parts.push("text-decoration:underline")
+  if (span.attributes & TextAttributes.STRIKETHROUGH) parts.push("text-decoration:line-through")
+  if (span.attributes & TextAttributes.DIM) parts.push("opacity:0.5")
+
+  return parts.join(";")
+}
+
+/**
+ * Style class map — maps CSS declaration strings to short class names.
+ * Populated during frameToHtml, consumed by frameToHtmlDocument to emit
+ * a compact <style> block instead of repeating inline styles on every span.
+ *
+ * A typical diff has 50-200 unique style combos. Using classes instead of
+ * inline styles reduces HTML size by ~8MB on large diffs (185K spans ×
+ * ~55 bytes per inline style attribute).
+ */
+class StyleClassMap {
+  private map = new Map<string, string>()
+  private counter = 0
+
+  /** Get or create a class name for a CSS declaration string */
+  getClass(styleKey: string): string {
+    let cls = this.map.get(styleKey)
+    if (!cls) {
+      cls = `s${this.counter++}`
+      this.map.set(styleKey, cls)
+    }
+    return cls
   }
-  if (bg) {
-    styles.push(`background-color:${bg}`)
+
+  /** Generate the CSS block for all collected classes */
+  toCss(): string {
+    const rules: string[] = []
+    for (const [style, cls] of this.map) {
+      rules.push(`.${cls}{${style}}`)
+    }
+    return rules.join("\n")
   }
-  
-  // Handle style flags using TextAttributes
-  if (span.attributes & TextAttributes.BOLD) {
-    styles.push("font-weight:bold")
-  }
-  if (span.attributes & TextAttributes.ITALIC) {
-    styles.push("font-style:italic")
-  }
-  if (span.attributes & TextAttributes.UNDERLINE) {
-    styles.push("text-decoration:underline")
-  }
-  if (span.attributes & TextAttributes.STRIKETHROUGH) {
-    styles.push("text-decoration:line-through")
-  }
-  if (span.attributes & TextAttributes.DIM) {
-    styles.push("opacity:0.5")
-  }
-  
+}
+
+/**
+ * Convert a single span to HTML using class-based styling.
+ * The classMap collects unique style combos; the actual CSS is emitted later.
+ */
+function spanToHtml(span: CapturedSpan, classMap: StyleClassMap): string {
   const escapedText = linkifyHtml(escapeHtml(span.text))
-  
-  // Always wrap in span for consistent inline-block sizing
-  if (styles.length === 0) {
+  const key = spanStyleKey(span)
+
+  if (key === "") {
     return `<span>${escapedText}</span>`
   }
-  
-  return `<span style="${styles.join(";")}">${escapedText}</span>`
+
+  const cls = classMap.getClass(key)
+  return `<span class="${cls}">${escapedText}</span>`
 }
 
 /**
  * Convert a single line to HTML
  */
-function lineToHtml(line: CapturedLine): string {
+function lineToHtml(line: CapturedLine, classMap: StyleClassMap): string {
   if (line.spans.length === 0) {
     return ""
   }
-  return line.spans.map(spanToHtml).join("")
+  return line.spans.map((span) => spanToHtml(span, classMap)).join("")
 }
 
 /**
@@ -126,9 +152,11 @@ function isLineEmpty(line: CapturedLine): boolean {
 /**
  * Converts captured frame to styled HTML.
  * Renders HTML line by line from the CapturedFrame structure.
+ * Returns both the content HTML and a CSS block for deduplicated span styles.
  */
-export function frameToHtml(frame: CapturedFrame, options: ToHtmlOptions = {}): string {
+export function frameToHtml(frame: CapturedFrame, options: ToHtmlOptions = {}): { html: string; spanCss: string } {
   const { trimEmptyLines = true } = options
+  const classMap = new StyleClassMap()
 
   let lines = frame.lines
 
@@ -141,7 +169,7 @@ export function frameToHtml(frame: CapturedFrame, options: ToHtmlOptions = {}): 
 
   // Render each line as a div
   const htmlLines = lines.map((line, lineIndex) => {
-    const content = lineToHtml(line)
+    const content = lineToHtml(line, classMap)
     // Use a div for each line to ensure proper line breaks
     // Empty lines get a span with nbsp for consistent flex behavior
     const defaultHtml = `<div class="line">${content || "<span>&nbsp;</span>"}</div>`
@@ -150,7 +178,10 @@ export function frameToHtml(frame: CapturedFrame, options: ToHtmlOptions = {}): 
       : defaultHtml
   })
 
-  return htmlLines.join("\n")
+  return {
+    html: htmlLines.join("\n"),
+    spanCss: classMap.toCss(),
+  }
 }
 
 /**
@@ -167,7 +198,7 @@ export function frameToHtmlDocument(frame: CapturedFrame, options: ToHtmlOptions
   } = options
 
   const cols = frame.cols
-  const content = frameToHtml(frame, options)
+  const { html: content, spanCss } = frameToHtml(frame, options)
 
   const ogTags = options.ogImageUrl ? '\n' + html`
     <meta property="og:title" content="${escapeHtml(title)}">
@@ -299,6 +330,7 @@ export function frameToHtmlDocument(frame: CapturedFrame, options: ToHtmlOptions
       }
     }
     ${options.extraCss || ''}
+    ${spanCss}
     </style>
     </head>
     <body>

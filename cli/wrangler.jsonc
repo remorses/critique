@@ -29,7 +29,7 @@
     ]
   },
 
-  // Durable Object migrations (SQLite storage for comments)
+  // Durable Object migrations (SQLite storage for annotations)
   "migrations": [
     {
       "tag": "v1",
@@ -41,5 +41,29 @@
   "routes": [
     { "pattern": "critique.work", "custom_domain": true },
     { "pattern": "www.critique.work", "custom_domain": true }
-  ]
+  ],
+
+  // Preview environment for testing before production deploy
+  "env": {
+    "preview": {
+      "name": "critique-web-preview",
+      "routes": [
+        { "pattern": "preview.critique.work", "custom_domain": true }
+      ],
+      "kv_namespaces": [
+        {
+          "binding": "CRITIQUE_KV",
+          "id": "844b10c9fea049c8b20fa4a8c5cae44e"
+        }
+      ],
+      "durable_objects": {
+        "bindings": [
+          {
+            "name": "CommentRoom",
+            "class_name": "CommentRoom"
+          }
+        ]
+      }
+    }
+  }
 }
