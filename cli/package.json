@@ -27,7 +27,7 @@
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20250525.0",
     "@critique.work/agentation": "2.5.3",
-    "@critique.work/server": "workspace:*",
+    "@critique.work/server": "workspace:^",
     "agents": "^0.6.0",
     "@types/bun": "1.3.5",
     "@types/js-yaml": "^4.0.9",

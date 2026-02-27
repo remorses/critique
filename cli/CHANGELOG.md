@@ -1,24 +1,10 @@
 # 0.1.119
 
-- Agentation API preview validation:
-  - `bun run test:agentation-preview`:
-    - Add a live `bun:test` end-to-end test that uses `fetch` against `https://preview.critique.work/a`
-    - Validate Agentation-compatible flow: `/health`, `/status`, session creation, annotation CRUD, thread posting, and pending list behavior
-    - Simulate multiple users via `cw_user_id` cookies and assert server-assigned `createdBy` + `{sessionId}_{uuid}` annotation IDs
-    - Verify SSE lifecycle events (`annotation.created`, `annotation.updated`, `annotation.deleted`) and monotonic event `sequence` values
-- Agentation API server compatibility:
-  - `/a/sessions/:id/action`:
-    - Add session action submit route in proxy (`cli/src/agentation-api.ts`) and DO handler (`comments-server/src/comment-room.ts`)
-    - Return Agentation-compatible action response payload (`success`, `annotationCount`, `delivered`)
-    - Emit SSE `action.requested` with output + annotation count
-  - SSE streaming:
-    - Fix DO SSE stream lifecycle to avoid locking/consuming the stream before `Response` creation
-    - Clean up SSE client writers on request abort to avoid stale writer leaks
-    - Preserve upstream status in `/a/sessions/:id/events` proxy responses while keeping SSE/CORS headers
-  - Annotation IDs:
-    - Enforce `{sessionId}_{uuid}` format for created annotations even when clients provide invalid/mismatched IDs
-  - Legacy annotation fetch endpoints:
-    - Add `x-partykit-room` header forwarding in worker-side `/api/comments` and standalone comments worker `/api/annotations`
+- Web preview (`critique --web`):
+  - Real-time annotations on shared diff pages — collaborators can now leave comments and annotations directly on `critique.work` diff pages
+  - Annotation widget loads automatically on web previews with real-time SSE updates as teammates add or resolve annotations
+  - HTML styles scoped to `#content` container and static assets cache-busted to prevent stale widget loads after updates
+  - Fixed mobile redirect to preserve scroll position and annotation overlay on small screens
 
 # 0.1.118
 
