@@ -1,10 +1,8 @@
 // Hono worker for the annotation system.
-// Handles cookie-based user identity, routes agent WebSocket/RPC requests,
-// and provides an HTTP API for fetching annotations (for agents/bots).
+// Handles cookie-based user identity and provides an HTTP API for fetching annotations.
 
 import { Hono } from "hono"
 import { cors } from "hono/cors"
-import { routeAgentRequest } from "agents"
 
 // Re-export so wrangler can find the Durable Object class when using this module as main
 export { CommentRoom } from "./comment-room.js"
@@ -58,13 +56,6 @@ export function createCommentsWorker() {
     const response = await stub.fetch(request)
     const data = await response.json()
     return c.json(data)
-  })
-
-  // Route all agent requests (WebSocket upgrades, RPC, state sync)
-  app.all("/agents/*", async (c) => {
-    const response = await routeAgentRequest(c.req.raw, c.env)
-    if (response) return response
-    return c.text("Not found", 404)
   })
 
   return app

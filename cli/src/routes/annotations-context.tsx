@@ -42,7 +42,7 @@ route.get("/v/:id/annotations", async (c) => {
     intent?: string
     severity?: string
     status?: string
-    createdBy?: string
+    authorId?: string
     userName?: string
     createdAt?: string
     thread?: Array<{ role: string; content: string; timestamp: number }>

@@ -1,12 +1,12 @@
 // CommentRoom — Durable Object Agent for managing annotations per room.
-// Each room is identified by a key (typically a diff ID). Annotations and
-// thread messages are persisted in embedded SQLite; lightweight annotation
-// summaries are synced to all connected clients via the agents state system.
+// Each room is identified by a key (typically a diff ID). Annotations are
+// persisted as JSON blobs in SQLite with minimal indexed columns (id, timestamp, status).
+// Thread messages are stored inside the annotation JSON directly.
 //
 // Exposes an HTTP API (onRequest) compatible with the Agentation spec,
-// plus SSE streaming for real-time multi-user sync.
+// plus SSE streaming for real-time updates.
 
-import { Agent, type Connection, type ConnectionContext, type WSMessage } from "agents"
+import { Agent } from "agents"
 import type {
   RoomState,
   Annotation,
@@ -41,117 +41,52 @@ export class CommentRoom extends Agent<CommentRoomEnv, RoomState> {
   }
 
   async onStart() {
-    this.sql`
-      CREATE TABLE IF NOT EXISTS annotations (
-        id TEXT PRIMARY KEY,
-        comment TEXT NOT NULL,
-        elementPath TEXT NOT NULL,
-        timestamp INTEGER NOT NULL,
-        x REAL NOT NULL,
-        y REAL NOT NULL,
-        element TEXT NOT NULL,
-        url TEXT,
-        status TEXT DEFAULT 'pending',
-        intent TEXT,
-        severity TEXT,
-        resolvedAt TEXT,
-        resolvedBy TEXT,
-        createdBy TEXT,
-        userName TEXT,
-        anchor TEXT,
-        createdAt TEXT NOT NULL,
-        updatedAt TEXT NOT NULL,
-        fullJson TEXT NOT NULL
-      )
-    `
+    this.sql`CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)`
 
-    this.sql`
-      CREATE TABLE IF NOT EXISTS thread_messages (
-        id TEXT PRIMARY KEY,
-        annotationId TEXT NOT NULL,
-        role TEXT NOT NULL,
-        content TEXT NOT NULL,
-        timestamp INTEGER NOT NULL,
-        FOREIGN KEY (annotationId) REFERENCES annotations(id) ON DELETE CASCADE
-      )
+    const versionRow = this.sql<{ value: string }>`
+      SELECT value FROM meta WHERE key = 'schema_version'
     `
+    const schemaVersion = versionRow[0]?.value ?? "0"
 
-    this.sql`
-      CREATE INDEX IF NOT EXISTS idx_thread_annotation
-        ON thread_messages(annotationId, timestamp)
-    `
+    if (schemaVersion !== "2") {
+      // One-time migration: drop old wide-column schema + separate thread_messages table.
+      // All data was duplicated in fullJson anyway; threads are now stored inside annotation JSON.
+      this.sql`DROP TABLE IF EXISTS thread_messages`
+      this.sql`DROP TABLE IF EXISTS annotations`
 
-    this.sql`
-      CREATE INDEX IF NOT EXISTS idx_annotations_status
-        ON annotations(status)
-    `
+      this.sql`
+        CREATE TABLE IF NOT EXISTS annotations (
+          id TEXT PRIMARY KEY,
+          timestamp INTEGER NOT NULL,
+          status TEXT DEFAULT 'pending',
+          data TEXT NOT NULL
+        )
+      `
+
+      this.sql`CREATE INDEX IF NOT EXISTS idx_annotations_status ON annotations(status)`
+      this.sql`INSERT INTO meta (key, value) VALUES ('schema_version', '2') ON CONFLICT(key) DO UPDATE SET value = '2'`
+    }
 
     // Load annotations into state on startup
     const annotations = this.loadAllAnnotations()
     this.setState({ annotations })
   }
 
-  // --- WebSocket presence ---
-
-  onConnect(connection: Connection, ctx: ConnectionContext) {
-    const url = new URL(ctx.request.url)
-    const userId = url.searchParams.get("userId") || connection.id
-    const userName = url.searchParams.get("userName") || undefined
-    connection.setState({ userId, userName })
-  }
-
-  onMessage(connection: Connection, message: WSMessage) {
-    if (typeof message !== "string") return
-    try {
-      const data = JSON.parse(message)
-      if (data.type === "cursor" || data.type === "cursor-leave") {
-        this.broadcast(message, [connection.id])
-      }
-    } catch {
-      // Ignore malformed messages
-    }
-  }
-
-  onClose(connection: Connection) {
-    const state = connection.state as { userId?: string } | null
-    if (state?.userId) {
-      this.broadcast(
-        JSON.stringify({ type: "cursor-leave", userId: state.userId }),
-        [connection.id],
-      )
-    }
-  }
-
   // --- SQL helpers ---
 
   private loadAllAnnotations(): Annotation[] {
-    const rows = this.sql<{ id: string; fullJson: string }>`
-      SELECT id, fullJson FROM annotations ORDER BY timestamp ASC
+    const rows = this.sql<{ data: string }>`
+      SELECT data FROM annotations ORDER BY timestamp ASC
     `
-    return rows.map((row) => {
-      const annotation = JSON.parse(row.fullJson) as Annotation
-      annotation.thread = this.loadThreadMessages(row.id)
-      return annotation
-    })
+    return rows.map((row) => JSON.parse(row.data) as Annotation)
   }
 
   private loadAnnotation(id: string): Annotation | null {
-    const rows = this.sql<{ fullJson: string }>`
-      SELECT fullJson FROM annotations WHERE id = ${id}
+    const rows = this.sql<{ data: string }>`
+      SELECT data FROM annotations WHERE id = ${id}
     `
     if (rows.length === 0) return null
-    const annotation = JSON.parse(rows[0].fullJson) as Annotation
-    annotation.thread = this.loadThreadMessages(id)
-    return annotation
-  }
-
-  private loadThreadMessages(annotationId: string): ThreadMessage[] {
-    return this.sql<ThreadMessage>`
-      SELECT id, role, content, timestamp
-      FROM thread_messages
-      WHERE annotationId = ${annotationId}
-      ORDER BY timestamp ASC
-    `
+    return JSON.parse(rows[0].data) as Annotation
   }
 
   // --- Annotation CRUD ---
@@ -183,7 +118,7 @@ export class CommentRoom extends Agent<CommentRoomEnv, RoomState> {
       status: input.status || "pending",
       resolvedAt: input.resolvedAt,
       resolvedBy: input.resolvedBy,
-      createdBy: input.createdBy,
+      authorId: input.authorId,
       userName: input.userName,
       anchor: input.anchor,
       sessionId: input.sessionId,
@@ -191,30 +126,9 @@ export class CommentRoom extends Agent<CommentRoomEnv, RoomState> {
       updatedAt: now,
     }
 
-    const fullJson = JSON.stringify(annotation)
     this.sql`
-      INSERT INTO annotations (id, comment, elementPath, timestamp, x, y, element, url, status, intent, severity, resolvedAt, resolvedBy, createdBy, userName, anchor, createdAt, updatedAt, fullJson)
-      VALUES (
-        ${annotation.id},
-        ${annotation.comment},
-        ${annotation.elementPath},
-        ${annotation.timestamp},
-        ${annotation.x},
-        ${annotation.y},
-        ${annotation.element},
-        ${annotation.url ?? null},
-        ${annotation.status ?? null},
-        ${annotation.intent ?? null},
-        ${annotation.severity ?? null},
-        ${annotation.resolvedAt ?? null},
-        ${annotation.resolvedBy ?? null},
-        ${annotation.createdBy ?? null},
-        ${annotation.userName ?? null},
-        ${annotation.anchor ?? null},
-        ${now},
-        ${now},
-        ${fullJson}
-      )
+      INSERT INTO annotations (id, timestamp, status, data)
+      VALUES (${annotation.id}, ${annotation.timestamp}, ${annotation.status ?? null}, ${JSON.stringify(annotation)})
     `
 
     this.setState({
@@ -233,23 +147,11 @@ export class CommentRoom extends Agent<CommentRoomEnv, RoomState> {
 
     const now = new Date().toISOString()
     const updated: Annotation = { ...existing, ...partial, id, updatedAt: now }
-    // Preserve thread from existing
-    updated.thread = existing.thread
 
     this.sql`
       UPDATE annotations
-      SET comment = ${updated.comment},
-          elementPath = ${updated.elementPath},
-          x = ${updated.x},
-          y = ${updated.y},
-          element = ${updated.element},
-          status = ${updated.status ?? null},
-          intent = ${updated.intent ?? null},
-          severity = ${updated.severity ?? null},
-          resolvedAt = ${updated.resolvedAt ?? null},
-          resolvedBy = ${updated.resolvedBy ?? null},
-          updatedAt = ${now},
-          fullJson = ${JSON.stringify(updated)}
+      SET status = ${updated.status ?? null},
+          data = ${JSON.stringify(updated)}
       WHERE id = ${id}
     `
 
@@ -269,7 +171,6 @@ export class CommentRoom extends Agent<CommentRoomEnv, RoomState> {
       throw new Error(`Annotation ${id} not found`)
     }
 
-    this.sql`DELETE FROM thread_messages WHERE annotationId = ${id}`
     this.sql`DELETE FROM annotations WHERE id = ${id}`
 
     this.setState({
@@ -292,17 +193,22 @@ export class CommentRoom extends Agent<CommentRoomEnv, RoomState> {
       timestamp: Date.now(),
     }
 
+    const now = new Date().toISOString()
+    const updated: Annotation = {
+      ...existing,
+      thread: [...(existing.thread || []), msg],
+      updatedAt: now,
+    }
+
     this.sql`
-      INSERT INTO thread_messages (id, annotationId, role, content, timestamp)
-      VALUES (${msg.id}, ${annotationId}, ${msg.role}, ${msg.content}, ${msg.timestamp})
+      UPDATE annotations
+      SET data = ${JSON.stringify(updated)}
+      WHERE id = ${annotationId}
     `
 
-    // Update annotation in state with new thread message
     this.setState({
       annotations: this.state.annotations.map((a) =>
-        a.id === annotationId
-          ? { ...a, thread: [...(a.thread || []), msg], updatedAt: new Date().toISOString() }
-          : a,
+        a.id === annotationId ? updated : a,
       ),
     })
 
@@ -395,13 +301,7 @@ export class CommentRoom extends Agent<CommentRoomEnv, RoomState> {
       return this.handleEvents(request)
     }
 
-    // Legacy: GET /api/comments — backwards compat for old API consumers
-    if (path === "/api/comments" && method === "GET") {
-      return this.handleAnnotationsGet()
-    }
-
-    // Let the base class handle WebSocket upgrades and RPC
-    return super.onRequest(request)
+    return new Response("Not found", { status: 404 })
   }
 
   private handleAnnotationsGet(): Response {

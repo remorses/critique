@@ -48,8 +48,7 @@ function parseAnnotationId(annotationId: string): { sessionId: string; rawId: st
 // Health check (Agentation polls this)
 api.get("/health", (c) => c.json({ status: "ok" }))
 
-// Status
-api.get("/status", (c) => c.json({ version: "1.0", storage: "cloudflare-do" }))
+
 
 // Create session (Agentation calls POST /sessions with { url })
 api.post("/sessions", async (c) => {
@@ -83,7 +82,10 @@ api.post("/sessions/:id/annotations", async (c) => {
   if (typeof body.id !== "string" || !body.id.startsWith(`${sessionId}_`)) {
     body.id = `${sessionId}_${crypto.randomUUID()}`
   }
-  body.createdBy = body.createdBy || c.get("userId")
+  // Support legacy createdBy field from old clients
+  const legacyCreatedBy = typeof body.createdBy === "string" ? body.createdBy : undefined
+  body.authorId = body.authorId || legacyCreatedBy || c.get("userId")
+  delete body.createdBy
   body.sessionId = sessionId
 
   const resp = await proxyToDO(c.env, sessionId, "https://internal/api/annotations", {
@@ -165,8 +167,7 @@ api.get("/sessions/:id/pending", async (c) => {
   return new Response(resp.body, resp)
 })
 
-// Global pending (empty for v1)
-api.get("/pending", (c) => c.json({ count: 0, annotations: [] }))
+
 
 // SSE events — proxy to DO's SSE endpoint
 api.get("/sessions/:id/events", async (c) => {

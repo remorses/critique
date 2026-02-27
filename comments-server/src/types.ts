@@ -29,8 +29,8 @@ export interface Annotation {
   resolvedAt?: string
   resolvedBy?: "human" | "agent"
   thread?: ThreadMessage[]
-  // Our extensions for multi-user
-  createdBy?: string
+  // Multi-user identity (authorId matches agentation spec)
+  authorId?: string
   userName?: string
   anchor?: string // file:line for diff code context
   sessionId?: string
@@ -63,16 +63,13 @@ export interface Session {
   annotations: Annotation[]
 }
 
-// SSE event envelope (matches AFS spec)
+// SSE event envelope
 export interface AgentationEvent {
   type:
     | "annotation.created"
     | "annotation.updated"
     | "annotation.deleted"
     | "action.requested"
-    | "session.created"
-    | "session.updated"
-    | "session.closed"
     | "thread.message"
   timestamp: string
   sessionId: string

@@ -1,13 +1,12 @@
 /** @jsxImportSource hono/jsx */
 // Cloudflare Worker for hosting HTML diff previews at critique.work.
 // Handles upload, storage (KV), Stripe checkout, responsive serving, and real-time comments.
-// Endpoints: POST /upload, GET /v/:id (view), GET /raw/:id (debug), ALL /agents/* (comments).
+// Endpoints: POST /upload, GET /v/:id (view), GET /raw/:id (debug), /a/* (agentation API).
 // Payments: GET /buy, GET /success, POST /stripe/webhook.
 
 import { Hono } from "hono"
 import { cors } from "hono/cors"
 import { stream } from "hono/streaming"
-import { routeAgentRequest } from "agents"
 import type { KVNamespace } from "@cloudflare/workers-types"
 import Stripe from "stripe"
 import { Resend } from "resend"
@@ -73,35 +72,11 @@ app.use("*", async (c, next) => {
   await next()
 })
 
-// Route all agent requests (WebSocket upgrades, RPC, state sync for comments)
-app.all("/agents/*", async (c) => {
-  const response = await routeAgentRequest(c.req.raw, c.env as any)
-  if (response) return response
-  return c.text("Not found", 404)
-})
-
 // Agentation HTTP API (annotations, sessions, SSE)
 app.route("/a", agentationApi)
 
 // Annotations context page (HTML/JSON view of all annotations for a diff)
 app.route("", annotationsContextRoute)
-
-// HTTP API: get all annotations for a room (for agents/bots)
-// GET /api/comments?key=<roomKey> — roomKey is the diff ID
-app.get("/api/comments", async (c) => {
-  const key = c.req.query("key")
-  if (!key) {
-    return c.json({ error: "Missing ?key parameter. Use the diff ID as the key." }, 400)
-  }
-
-  const id = c.env.CommentRoom.idFromName(key)
-  const stub = c.env.CommentRoom.get(id)
-  const request = new Request("https://internal/api/comments", { method: "GET" })
-  request.headers.set("x-partykit-room", key)
-  const response = await stub.fetch(request)
-  const data = await response.json()
-  return c.json(data)
-})
 
 // Redirect to GitHub repo
 app.get("/", (c) => {

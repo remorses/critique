@@ -208,11 +208,6 @@ describe("preview worker Agentation API", () => {
     const healthBody = asObject(health.json, "health")
     expect(getString(healthBody, "status", "health")).toBe("ok")
 
-    const status = await requestJson("/status")
-    expect(status.response.status).toBe(200)
-    const statusBody = asObject(status.json, "status")
-    expect(getString(statusBody, "storage", "status")).toBe("cloudflare-do")
-
     const createdSession = await requestJson("/sessions", {
       method: "POST",
       body: { url: `https://preview.critique.work/v/${sessionId}` },
@@ -259,7 +254,7 @@ describe("preview worker Agentation API", () => {
     const createdAnnotation = asObject(createdAnnotationResponse.json, "createdAnnotation")
     const annotationId = getString(createdAnnotation, "id", "createdAnnotation")
     expect(annotationId.startsWith(`${sessionId}_`)).toBe(true)
-    expect(getString(createdAnnotation, "createdBy", "createdAnnotation")).toBe(userA)
+    expect(getString(createdAnnotation, "authorId", "createdAnnotation")).toBe(userA)
     expect(getString(createdAnnotation, "sessionId", "createdAnnotation")).toBe(sessionId)
 
     const getCreated = await requestJson(`/annotations/${annotationId}`)
