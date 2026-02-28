@@ -13,6 +13,13 @@
 //   containing many spans). We inject content-visibility: auto on .line elements
 //   so the browser only renders visible lines, skipping layout/paint for the
 //   ~6,400 off-screen lines. This brings page load from ~16s to <2s on large diffs.
+//
+// iOS Safari pinch-zoom fix:
+//   position:fixed is relative to the layout viewport, not the visual viewport.
+//   When users pinch-to-zoom on iOS Safari, the widget drifts with the zoomed
+//   content and can end up mispositioned after zooming out. We use the
+//   visualViewport API to apply a counter-transform that keeps the widget
+//   anchored to the bottom-right of what the user actually sees.
 
 interface CritiqueConfig {
   endpoint: string
@@ -60,6 +67,12 @@ async function init() {
   container.id = "critique-agentation"
   document.body.appendChild(container)
 
+  // Fix position:fixed drift during pinch-to-zoom on iOS Safari.
+  // The visualViewport API tells us how the visible area has shifted
+  // relative to the layout viewport. We apply a counter-transform so
+  // the widget stays anchored to the visual viewport's bottom-right.
+  setupVisualViewportFix(container)
+
   // Use preact's render() directly since the build aliases react → preact/compat.
   // preact/compat does not export createRoot from react-dom/client.
   const [{ Agentation }, { render, h }] = await Promise.all([
@@ -75,6 +88,31 @@ async function init() {
     }),
     container,
   )
+}
+
+function setupVisualViewportFix(container: HTMLElement) {
+  const vv = window.visualViewport
+  if (!vv) return
+
+  function update() {
+    if (!vv) return
+    if (vv.scale <= 1.01) {
+      // No zoom — clear any transform so default fixed positioning works
+      container.style.transform = ""
+      return
+    }
+    // Translate the container so it follows the visual viewport's position,
+    // then scale it back to its original size (counter the zoom).
+    container.style.transform = [
+      `translate(${vv.offsetLeft}px, ${vv.offsetTop}px)`,
+      `scale(${1 / vv.scale})`,
+    ].join(" ")
+    // Set transform-origin to top-left so the translate values are intuitive
+    container.style.transformOrigin = "top left"
+  }
+
+  vv.addEventListener("resize", update)
+  vv.addEventListener("scroll", update)
 }
 
 if (document.readyState === "loading") {
