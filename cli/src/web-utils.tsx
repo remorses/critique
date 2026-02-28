@@ -8,7 +8,7 @@ import fs from "fs"
 import { tmpdir } from "os"
 import { join } from "path"
 import { getResolvedTheme, rgbaToHex } from "./themes.js"
-import type { BoxRenderable, CapturedFrame, RootRenderable, CliRenderer } from "@opentuah/core"
+import type { BoxRenderable, CapturedFrame, CapturedLine, RootRenderable, CliRenderer } from "@opentuah/core"
 import type { IndexedHunk, ReviewYaml } from "./review/types.js"
 import { loadStoredLicenseKey, loadOrCreateOwnerSecret } from "./license.js"
 
@@ -354,6 +354,24 @@ function dedupeId(id: string, usedIds: Set<string>): string {
 }
 
 /**
+ * Extract the first line number from a captured diff line's spans.
+ * Diff lines start with spans like: " " "26" "   " — the line number
+ * is the first span whose trimmed text is purely numeric.
+ * Returns the number string or null if no line number found.
+ */
+function extractLineNumber(line: CapturedLine): string | null {
+  for (const span of line.spans) {
+    const trimmed = span.text.trim()
+    if (trimmed === "") continue
+    // First non-empty span: if it's a number, that's the line number
+    if (/^\d+$/.test(trimmed)) return trimmed
+    // Otherwise this line doesn't start with a line number (e.g. header, hunk marker)
+    return null
+  }
+  return null
+}
+
+/**
  * Build line-indexed anchors from file section layout positions.
  * This avoids regex detection on rendered text, which can produce
  * false positives when code lines mimic file-header patterns.
@@ -414,31 +432,61 @@ export async function captureToHtml(
   const { themeNames, defaultThemeName } = await import("./themes.js")
   const customTheme = options.themeName !== defaultThemeName && themeNames.includes(options.themeName)
 
-  // Build renderLine callback that wraps file header lines with anchor IDs
-  // and makes the filename text itself a clickable link
-  const renderLineCallback = anchors.size > 0
-    ? (defaultHtml: string, _line: unknown, lineIndex: number) => {
-        const anchor = anchors.get(lineIndex)
-        if (!anchor) return defaultHtml
-        // Add id + class to the line div
-        let html = defaultHtml.replace(
-          '<div class="line">',
-          `<div id="${anchor.id}" class="line file-section">`,
-        )
-        // Wrap the filename text inside its span with an <a> link.
-        // The filename appears as escaped text content inside a styled span.
-        const escapedLabel = anchor.label
-          .replace(/&/g, "&amp;")
-          .replace(/</g, "&lt;")
-          .replace(/>/g, "&gt;")
-          .replace(/"/g, "&quot;")
+  // Build renderLine callback that:
+  // 1. Wraps file header lines with anchor IDs and clickable links
+  // 2. Adds data-anchor="file:line" on diff lines so the agentation widget
+  //    can capture which exact diff line an annotation refers to
+  //
+  // sectionPositions is sorted by lineIndex (ascending). We track currentFile
+  // by advancing a pointer as we iterate lines.
+  const sortedSections = [...sectionPositions].sort((a, b) => a.lineIndex - b.lineIndex)
+  let sectionPtr = 0
+  let currentFile: string | null = null
+
+  const renderLineCallback = (defaultHtml: string, line: CapturedLine, lineIndex: number) => {
+    // Advance current file when we pass a section boundary
+    while (sectionPtr < sortedSections.length && lineIndex >= sortedSections[sectionPtr]!.lineIndex) {
+      currentFile = sortedSections[sectionPtr]!.fileName
+      sectionPtr++
+    }
+
+    let html = defaultHtml
+
+    // File-section header: add id + clickable link
+    const anchor = anchors.get(lineIndex)
+    if (anchor) {
+      html = html.replace(
+        '<div class="line">',
+        `<div id="${anchor.id}" class="line file-section">`,
+      )
+      const escapedLabel = anchor.label
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+      html = html.replace(
+        `>${escapedLabel}</span>`,
+        `><a href="#${anchor.id}" class="file-link">${escapedLabel}</a></span>`,
+      )
+    }
+
+    // Diff line: extract line number from spans and add data-anchor.
+    // Diff lines start with spans like: " " "26" " " — the line number
+    // is the first span whose trimmed text is purely numeric.
+    if (currentFile && !anchor) {
+      const lineNum = extractLineNumber(line)
+      if (lineNum) {
+        const basename = currentFile.split("/").pop() || currentFile
+        const anchorValue = `${basename}:${lineNum}`
         html = html.replace(
-          `>${escapedLabel}</span>`,
-          `><a href="#${anchor.id}" class="file-link">${escapedLabel}</a></span>`,
+          '<div class="line">',
+          `<div class="line" data-anchor="${anchorValue}">`,
         )
-        return html
       }
-    : undefined
+    }
+
+    return html
+  }
 
   return frameToHtmlDocument(frame, {
     backgroundColor,
