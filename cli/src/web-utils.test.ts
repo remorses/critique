@@ -4,7 +4,7 @@ import { createRoot } from "@opentuah/react"
 import React from "react"
 import { RGBA } from "@opentuah/core"
 import type { CapturedFrame, CapturedLine, CapturedSpan } from "@opentuah/core"
-import { slugifyFileName, buildAnchorMap } from "./web-utils.js"
+import { slugifyFileName, buildAnchorMap, extractLineNumber } from "./web-utils.js"
 import { frameToHtml, frameToHtmlDocument } from "./ansi-html.js"
 
 describe("getSpanLines rendering", () => {
@@ -228,6 +228,146 @@ describe("ansi-html renderLine callback", () => {
     const frame = mockFrame(["hello"])
     const { html } = frameToHtml(frame)
     expect(html).toBe('<div class="line"><span>hello</span></div>')
+  })
+})
+
+describe("extractLineNumber", () => {
+  // Helper to create a line with multiple spans (like opentui renders diff lines)
+  function spanLine(...texts: string[]): CapturedLine {
+    return { spans: texts.map(t => mockSpan(t)) }
+  }
+
+  test("unified view: single line number", () => {
+    // " " "26" "   " "content..."
+    const line = spanLine(" ", "26", "   ", "const x = 1")
+    expect(extractLineNumber(line)).toBe("26")
+  })
+
+  test("split view: returns right-side (new-file) line number", () => {
+    // " " "29" " - " "old code" "   " "30" " + " "new code"
+    const line = spanLine(" ", "29", " - ", "old code", "   ", "30", " + ", "new code")
+    expect(extractLineNumber(line)).toBe("30")
+  })
+
+  test("split view: same line numbers on both sides (context line)", () => {
+    // " " "26" "   " "unchanged" "   " "26" "   " "unchanged"
+    const line = spanLine(" ", "26", "   ", "unchanged", "   ", "26", "   ", "unchanged")
+    expect(extractLineNumber(line)).toBe("26")
+  })
+
+  test("file header line: returns null", () => {
+    // "cli/package.json" " +1-1"
+    const line = spanLine("cli/package.json", " +1-1")
+    expect(extractLineNumber(line)).toBe(null)
+  })
+
+  test("hunk marker: returns null", () => {
+    // "@@ -26,7 +26,7 @@"
+    const line = spanLine("@@ -26,7 +26,7 @@")
+    expect(extractLineNumber(line)).toBe(null)
+  })
+
+  test("empty line: returns null", () => {
+    const line = spanLine("   ", "   ", "   ")
+    expect(extractLineNumber(line)).toBe(null)
+  })
+
+  test("no spans: returns null", () => {
+    const line: CapturedLine = { spans: [] }
+    expect(extractLineNumber(line)).toBe(null)
+  })
+
+  test("deleted-only row: falls back to left (old) number", () => {
+    // Only left number present, right side is empty
+    // " " "42" " - " "deleted line" "                    "
+    const line = spanLine(" ", "42", " - ", "deleted line", "                    ")
+    expect(extractLineNumber(line)).toBe("42")
+  })
+})
+
+describe("data-anchor in rendered HTML", () => {
+  test("injects data-anchor with file and line number", () => {
+    // Simulate a frame with a file header line and diff lines
+    const frame: CapturedFrame = {
+      cols: 80,
+      rows: 3,
+      cursor: [0, 0],
+      lines: [
+        // File header line (first non-empty span is not numeric)
+        { spans: [mockSpan("src/foo.ts +1-0")] },
+        // Diff line: " " "10" "   " "const x = 1"
+        { spans: [mockSpan(" "), mockSpan("10"), mockSpan("   "), mockSpan("const x = 1")] },
+        // Another diff line
+        { spans: [mockSpan(" "), mockSpan("11"), mockSpan("   "), mockSpan("return true")] },
+      ],
+    }
+
+    // Use renderLine to inject data-anchor, mimicking captureToHtml logic
+    const sectionPositions = [{ lineIndex: 0, fileName: "src/foo.ts" }]
+    let currentFile: string | null = null
+    let sectionPtr = 0
+    const sorted = [...sectionPositions].sort((a, b) => a.lineIndex - b.lineIndex)
+
+    const { html } = frameToHtml(frame, {
+      renderLine: (defaultHtml, line, lineIndex) => {
+        while (sectionPtr < sorted.length && lineIndex >= sorted[sectionPtr]!.lineIndex) {
+          currentFile = sorted[sectionPtr]!.fileName
+          sectionPtr++
+        }
+        if (currentFile && lineIndex > 0) {
+          const lineNum = extractLineNumber(line)
+          if (lineNum) {
+            return defaultHtml.replace(
+              '<div class="line">',
+              `<div class="line" data-anchor="${currentFile}:${lineNum}">`,
+            )
+          }
+        }
+        return defaultHtml
+      },
+    })
+
+    expect(html).toContain('data-anchor="src/foo.ts:10"')
+    expect(html).toContain('data-anchor="src/foo.ts:11"')
+    // File header line should not have data-anchor
+    expect(html).not.toContain('data-anchor="src/foo.ts:src')
+  })
+
+  test("escapes special characters in anchor value", () => {
+    const frame: CapturedFrame = {
+      cols: 80,
+      rows: 2,
+      cursor: [0, 0],
+      lines: [
+        { spans: [mockSpan('file "name".ts +1-0')] },
+        { spans: [mockSpan(" "), mockSpan("5"), mockSpan("   "), mockSpan("code")] },
+      ],
+    }
+
+    let currentFile: string | null = 'src/"quoted".ts'
+    const { html } = frameToHtml(frame, {
+      renderLine: (defaultHtml, line, lineIndex) => {
+        if (lineIndex > 0 && currentFile) {
+          const lineNum = extractLineNumber(line)
+          if (lineNum) {
+            const anchorValue = `${currentFile}:${lineNum}`
+            const safeAnchor = anchorValue
+              .replace(/&/g, "&amp;")
+              .replace(/"/g, "&quot;")
+              .replace(/</g, "&lt;")
+              .replace(/>/g, "&gt;")
+            return defaultHtml.replace(
+              '<div class="line">',
+              `<div class="line" data-anchor="${safeAnchor}">`,
+            )
+          }
+        }
+        return defaultHtml
+      },
+    })
+
+    // Quotes should be escaped in the attribute
+    expect(html).toContain('data-anchor="src/&quot;quoted&quot;.ts:5"')
   })
 })
 

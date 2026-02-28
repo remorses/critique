@@ -354,21 +354,39 @@ function dedupeId(id: string, usedIds: Set<string>): string {
 }
 
 /**
- * Extract the first line number from a captured diff line's spans.
- * Diff lines start with spans like: " " "26" "   " — the line number
- * is the first span whose trimmed text is purely numeric.
- * Returns the number string or null if no line number found.
+ * Extract line numbers from a captured diff line's spans.
+ * In split view each row has two line number columns (old + new):
+ *   " " "29" " - " ...content... " " "29" " + " ...content...
+ * In unified view there's only one.
+ *
+ * Returns the new-file (right) line number when available,
+ * falling back to the old-file (left) number for deleted-only rows.
+ * Returns null for non-diff lines (headers, hunk markers, etc.).
  */
-function extractLineNumber(line: CapturedLine): string | null {
+export function extractLineNumber(line: CapturedLine): string | null {
+  let firstNum: string | null = null
+  let secondNum: string | null = null
+  let foundNonEmpty = false
+
   for (const span of line.spans) {
     const trimmed = span.text.trim()
     if (trimmed === "") continue
-    // First non-empty span: if it's a number, that's the line number
-    if (/^\d+$/.test(trimmed)) return trimmed
-    // Otherwise this line doesn't start with a line number (e.g. header, hunk marker)
-    return null
+
+    if (/^\d+$/.test(trimmed)) {
+      if (!firstNum) {
+        firstNum = trimmed
+      } else if (!secondNum) {
+        secondNum = trimmed
+      }
+    } else if (!foundNonEmpty) {
+      // First non-empty span is not a number — not a diff line
+      return null
+    }
+    foundNonEmpty = true
   }
-  return null
+
+  // Prefer new-file (right/second) number; fall back to old-file (left/first)
+  return secondNum ?? firstNum
 }
 
 /**
@@ -476,11 +494,15 @@ export async function captureToHtml(
     if (currentFile && !anchor) {
       const lineNum = extractLineNumber(line)
       if (lineNum) {
-        const basename = currentFile.split("/").pop() || currentFile
-        const anchorValue = `${basename}:${lineNum}`
+        const anchorValue = `${currentFile}:${lineNum}`
+        const safeAnchor = anchorValue
+          .replace(/&/g, "&amp;")
+          .replace(/"/g, "&quot;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
         html = html.replace(
           '<div class="line">',
-          `<div class="line" data-anchor="${anchorValue}">`,
+          `<div class="line" data-anchor="${safeAnchor}">`,
         )
       }
     }
