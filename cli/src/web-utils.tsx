@@ -414,15 +414,34 @@ export function buildAnchorMap(
   return anchors
 }
 
-// CSS for file section anchors — injected via extraCss hook
-const SECTION_ANCHOR_CSS =
-  `.file-section{scroll-margin-top:16px;}` +
-  `.file-link{color:inherit;text-decoration:none;cursor:pointer;}` +
-  `.file-link:hover{text-decoration:underline;}`
+// CSS for file section anchors — injected via extraCss hook.
+// Clicking a file link copies the filename to clipboard and updates the URL hash.
+const SECTION_ANCHOR_CSS = `
+  .file-section { scroll-margin-top: 16px; }
+  .file-link { color: inherit; text-decoration: none; cursor: copy; }
+  .file-link:hover { text-decoration: underline; }
+`
 
-// JS to scroll to hash fragment on page load — injected via extraJs hook
-const SECTION_ANCHOR_JS =
-  `if(location.hash){var el=document.getElementById(location.hash.slice(1));if(el)setTimeout(function(){el.scrollIntoView({behavior:'smooth'})},100);}`
+// JS: scroll to hash fragment on page load + click-to-copy filename on .file-link click.
+// On click: copies the filename text to clipboard and updates the URL hash.
+const SECTION_ANCHOR_JS = `
+  // Scroll to hash on page load
+  if (location.hash) {
+    var el = document.getElementById(location.hash.slice(1));
+    if (el) setTimeout(function () { el.scrollIntoView({ behavior: 'smooth' }) }, 100);
+  }
+
+  // Click file link: copy filename to clipboard + update URL hash
+  document.addEventListener('click', function (e) {
+    var link = e.target.closest('.file-link');
+    if (!link) return;
+    e.preventDefault();
+    var text = link.textContent;
+    var section = link.closest('.file-section');
+    if (section && section.id) history.replaceState(null, '', '#' + section.id);
+    navigator.clipboard.writeText(text);
+  });
+`
 
 /**
  * Capture diff and convert to HTML using test renderer
