@@ -548,6 +548,48 @@ describe("getOldFileName", () => {
 })
 
 // ============================================================================
+// --commit with range syntax (HEAD~2..HEAD)
+// ============================================================================
+
+describe("--commit with range syntax", () => {
+  it("should use git diff instead of git show for two-dot range", () => {
+    // --commit with range redirects to base, which uses the two-dot path
+    const cmd = buildGitCommand({ commit: "HEAD~2..HEAD" })
+    expect(cmd).toStartWith("git diff HEAD~2..HEAD")
+    expect(cmd).not.toContain("git show")
+  })
+
+  it("should use git diff instead of git show for three-dot range", () => {
+    // --commit with range redirects to base, which uses the three-dot path
+    const cmd = buildGitCommand({ commit: "main...feature" })
+    expect(cmd).toStartWith("git diff main...feature")
+    expect(cmd).not.toContain("git show")
+  })
+
+  it("should use git diff for named ref range", () => {
+    const cmd = buildGitCommand({ commit: "origin/main..HEAD" })
+    expect(cmd).toStartWith("git diff origin/main..HEAD")
+    expect(cmd).not.toContain("git show")
+  })
+
+  it("should produce same command whether range comes via --commit or positional base", () => {
+    const viaCommit = buildGitCommand({ commit: "HEAD~2..HEAD" })
+    const viaBase = buildGitCommand({ base: "HEAD~2..HEAD" })
+    expect(viaCommit).toBe(viaBase)
+  })
+
+  it("should still use git show for a single commit ref", () => {
+    const cmd = buildGitCommand({ commit: "HEAD" })
+    expect(cmd).toStartWith("git show HEAD")
+  })
+
+  it("should still use git show for a single hash", () => {
+    const cmd = buildGitCommand({ commit: "abc123" })
+    expect(cmd).toStartWith("git show abc123")
+  })
+})
+
+// ============================================================================
 // buildGitCommand includes rename detection
 // ============================================================================
 

@@ -295,6 +295,14 @@ export function buildGitCommand(options: GitCommandOptions): string {
       ? `-- ${filters.map((f: string) => `'${f}'`).join(" ")}`
       : "";
 
+  // If --commit contains range syntax (A..B or A...B), treat it as a base ref
+  // instead. git show with ranges outputs commit metadata interleaved with diffs
+  // that parsePatch cannot parse. Redirecting to base reuses the existing range
+  // handling below (two-dot and three-dot parsing).
+  if (options.commit?.includes("..")) {
+    options = { ...options, base: options.commit, commit: undefined };
+  }
+
   if (options.staged) {
     return `git diff --cached --no-prefix ${renameArg} ${submoduleArg} ${contextArg} ${filterArg}`.trim();
   }
