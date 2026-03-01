@@ -55,6 +55,10 @@ async function init() {
     localStorage.setItem("feedback-toolbar-theme", isLight ? "light" : "dark")
   }
 
+  // Always reset the widget to the default bottom-right position on page load.
+  // If a user accidentally drags it, it snaps back on refresh.
+  localStorage.removeItem("feedback-toolbar-position")
+
   if (document.getElementById("critique-agentation")) return
 
   const config = (window as any).__CRITIQUE_CONFIG__ as CritiqueConfig | undefined
