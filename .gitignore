@@ -39,3 +39,10 @@ opensrc/
 
 # local test repo
 test-repo/
+
+# built widget bundles (regenerate with: bun run build:comments-widget)
+cli/public/comments.js
+cli/public/comments.css
+cli/public/agentation-widget.js
+
+.test*

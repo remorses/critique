@@ -1,0 +1,69 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "critique-web",
+  "main": "src/worker.tsx",
+  "compatibility_date": "2025-05-26",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+
+  // Static assets (fonts, comments widget, etc.)
+  "assets": {
+    "directory": "./public"
+  },
+
+  // KV Namespace binding for storing HTML content
+  "kv_namespaces": [
+    {
+      "binding": "CRITIQUE_KV",
+      "id": "844b10c9fea049c8b20fa4a8c5cae44e"
+    }
+  ],
+
+  // CommentRoom Durable Object for real-time threaded comments
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "CommentRoom",
+        "class_name": "CommentRoom"
+      }
+    ]
+  },
+
+  // Durable Object migrations (SQLite storage for annotations)
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["CommentRoom"]
+    }
+  ],
+
+  // Custom domain
+  "routes": [
+    { "pattern": "critique.work", "custom_domain": true },
+    { "pattern": "www.critique.work", "custom_domain": true }
+  ],
+
+  // Preview environment for testing before production deploy
+  "env": {
+    "preview": {
+      "name": "critique-web-preview",
+      "routes": [
+        { "pattern": "preview.critique.work", "custom_domain": true }
+      ],
+      "kv_namespaces": [
+        {
+          "binding": "CRITIQUE_KV",
+          "id": "844b10c9fea049c8b20fa4a8c5cae44e"
+        }
+      ],
+      "durable_objects": {
+        "bindings": [
+          {
+            "name": "CommentRoom",
+            "class_name": "CommentRoom"
+          }
+        ]
+      }
+    }
+  }
+}

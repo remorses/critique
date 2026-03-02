@@ -1,0 +1,25 @@
+{
+  "name": "@critique.work/server",
+  "version": "0.0.1",
+  "type": "module",
+  "license": "MIT",
+  "main": "dist/index.js",
+  "exports": {
+    ".": "./dist/index.js",
+    "./types": "./dist/types.js"
+  },
+  "files": ["dist", "src"],
+  "scripts": {
+    "build": "rm -rf dist && tsc",
+    "prepublishOnly": "bun run build"
+  },
+  "dependencies": {
+    "agents": "^0.6.0",
+    "hono": "^4.7.10"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250525.0",
+    "typescript": "^5.9.3",
+    "wrangler": "^4.19.1"
+  }
+}
