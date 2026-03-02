@@ -44,3 +44,5 @@ test-repo/
 cli/public/comments.js
 cli/public/comments.css
 cli/public/agentation-widget.js
+
+.test*
