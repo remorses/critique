@@ -546,6 +546,8 @@ export function detectFiletype(filePath: string): string | undefined {
     case "cts":
       return "typescript";
     case "json":
+    case "jsonc":
+    case "json5":
       return "json";
     case "md":
     case "mdx":
