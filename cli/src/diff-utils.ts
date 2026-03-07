@@ -551,6 +551,10 @@ export function detectFiletype(filePath: string): string | undefined {
       return "json";
     case "md":
     case "mdx":
+    case "mkd":
+    case "mkdn":
+    case "mdown":
+    case "markdown":
       return "markdown";
     case "zig":
       return "zig";
@@ -568,6 +572,10 @@ export function detectFiletype(filePath: string): string | undefined {
     case "cxx":
     case "hpp":
     case "hxx":
+    case "hh":
+    case "tpp":
+    case "ipp":
+    case "inl":
     case "h":
       return "cpp";
     case "cs":
@@ -575,6 +583,7 @@ export function detectFiletype(filePath: string): string | undefined {
     case "sh":
     case "bash":
     case "zsh":
+    case "ksh":
       return "bash";
     case "c":
       return "c";
@@ -591,6 +600,9 @@ export function detectFiletype(filePath: string): string | undefined {
       return "scala";
     case "html":
     case "htm":
+    case "xhtml":
+    case "xml":
+    case "svg":
       return "html";
     case "yaml":
     case "yml":
@@ -599,6 +611,8 @@ export function detectFiletype(filePath: string): string | undefined {
     case "lhs":
       return "haskell";
     case "css":
+    case "scss":
+    case "less":
       return "css";
     case "jl":
       return "julia";
