@@ -1,3 +1,22 @@
+# 0.1.121
+
+- `--web` performance (~2x faster URL delivery):
+  - Replace fixed stabilization timeout with idle+max model: exits when tree-sitter is idle for 80ms or hard cap at 400ms, with 20ms polling granularity (was a flat 500ms wait)
+  - Parallelize desktop, mobile, and OG image renders in `Promise.all` instead of running OG image sequentially before HTML renders
+  - Upload HTML immediately without waiting for OG image — URL is printed as soon as HTML upload completes
+  - Generate and upload OG image in the background via new `PATCH /upload/:id/og` worker endpoint after URL is printed
+  - OG meta tags injected at POST time with deterministic `/og/{id}.png` URL, so PATCH only stores binary (no HTML read-modify-write race)
+  - Background OG upload bounded by `AbortSignal.timeout(5s)` + process-level `Promise.race(8s)` to prevent hanging
+  - Thread `stabilizeMs` option through `CaptureOptions`, `captureResponsiveHtml`, `captureReviewResponsiveHtml`, and `renderDiffToOgImage`
+  - Before: ~3100ms total (URL printed after ~3100ms). After: ~1100ms to URL, ~1500ms total
+
+# 0.1.120
+
+- Text selection copy (`critique`, `critique review`):
+  - Improve copy-on-selection hook to skip clipboard writes while a drag is still active (`selection.isDragging` guard)
+  - Keep macOS native copy path via `pbcopy`, with fallback to OpenTUI's built-in `renderer.copyToClipboardOSC52()` utility
+  - Align Node API usage with project rules by switching `child_process` import to namespace style
+
 # 0.1.119
 
 - Web preview (`critique --web`):

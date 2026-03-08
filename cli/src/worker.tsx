@@ -369,6 +369,10 @@ function extractTitle(html: string): string {
 // Upload HTML content
 // POST /upload with JSON body { html: string, htmlMobile?: string, ogImage?: string (base64) }
 // Returns { id: string, url: string, ogImageUrl?: string }
+//
+// OG tags are always injected with the deterministic URL /og/{id}.png,
+// even if no ogImage is provided yet. This lets the CLI upload HTML first
+// and PATCH the OG image later without needing to re-read/modify stored HTML.
 app.post("/upload", async (c) => {
   try {
     const kv = new CritiqueKv(c.env.CRITIQUE_KV)
@@ -389,7 +393,6 @@ app.post("/upload", async (c) => {
     const id = hashHex.slice(0, 32)
 
     const url = new URL(c.req.url)
-    let ogImageUrl: string | undefined
 
     const licenseKey = c.req.header(LICENSE_HEADER)
     const ownerSecret = c.req.header(OWNER_SECRET_HEADER)
@@ -402,31 +405,25 @@ app.post("/upload", async (c) => {
       await kv.setOwnerSecret(id, ownerSecret, ttlSeconds)
     }
 
-    // Store OG image if provided
+    // Store OG image if provided inline
     if (body.ogImage && typeof body.ogImage === "string") {
-      // Decode base64 to binary
       const binaryString = atob(body.ogImage)
       const bytes = new Uint8Array(binaryString.length)
       for (let i = 0; i < binaryString.length; i++) {
         bytes[i] = binaryString.charCodeAt(i)
       }
-
-      // Store as binary in KV
       await kv.setOgImage(id, bytes.buffer, ttlSeconds)
-
-      ogImageUrl = `${url.origin}/og/${id}.png`
     }
 
-    // Inject OG tags into HTML if we have an OG image
-    let htmlDesktop = body.html
-    let htmlMobile = body.htmlMobile
-
-    if (ogImageUrl) {
-      const title = extractTitle(body.html)
-      htmlDesktop = injectOgTags(htmlDesktop, ogImageUrl, title)
-      htmlMobile = htmlMobile ? injectOgTags(htmlMobile, ogImageUrl, title) : htmlMobile
-    }
-
+    // Always inject OG tags with the deterministic URL.
+    // The image may arrive later via PATCH /upload/:id/og —
+    // the URL will already be correct in the stored HTML.
+    const ogImageUrl = `${url.origin}/og/${id}.png`
+    const title = extractTitle(body.html)
+    const htmlDesktop = injectOgTags(body.html, ogImageUrl, title)
+    const htmlMobile = body.htmlMobile
+      ? injectOgTags(body.htmlMobile, ogImageUrl, title)
+      : body.htmlMobile
 
     // Store desktop version in KV
     await kv.setHtml(id, htmlDesktop, ttlSeconds)
@@ -446,6 +443,53 @@ app.post("/upload", async (c) => {
     })
   } catch (error) {
     return c.json({ error: "Failed to process upload" }, 500)
+  }
+})
+
+// PATCH /upload/:id/og — Store OG image binary for an existing upload.
+// Called in the background after the initial POST returns the URL.
+// The POST already injected OG meta tags with the deterministic /og/:id.png URL,
+// so this endpoint only stores the image binary — no HTML read-modify-write needed.
+// Requires the same owner secret that was used for the original upload.
+// Body: { ogImage: string (base64 PNG) }
+app.patch("/upload/:id/og", async (c) => {
+  try {
+    const kv = new CritiqueKv(c.env.CRITIQUE_KV)
+    const id = c.req.param("id")
+
+    // Verify owner secret
+    const ownerSecret = c.req.header(OWNER_SECRET_HEADER)
+    if (!ownerSecret) {
+      return c.json({ error: "Missing owner secret" }, 401)
+    }
+    const storedSecret = await kv.getOwnerSecret(id)
+    if (!storedSecret || storedSecret !== ownerSecret) {
+      return c.json({ error: "Invalid owner secret" }, 403)
+    }
+
+    const body = await c.req.json<{ ogImage: string }>()
+    if (!body.ogImage || typeof body.ogImage !== "string") {
+      return c.json({ error: "Missing or invalid 'ogImage' field" }, 400)
+    }
+
+    // Check license for TTL
+    const licenseKey = c.req.header(LICENSE_HEADER)
+    const license = licenseKey ? await kv.getLicense(licenseKey) : null
+    const hasActiveLicense = license?.status === "active"
+    const ttlSeconds = hasActiveLicense ? undefined : SEVEN_DAYS
+
+    // Decode and store OG image binary only — HTML already has the correct meta tags
+    const binaryString = atob(body.ogImage)
+    const bytes = new Uint8Array(binaryString.length)
+    for (let i = 0; i < binaryString.length; i++) {
+      bytes[i] = binaryString.charCodeAt(i)
+    }
+    await kv.setOgImage(id, bytes.buffer, ttlSeconds)
+
+    const url = new URL(c.req.url)
+    return c.json({ ogImageUrl: `${url.origin}/og/${id}.png` })
+  } catch (error) {
+    return c.json({ error: "Failed to update OG image" }, 500)
   }
 })
 

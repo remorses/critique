@@ -319,7 +319,7 @@ export async function renderFrameToOgImage(
  */
 export async function renderDiffToOgImage(
   diffContent: string,
-  options: OgImageOptions & { cols?: number } = {}
+  options: OgImageOptions & { cols?: number; stabilizeMs?: number } = {}
 ): Promise<Buffer> {
   const { renderDiffToFrame } = await import("./web-utils.js")
 
@@ -339,6 +339,7 @@ export async function renderDiffToOgImage(
     cols,
     maxRows: 200,
     themeName,
+    stabilizeMs: options.stabilizeMs,
   })
 
   // Convert frame to OG image

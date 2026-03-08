@@ -28,6 +28,9 @@ export interface CaptureOptions {
   viewMode?: "split" | "unified"
   /** Show privacy/expiry notice block at top (default: false, enabled for web uploads) */
   showNotice?: boolean
+  /** How long to wait for async rendering (tree-sitter) to stabilize.
+   *  Default: 500ms for interactive TUI, use 100ms for batch/web mode. */
+  stabilizeMs?: number
 }
 
 export interface UploadResult {
@@ -91,22 +94,43 @@ function getContentHeight(root: RootRenderable): number {
 
 /**
  * Wait for async rendering (tree-sitter highlighting etc.) to stabilize.
- * Returns when no render requests for stabilizeMs milliseconds.
+ *
+ * Uses an idle+max model:
+ * - Exits when no render requests for `idleMs` (tree-sitter is done)
+ * - Hard cap at `maxMs` to prevent unbounded waits on huge diffs
+ * - Polls at `pollMs` granularity (finer than the idle threshold)
+ *
+ * The old approach used a single `stabilizeMs` with 100ms polling, which
+ * meant stabilizeMs=100 gave only one polling window and could miss late
+ * highlights, while stabilizeMs=500 was wastefully slow for small diffs.
  */
 async function waitForRenderStabilization(
   renderer: CliRenderer,
   renderOnce: () => Promise<void>,
   stabilizeMs: number = 500
 ): Promise<void> {
+  // Derive idle/max from the legacy parameter:
+  // - Interactive TUI (500ms): idleMs=200, maxMs=800
+  // - Web/batch (100ms):       idleMs=80,  maxMs=400
+  const idleMs = Math.max(Math.round(stabilizeMs * 0.4), 60)
+  const maxMs = Math.max(stabilizeMs, Math.round(stabilizeMs * 4))
+  const pollMs = 20
+
   let lastRenderTime = Date.now()
+  const startTime = lastRenderTime
   const originalRequestRender = renderer.root.requestRender.bind(renderer.root)
   renderer.root.requestRender = function() {
     lastRenderTime = Date.now()
     originalRequestRender()
   }
-  
-  while (Date.now() - lastRenderTime < stabilizeMs) {
-    await new Promise(resolve => setTimeout(resolve, 100))
+
+  while (true) {
+    const now = Date.now()
+    // Exit if idle long enough (no render requests for idleMs)
+    if (now - lastRenderTime >= idleMs) break
+    // Exit if hard cap reached
+    if (now - startTime >= maxMs) break
+    await new Promise(resolve => setTimeout(resolve, pollMs))
     await renderOnce()
   }
 }
@@ -292,7 +316,7 @@ async function renderDiffToFrameWithSectionPositions(
   }
   
   // Wait for async highlighting to complete (only once at the end)
-  await waitForRenderStabilization(renderer, renderOnce)
+  await waitForRenderStabilization(renderer, renderOnce, options.stabilizeMs ?? 500)
 
   const sectionPositions: FileSectionPosition[] = []
   for (let idx = 0; idx < fileNames.length; idx++) {
@@ -551,39 +575,50 @@ export async function captureResponsiveHtml(
     baseRows: number
     themeName: string
     title?: string
+    /** Stabilization timeout for tree-sitter highlighting (default: 100ms for web) */
+    stabilizeMs?: number
+    /** Skip OG image generation for faster URL delivery */
+    skipOgImage?: boolean
   }
 ): Promise<{ htmlDesktop: string; htmlMobile: string; ogImage: Buffer | null }> {
   // Max row values - content-fitting will grow to actual content size
   // These act as upper bounds to prevent runaway memory usage
   const desktopRows = Math.max(options.baseRows * 3, 5000)
   const mobileRows = Math.max(Math.ceil(desktopRows * (options.desktopCols / options.mobileCols)), 10000)
+  const stabilizeMs = options.stabilizeMs ?? 100
 
-  // Try to generate OG image (takumi is optional)
-  let ogImage: Buffer | null = null
-  try {
-    const { renderDiffToOgImage } = await import("./image.js")
-    ogImage = await renderDiffToOgImage(diffContent, {
-      // Always use github-light for OG images (no dark mode support in OG protocol)
-      themeName: "github-light",
-    })
-  } catch (e) {
-    // takumi not installed or error - skip OG image
-    ogImage = null
-  }
+  // Run all renders in parallel: desktop HTML, mobile HTML, and OG image
+  const ogImagePromise = options.skipOgImage
+    ? Promise.resolve(null)
+    : (async (): Promise<Buffer | null> => {
+        try {
+          const { renderDiffToOgImage } = await import("./image.js")
+          return await renderDiffToOgImage(diffContent, {
+            // Always use github-light for OG images (no dark mode support in OG protocol)
+            themeName: "github-light",
+            stabilizeMs,
+          })
+        } catch {
+          return null
+        }
+      })()
 
-  const [htmlDesktop, htmlMobile] = await Promise.all([
+  const [htmlDesktop, htmlMobile, ogImage] = await Promise.all([
     captureToHtml(diffContent, {
       cols: options.desktopCols,
       maxRows: desktopRows,
       themeName: options.themeName,
       title: options.title,
+      stabilizeMs,
     }),
     captureToHtml(diffContent, {
       cols: options.mobileCols,
       maxRows: mobileRows,
       themeName: options.themeName,
       title: options.title,
+      stabilizeMs,
     }),
+    ogImagePromise,
   ])
 
   return { htmlDesktop, htmlMobile, ogImage }
@@ -691,7 +726,7 @@ export async function renderReviewToFrame(
   }
   
   // Wait for async highlighting to complete (only once at the end)
-  await waitForRenderStabilization(renderer, renderOnce)
+  await waitForRenderStabilization(renderer, renderOnce, options.stabilizeMs ?? 500)
 
   // Capture the final frame
   const buffer = renderer.currentRenderBuffer
@@ -747,34 +782,39 @@ export async function captureReviewResponsiveHtml(
     baseRows: number
     themeName: string
     title?: string
+    /** Stabilization timeout for tree-sitter highlighting (default: 100ms for web) */
+    stabilizeMs?: number
+    /** Skip OG image generation for faster URL delivery */
+    skipOgImage?: boolean
   }
 ): Promise<{ htmlDesktop: string; htmlMobile: string; ogImage: Buffer | null }> {
   // Max row values - content-fitting will grow to actual content size
   // These act as upper bounds to prevent runaway memory usage
   const desktopRows = Math.max(options.baseRows * 3, 5000)
   const mobileRows = Math.max(Math.ceil(desktopRows * (options.desktopCols / options.mobileCols)), 10000)
+  const stabilizeMs = options.stabilizeMs ?? 100
 
-  // Generate OG image from first few hunks' raw diff
-  let ogImage: Buffer | null = null
-  try {
-    const { renderDiffToOgImage } = await import("./image.js")
-    // Extract raw diff from hunks (they have rawDiff field)
-    const diffContent = options.hunks
-      .slice(0, 5) // Take first 5 hunks max
-      .map((h) => h.rawDiff)
-      .join("\n")
-    if (diffContent) {
-      ogImage = await renderDiffToOgImage(diffContent, {
-        // Always use github-light for OG images (no dark mode support in OG protocol)
-        themeName: "github-light",
-      })
-    }
-  } catch (e) {
-    // takumi not installed or error - skip OG image
-    ogImage = null
-  }
+  // Generate OG image from first few hunks' raw diff (in parallel with HTML renders)
+  const ogImagePromise = options.skipOgImage
+    ? Promise.resolve(null)
+    : (async (): Promise<Buffer | null> => {
+        try {
+          const { renderDiffToOgImage } = await import("./image.js")
+          const diffContent = options.hunks
+            .slice(0, 5)
+            .map((h) => h.rawDiff)
+            .join("\n")
+          if (!diffContent) return null
+          return await renderDiffToOgImage(diffContent, {
+            themeName: "github-light",
+            stabilizeMs,
+          })
+        } catch {
+          return null
+        }
+      })()
 
-  const [htmlDesktop, htmlMobile] = await Promise.all([
+  const [htmlDesktop, htmlMobile, ogImage] = await Promise.all([
     captureReviewToHtml({
       hunks: options.hunks,
       reviewData: options.reviewData,
@@ -782,6 +822,7 @@ export async function captureReviewResponsiveHtml(
       maxRows: desktopRows,
       themeName: options.themeName,
       title: options.title,
+      stabilizeMs,
     }),
     captureReviewToHtml({
       hunks: options.hunks,
@@ -790,7 +831,9 @@ export async function captureReviewResponsiveHtml(
       maxRows: mobileRows,
       themeName: options.themeName,
       title: options.title,
+      stabilizeMs,
     }),
+    ogImagePromise,
   ])
 
   return { htmlDesktop, htmlMobile, ogImage }
@@ -842,6 +885,34 @@ export async function uploadHtml(
     expiresInDays?: number | null
   }
   return result
+}
+
+/**
+ * Upload OG image to an existing diff via PATCH.
+ * Called in the background after the initial upload returns the URL.
+ * Uses a 5s timeout to prevent hanging the process after URL is printed.
+ */
+export async function uploadOgImage(id: string, ogImage: Buffer): Promise<void> {
+  const licenseKey = loadStoredLicenseKey()
+  const ownerSecret = loadOrCreateOwnerSecret()
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    "X-Critique-Owner-Secret": ownerSecret,
+  }
+  if (licenseKey) {
+    headers["X-Critique-License"] = licenseKey
+  }
+
+  const response = await fetch(`${WORKER_URL}/upload/${id}/og`, {
+    method: "PATCH",
+    headers,
+    body: JSON.stringify({ ogImage: ogImage.toString("base64") }),
+    signal: AbortSignal.timeout(5000),
+  })
+
+  if (!response.ok) {
+    throw new Error(`OG image PATCH failed: ${response.status}`)
+  }
 }
 
 /**

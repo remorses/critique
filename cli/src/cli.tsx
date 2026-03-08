@@ -1121,6 +1121,7 @@ async function runWebMode(
   const {
     captureResponsiveHtml,
     uploadHtml,
+    uploadOgImage,
     openInBrowser,
   } = await import("./web-utils.js");
 
@@ -1145,14 +1146,17 @@ async function runWebMode(
   log("Converting to HTML...");
 
   try {
+    // Render desktop + mobile HTML and OG image in parallel.
+    // Skip OG from initial upload — we'll PATCH it in the background
+    // after the URL is printed, so the user sees the URL faster.
     const { htmlDesktop, htmlMobile, ogImage } = await captureResponsiveHtml(
       diffContent,
-      { desktopCols, mobileCols, baseRows, themeName, title: options.title }
+      { desktopCols, mobileCols, baseRows, themeName, title: options.title, skipOgImage: true }
     );
 
     log("Uploading...");
 
-    const result = await uploadHtml(htmlDesktop, htmlMobile, ogImage);
+    const result = await uploadHtml(htmlDesktop, htmlMobile);
 
     log(`\nPreview URL: ${result.url}`);
     log(formatPreviewExpiry(result.expiresInDays));
@@ -1175,6 +1179,29 @@ async function runWebMode(
       await openInBrowser(result.url);
     }
 
+    // Generate and upload OG image in the background after URL is printed.
+    // The URL is already available — this just adds social media previews.
+    // Hard cap at 8s to prevent the process hanging after URL output.
+    const ogUpload = (async () => {
+      try {
+        const { renderDiffToOgImage } = await import("./image.js");
+        const ogImg = await renderDiffToOgImage(diffContent, {
+          themeName: "github-light",
+          stabilizeMs: 100,
+        });
+        if (ogImg) {
+          await uploadOgImage(result.id, ogImg);
+        }
+      } catch {
+        // OG image generation failed — not critical, skip silently
+      }
+    })();
+
+    // Wait for OG upload with a hard timeout so the process always exits
+    await Promise.race([
+      ogUpload,
+      new Promise<void>(resolve => setTimeout(resolve, 8000)),
+    ]);
     process.exit(0);
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
