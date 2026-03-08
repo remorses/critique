@@ -1,21 +1,26 @@
 # 0.1.121
 
-- `--web` performance (~2x faster URL delivery):
-  - Replace fixed stabilization timeout with idle+max model: exits when tree-sitter is idle for 80ms or hard cap at 400ms, with 20ms polling granularity (was a flat 500ms wait)
-  - Parallelize desktop, mobile, and OG image renders in `Promise.all` instead of running OG image sequentially before HTML renders
-  - Upload HTML immediately without waiting for OG image — URL is printed as soon as HTML upload completes
-  - Generate and upload OG image in the background via new `PATCH /upload/:id/og` worker endpoint after URL is printed
-  - OG meta tags injected at POST time with deterministic `/og/{id}.png` URL, so PATCH only stores binary (no HTML read-modify-write race)
-  - Background OG upload bounded by `AbortSignal.timeout(5s)` + process-level `Promise.race(8s)` to prevent hanging
-  - Thread `stabilizeMs` option through `CaptureOptions`, `captureResponsiveHtml`, `captureReviewResponsiveHtml`, and `renderDiffToOgImage`
-  - Before: ~3100ms total (URL printed after ~3100ms). After: ~1100ms to URL, ~1500ms total
+1. **`--web` is now ~2x faster** — URL is printed in ~1.1s instead of ~3.1s:
 
-# 0.1.120
+   Desktop HTML, mobile HTML, and OG image now render in parallel. The URL is returned as soon as the HTML upload completes; the OG image uploads in the background so social previews appear seconds later without delaying the URL output.
 
-- Text selection copy (`critique`, `critique review`):
-  - Improve copy-on-selection hook to skip clipboard writes while a drag is still active (`selection.isDragging` guard)
-  - Keep macOS native copy path via `pbcopy`, with fallback to OpenTUI's built-in `renderer.copyToClipboardOSC52()` utility
-  - Align Node API usage with project rules by switching `child_process` import to namespace style
+2. **New syntax highlighting aliases** — more file extensions get proper highlighting:
+   - `.jsonc`, `.json5` → JSON
+   - `.mkd`, `.mkdn`, `.mdown`, `.markdown` → Markdown
+   - `.scss`, `.less` → CSS
+   - `.xhtml`, `.xml`, `.svg` → HTML
+   - `.hh`, `.tpp`, `.ipp`, `.inl` → C++
+   - `.ksh` → Bash
+
+3. **Click filename in web preview to copy path** — clicking a file header in `critique --web` pages now copies the full filename to clipboard and updates the URL hash for deep linking. Cursor changes to `copy` to hint at the behavior.
+
+4. **`--commit` now accepts range syntax** — `critique --commit HEAD~2..HEAD` or `HEAD~2...HEAD` now works correctly (previously it was silently mishandled by `git show`):
+   ```bash
+   critique --commit HEAD~2..HEAD
+   critique --commit main..feature-branch
+   ```
+
+5. **Fixed iOS Safari pinch-to-zoom widget drift** — the annotation widget on `critique.work` pages no longer drifts when users pinch-to-zoom on iOS Safari. Uses the `visualViewport` API to apply a counter-transform that keeps the widget anchored to the bottom-right corner.
 
 # 0.1.119
 
