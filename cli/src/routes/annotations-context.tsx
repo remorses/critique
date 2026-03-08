@@ -41,7 +41,7 @@ function generateMarkdown(
   let output = `## Page Feedback: ${diffUrl}\n\n`
 
   for (let i = 0; i < annotations.length; i++) {
-    const a = annotations[i]
+    const a = annotations[i]!
     output += `### ${i + 1}. ${a.element || a.elementPath}\n`
     if (a.elementPath) {
       output += `**Location:** ${a.elementPath}\n`

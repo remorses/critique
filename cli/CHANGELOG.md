@@ -1,3 +1,13 @@
+# 0.1.122
+
+1. **Deterministic syntax highlighting detection** — `--web` no longer polls for tree-sitter completion with arbitrary timeouts. Uses `DiffRenderable.isHighlighting` to detect exactly when highlighting finishes, then waits for one render stabilization pass. Exits the instant tree-sitter is done instead of always waiting a fixed 500ms.
+
+2. **Fixed accidental clipboard copy during text drag** — selecting text in the TUI no longer copies to clipboard mid-drag. Clipboard copy only fires on mouse-up after the selection is complete (`isDragging` check).
+
+3. **Clipboard OSC52 fallback uses renderer API** — the OSC52 clipboard escape sequence (used over SSH) now goes through `renderer.copyToClipboardOSC52()` instead of writing directly to stdout, which is more reliable with the rendering pipeline.
+
+4. **Updated @opentuah/core and @opentuah/react to 0.1.97**
+
 # 0.1.121
 
 1. **`--web` is now ~2x faster** — URL is printed in ~1.1s instead of ~3.1s:

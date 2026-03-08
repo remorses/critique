@@ -1187,7 +1187,7 @@ async function runWebMode(
         const { renderDiffToOgImage } = await import("./image.js");
         const ogImg = await renderDiffToOgImage(diffContent, {
           themeName: "github-light",
-          stabilizeMs: 100,
+          stabilizeMs: 2000,
         });
         if (ogImg) {
           await uploadOgImage(result.id, ogImg);

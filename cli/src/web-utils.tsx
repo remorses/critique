@@ -9,6 +9,7 @@ import { tmpdir } from "os"
 import { join } from "path"
 import { getResolvedTheme, rgbaToHex } from "./themes.js"
 import type { BoxRenderable, CapturedFrame, CapturedLine, RootRenderable, CliRenderer } from "@opentuah/core"
+import { DiffRenderable } from "@opentuah/core"
 import type { IndexedHunk, ReviewYaml } from "./review/types.js"
 import { loadStoredLicenseKey, loadOrCreateOwnerSecret } from "./license.js"
 
@@ -93,43 +94,80 @@ function getContentHeight(root: RootRenderable): number {
 }
 
 /**
- * Wait for async rendering (tree-sitter highlighting etc.) to stabilize.
- *
- * Uses an idle+max model:
- * - Exits when no render requests for `idleMs` (tree-sitter is done)
- * - Hard cap at `maxMs` to prevent unbounded waits on huge diffs
- * - Polls at `pollMs` granularity (finer than the idle threshold)
- *
- * The old approach used a single `stabilizeMs` with 100ms polling, which
- * meant stabilizeMs=100 gave only one polling window and could miss late
- * highlights, while stabilizeMs=500 was wastefully slow for small diffs.
+ * Find all DiffRenderable instances in the renderer tree.
+ * Walks the tree recursively checking instanceof DiffRenderable.
  */
-async function waitForRenderStabilization(
+function findDiffRenderables(root: RootRenderable): InstanceType<typeof DiffRenderable>[] {
+  const results: InstanceType<typeof DiffRenderable>[] = []
+
+  function walk(node: { getChildren?: () => any[] }) {
+    if (!node.getChildren) return
+    for (const child of node.getChildren()) {
+      if (child instanceof DiffRenderable) {
+        results.push(child)
+      }
+      walk(child)
+    }
+  }
+
+  walk(root)
+  return results
+}
+
+/**
+ * Wait for tree-sitter syntax highlighting to complete on all diff elements,
+ * then wait for rendering to stabilize (no more requestRender calls).
+ *
+ * Two-phase approach:
+ * 1. Wait for DiffRenderable.isHighlighting to become false on all diffs
+ *    (deterministic, exits as soon as tree-sitter is done)
+ * 2. Wait for render idle — no new requestRender calls for idleMs
+ *    (catches deferred rebuilds like DiffRenderable.requestRebuild which
+ *    uses queueMicrotask to schedule buildView + requestRender after
+ *    highlighting completes)
+ *
+ * Phase 2 is critical because DiffRenderable's split view rebuild happens
+ * asynchronously via microtask AFTER isHighlighting goes false. Without it,
+ * the captured frame may have concealed (unhighlighted) content on one side.
+ */
+async function waitForHighlightAndRenderStabilization(
   renderer: CliRenderer,
   renderOnce: () => Promise<void>,
-  stabilizeMs: number = 500
+  maxMs: number = 2000
 ): Promise<void> {
-  // Derive idle/max from the legacy parameter:
-  // - Interactive TUI (500ms): idleMs=200, maxMs=800
-  // - Web/batch (100ms):       idleMs=80,  maxMs=400
-  const idleMs = Math.max(Math.round(stabilizeMs * 0.4), 60)
-  const maxMs = Math.max(stabilizeMs, Math.round(stabilizeMs * 4))
+  const startTime = Date.now()
   const pollMs = 20
+  const idleMs = 80
 
+  // Track render requests to detect when rendering has quiesced
   let lastRenderTime = Date.now()
-  const startTime = lastRenderTime
   const originalRequestRender = renderer.root.requestRender.bind(renderer.root)
   renderer.root.requestRender = function() {
     lastRenderTime = Date.now()
     originalRequestRender()
   }
 
-  while (true) {
+  // Do one render cycle to kick off highlighting
+  await renderOnce()
+
+  // Phase 1: wait for isHighlighting to become false on all diffs
+  while (Date.now() - startTime < maxMs) {
+    const diffs = findDiffRenderables(renderer.root)
+    if (diffs.length === 0 || diffs.every(d => !d.isHighlighting)) {
+      break
+    }
+    await new Promise(resolve => setTimeout(resolve, pollMs))
+    await renderOnce()
+  }
+
+  // Phase 2: wait for render to stabilize (catches deferred rebuilds)
+  // Reset the render timestamp so we wait for any post-highlight renders
+  lastRenderTime = Date.now()
+  await renderOnce()
+
+  while (Date.now() - startTime < maxMs) {
     const now = Date.now()
-    // Exit if idle long enough (no render requests for idleMs)
     if (now - lastRenderTime >= idleMs) break
-    // Exit if hard cap reached
-    if (now - startTime >= maxMs) break
     await new Promise(resolve => setTimeout(resolve, pollMs))
     await renderOnce()
   }
@@ -315,8 +353,8 @@ async function renderDiffToFrameWithSectionPositions(
     await renderOnce()
   }
   
-  // Wait for async highlighting to complete (only once at the end)
-  await waitForRenderStabilization(renderer, renderOnce, options.stabilizeMs ?? 500)
+  // Wait for tree-sitter highlighting + render stabilization
+  await waitForHighlightAndRenderStabilization(renderer, renderOnce, options.stabilizeMs ?? 2000)
 
   const sectionPositions: FileSectionPosition[] = []
   for (let idx = 0; idx < fileNames.length; idx++) {
@@ -585,7 +623,9 @@ export async function captureResponsiveHtml(
   // These act as upper bounds to prevent runaway memory usage
   const desktopRows = Math.max(options.baseRows * 3, 5000)
   const mobileRows = Math.max(Math.ceil(desktopRows * (options.desktopCols / options.mobileCols)), 10000)
-  const stabilizeMs = options.stabilizeMs ?? 100
+  // With deterministic isHighlighting detection, stabilizeMs is just a safety cap.
+  // The function exits instantly when highlighting completes, so 2000ms is fine.
+  const stabilizeMs = options.stabilizeMs ?? 2000
 
   // Run all renders in parallel: desktop HTML, mobile HTML, and OG image
   const ogImagePromise = options.skipOgImage
@@ -725,8 +765,8 @@ export async function renderReviewToFrame(
     await renderOnce()
   }
   
-  // Wait for async highlighting to complete (only once at the end)
-  await waitForRenderStabilization(renderer, renderOnce, options.stabilizeMs ?? 500)
+  // Wait for tree-sitter highlighting + render stabilization
+  await waitForHighlightAndRenderStabilization(renderer, renderOnce, options.stabilizeMs ?? 2000)
 
   // Capture the final frame
   const buffer = renderer.currentRenderBuffer
@@ -792,7 +832,7 @@ export async function captureReviewResponsiveHtml(
   // These act as upper bounds to prevent runaway memory usage
   const desktopRows = Math.max(options.baseRows * 3, 5000)
   const mobileRows = Math.max(Math.ceil(desktopRows * (options.desktopCols / options.mobileCols)), 10000)
-  const stabilizeMs = options.stabilizeMs ?? 100
+  const stabilizeMs = options.stabilizeMs ?? 2000
 
   // Generate OG image from first few hunks' raw diff (in parallel with HTML renders)
   const ogImagePromise = options.skipOgImage

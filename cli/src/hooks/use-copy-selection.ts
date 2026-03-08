@@ -3,13 +3,13 @@
 // Uses native clipboard commands (pbcopy, xclip, etc.) with OSC52 fallback.
 
 import { useRenderer } from "@opentuah/react"
-import { spawn } from "child_process"
+import childProcess from "child_process"
 
 /**
  * Copy text to system clipboard using native commands.
  * Falls back to OSC52 escape sequence for terminal clipboard (works over SSH).
  */
-async function copyToClipboard(text: string): Promise<void> {
+async function copyToClipboard(text: string, copyOsc52: (value: string) => boolean): Promise<void> {
   const platform = process.platform
 
   // Try native clipboard commands
@@ -57,9 +57,8 @@ async function copyToClipboard(text: string): Promise<void> {
     // Native clipboard failed, fall through to OSC52
   }
 
-  // Fallback: OSC52 escape sequence (works in many terminals, including over SSH)
-  const encoded = Buffer.from(text).toString("base64")
-  process.stdout.write(`\x1b]52;c;${encoded}\x07`)
+  // Fallback: renderer OSC52 utility (works in many terminals, including over SSH)
+  copyOsc52(text)
 }
 
 /**
@@ -67,7 +66,7 @@ async function copyToClipboard(text: string): Promise<void> {
  */
 function spawnClipboard(cmd: string, args: string[], text: string): Promise<void> {
   return new Promise((resolve, reject) => {
-    const proc = spawn(cmd, args, { stdio: ["pipe", "ignore", "ignore"] })
+    const proc = childProcess.spawn(cmd, args, { stdio: ["pipe", "ignore", "ignore"] })
 
     proc.on("error", reject)
     proc.on("close", (code) => {
@@ -115,12 +114,13 @@ export function useCopySelection(): CopySelectionHandlers {
   const onMouseUp = async () => {
     const selection = renderer.getSelection()
     if (!selection) return
+    if (selection.isDragging) return
 
     const text = selection.getSelectedText()
     if (!text || text.length === 0) return
 
     try {
-      await copyToClipboard(text)
+      await copyToClipboard(text, (value) => renderer.copyToClipboardOSC52(value))
     } catch {
       // Silent fail - user can manually copy if needed
     }
