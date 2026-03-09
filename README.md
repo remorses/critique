@@ -280,6 +280,9 @@ curl https://critique.work/v/b8faf4362c247bfc46f5098a028e00f0.patch
 
 # Apply the patch directly to your repo
 curl -s https://critique.work/v/b8faf4362c247bfc46f5098a028e00f0.patch | git apply
+
+# Reverse the patch (undo the changes)
+curl -s https://critique.work/v/b8faf4362c247bfc46f5098a028e00f0.patch | git apply --reverse
 ```
 
 This makes critique URLs useful for programmatic tools — share the HTML link for humans, use the `.patch` URL for machines.
