@@ -84,7 +84,7 @@ Use critique as a custom pager in [lazygit](https://github.com/jesseduffield/laz
 # ~/.config/lazygit/config.yml
 git:
   pagers:
-    pager: critique --stdin
+    - pager: critique --stdin
 ```
 
 For more details, see [lazygit's Custom Pagers documentation](https://github.com/jesseduffield/lazygit/blob/master/docs/Custom_Pagers.md).
