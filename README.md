@@ -270,6 +270,20 @@ critique web --title "Fix authentication bug"
 4. Uploads to [critique.work](https://critique.work) (Cloudflare Worker + KV storage)
 5. Returns a shareable URL that expires after 7 days
 
+**Raw Patch Access:**
+
+Every uploaded diff is also available as a raw unified diff (patch) by appending `.patch` to the URL:
+
+```bash
+# View the patch in your terminal
+curl https://critique.work/v/b8faf4362c247bfc46f5098a028e00f0.patch
+
+# Apply the patch directly to your repo
+curl -s https://critique.work/v/b8faf4362c247bfc46f5098a028e00f0.patch | git apply
+```
+
+This makes critique URLs useful for programmatic tools — share the HTML link for humans, use the `.patch` URL for machines.
+
 **Tips:**
 
 - The URL is based on a SHA-256 hash of the content, so identical diffs produce the same URL (deduplication)

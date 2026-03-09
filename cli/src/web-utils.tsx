@@ -885,7 +885,8 @@ export async function captureReviewResponsiveHtml(
 export async function uploadHtml(
   htmlDesktop: string,
   htmlMobile: string,
-  ogImage?: Buffer | null
+  ogImage?: Buffer | null,
+  patch?: string,
 ): Promise<UploadResult> {
   const body: Record<string, string> = { 
     html: htmlDesktop, 
@@ -895,6 +896,11 @@ export async function uploadHtml(
   // Include OG image as base64 if provided
   if (ogImage) {
     body.ogImage = ogImage.toString("base64")
+  }
+
+  // Include raw unified diff (patch) for programmatic access
+  if (patch) {
+    body.patch = patch
   }
 
   const licenseKey = loadStoredLicenseKey()

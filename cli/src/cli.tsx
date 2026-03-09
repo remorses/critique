@@ -1156,7 +1156,7 @@ async function runWebMode(
 
     log("Uploading...");
 
-    const result = await uploadHtml(htmlDesktop, htmlMobile);
+    const result = await uploadHtml(htmlDesktop, htmlMobile, undefined, diffContent);
 
     log(`\nPreview URL: ${result.url}`);
     log(formatPreviewExpiry(result.expiresInDays));
