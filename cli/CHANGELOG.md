@@ -1,3 +1,20 @@
+# 0.1.123
+
+1. **Raw patch access via `.patch` URL** — every diff uploaded with `critique --web` is now also available as a raw unified diff by appending `.patch` to the URL:
+
+   ```bash
+   # View the raw patch
+   curl https://critique.work/v/<id>.patch
+
+   # Apply the changes directly
+   curl -s https://critique.work/v/<id>.patch | git apply
+
+   # Undo the changes
+   curl -s https://critique.work/v/<id>.patch | git apply --reverse
+   ```
+
+   Useful for agents and scripts that need to programmatically consume or apply diffs shared as critique URLs — share the HTML link for humans, use the `.patch` URL for machines.
+
 # 0.1.122
 
 1. **Deterministic syntax highlighting detection** — `--web` no longer polls for tree-sitter completion with arbitrary timeouts. Uses `DiffRenderable.isHighlighting` to detect exactly when highlighting finishes, then waits for one render stabilization pass. Exits the instant tree-sitter is done instead of always waiting a fixed 500ms.
