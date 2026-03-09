@@ -200,6 +200,14 @@ class CritiqueKv {
     await this.kv.put(`${id}-mobile`, html, ttlSeconds ? { expirationTtl: ttlSeconds } : undefined)
   }
 
+  async getPatch(id: string): Promise<string | null> {
+    return this.kv.get(`${id}-patch`)
+  }
+
+  async setPatch(id: string, patch: string, ttlSeconds?: number): Promise<void> {
+    await this.kv.put(`${id}-patch`, patch, ttlSeconds ? { expirationTtl: ttlSeconds } : undefined)
+  }
+
   async getOgImage(id: string): Promise<ArrayBuffer | null> {
     return this.kv.get(`og-${id}`, "arrayBuffer")
   }
@@ -245,6 +253,7 @@ class CritiqueKv {
     await Promise.all([
       this.kv.delete(id),
       this.kv.delete(`${id}-mobile`),
+      this.kv.delete(`${id}-patch`),
       this.kv.delete(`og-${id}`),
       this.kv.delete(`owner:${id}`),
     ])
@@ -376,7 +385,7 @@ function extractTitle(html: string): string {
 app.post("/upload", async (c) => {
   try {
     const kv = new CritiqueKv(c.env.CRITIQUE_KV)
-    const body = await c.req.json<{ html: string; htmlMobile?: string; ogImage?: string }>()
+    const body = await c.req.json<{ html: string; htmlMobile?: string; ogImage?: string; patch?: string }>()
 
     if (!body.html || typeof body.html !== "string") {
       return c.json({ error: "Missing or invalid 'html' field" }, 400)
@@ -431,6 +440,11 @@ app.post("/upload", async (c) => {
     // Store mobile version if provided
     if (htmlMobile && typeof htmlMobile === "string") {
       await kv.setMobileHtml(id, htmlMobile, ttlSeconds)
+    }
+
+    // Store raw patch (unified diff) if provided
+    if (body.patch && typeof body.patch === "string") {
+      await kv.setPatch(id, body.patch, ttlSeconds)
     }
 
     const viewUrl = `${url.origin}/v/${id}`
@@ -778,6 +792,33 @@ async function handleView(c: any) {
     }
   })
 }
+
+// Serve raw patch (unified diff) as text/plain
+// GET /v/:id.patch — same URL as HTML view but with .patch extension
+// Uses regex constraint {[^./]+} so :id only matches hex chars (no dots),
+// and the literal .patch suffix is required — without this, Hono treats
+// ":id.patch" as a single param name that catches all /v/:id requests.
+app.get("/v/:id{[^./]+}.patch", async (c) => {
+  const id = c.req.param("id")
+
+  const kv = new CritiqueKv(c.env.CRITIQUE_KV)
+
+  if (!id || !/^[a-f0-9]{16,32}$/.test(id)) {
+    return c.text("Invalid ID", 400)
+  }
+
+  const patch = await kv.getPatch(id)
+
+  if (!patch) {
+    return c.text("Not found", 404)
+  }
+
+  return c.text(patch, 200, {
+    "Content-Type": "text/plain; charset=utf-8",
+    "Content-Disposition": `inline; filename="${id}.patch"`,
+    "Cache-Control": "public, max-age=86400",
+  })
+})
 
 app.get("/v/:id", handleView)
 app.get("/view/:id", handleView)
