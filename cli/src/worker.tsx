@@ -719,9 +719,27 @@ app.post("/stripe/webhook", async (c) => {
 // Query params: ?v=desktop or ?v=mobile to select version
 // Server redirects mobile devices to ?v=mobile, client JS also handles redirect
 async function handleView(c: any) {
-  const id = c.req.param("id")
+  let id: string = c.req.param("id") || ""
 
   const kv = new CritiqueKv(c.env.CRITIQUE_KV)
+
+  // Serve raw patch (unified diff) when URL ends with .patch
+  // e.g. /v/abc123.patch → strips suffix, returns text/plain
+  if (id.endsWith(".patch")) {
+    id = id.slice(0, -".patch".length)
+    if (!id || !/^[a-f0-9]{16,32}$/.test(id)) {
+      return c.text("Invalid ID", 400)
+    }
+    const patch = await kv.getPatch(id)
+    if (!patch) {
+      return c.text("Not found", 404)
+    }
+    return c.text(patch, 200, {
+      "Content-Type": "text/plain; charset=utf-8",
+      "Content-Disposition": `inline; filename="${id}.patch"`,
+      "Cache-Control": "public, max-age=86400",
+    })
+  }
 
   if (!id || !/^[a-f0-9]{16,32}$/.test(id)) {
     return c.text("Invalid ID", 400)
@@ -792,33 +810,6 @@ async function handleView(c: any) {
     }
   })
 }
-
-// Serve raw patch (unified diff) as text/plain
-// GET /v/:id.patch — same URL as HTML view but with .patch extension
-// Uses regex constraint {[^./]+} so :id only matches hex chars (no dots),
-// and the literal .patch suffix is required — without this, Hono treats
-// ":id.patch" as a single param name that catches all /v/:id requests.
-app.get("/v/:id{[^./]+}.patch", async (c) => {
-  const id = c.req.param("id")
-
-  const kv = new CritiqueKv(c.env.CRITIQUE_KV)
-
-  if (!id || !/^[a-f0-9]{16,32}$/.test(id)) {
-    return c.text("Invalid ID", 400)
-  }
-
-  const patch = await kv.getPatch(id)
-
-  if (!patch) {
-    return c.text("Not found", 404)
-  }
-
-  return c.text(patch, 200, {
-    "Content-Type": "text/plain; charset=utf-8",
-    "Content-Disposition": `inline; filename="${id}.patch"`,
-    "Cache-Control": "public, max-age=86400",
-  })
-})
 
 app.get("/v/:id", handleView)
 app.get("/view/:id", handleView)
