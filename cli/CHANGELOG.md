@@ -1,3 +1,26 @@
+# 0.1.125
+
+- Worker KV storage (`POST /upload`, `PATCH /upload/:id/og`, `GET /og/:id.png`):
+  - Enable OG PNG gzip-at-rest in KV by default (`COMPRESS_OG_IMAGE_IN_KV = true`)
+  - Keep metadata-aware decode on reads so served OG images remain byte-correct PNG responses
+- Preview verification tests:
+  - Add `src/worker.preview-upload.e2e.test.ts` to validate preview upload + read endpoints end-to-end (`/upload`, `/raw/:id`, `/v/:id`, `/og/:id.png`, `DELETE /v/:id`)
+  - Add `test:preview-upload` script for running the preview smoke test directly
+
+# 0.1.124
+
+- KV storage + web preview upload (`critique --web`, `critique review --web`):
+  - Store desktop/mobile HTML gzipped in KV with metadata (`contentType`, `contentEncoding`, `schemaVersion`) to reduce at-rest storage size
+  - Keep read compatibility with legacy uncompressed KV entries
+- Worker serving (`GET /v/:id`, `GET /raw/:id`, `HEAD /v/:id`):
+  - Decode metadata-marked gzip HTML before response rendering and widget injection
+  - Compute `Content-Length` from UTF-8 byte length for accurate HEAD responses
+- Worker OG image path (`GET /og/:id.png`):
+  - Add metadata-aware binary decode path so OG entries can be compressed in a future rollout without breaking reads
+  - Keep OG-at-rest compression disabled by default for now (`COMPRESS_OG_IMAGE_IN_KV = false`)
+- Tests:
+  - Add `src/kv-codec.test.ts` covering gzip text/binary round-trips, legacy uncompressed decoding, and KV put-option metadata generation
+
 # 0.1.123
 
 1. **Raw patch access via `.patch` URL** — every diff uploaded with `critique --web` is now also available as a raw unified diff by appending `.patch` to the URL:

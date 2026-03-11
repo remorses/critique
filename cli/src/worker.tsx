@@ -13,6 +13,15 @@ import { Resend } from "resend"
 import { agentationApi } from "./agentation-api.js"
 import { annotationsContextRoute } from "./routes/annotations-context.js"
 import { version as pkgVersion } from "../package.json"
+import {
+  buildKvPutOptions,
+  decodeBinaryFromKv,
+  decodeTextFromKv,
+  gzipArrayBuffer,
+  gzipText,
+  KV_SCHEMA_VERSION,
+  type KvValueMetadata,
+} from "./kv-codec.js"
 
 // Re-export CommentRoom so wrangler can discover the Durable Object class
 export { CommentRoom } from "@critique.work/server"
@@ -41,6 +50,9 @@ const SEVEN_DAYS = 60 * 60 * 24 * 7
 const LICENSE_HEADER = "X-Critique-License"
 const OWNER_SECRET_HEADER = "X-Critique-Owner-Secret"
 const STRIPE_YEARLY_PRICE_ID = "price_1Su9CZBekrVyz93iMIEnjPOk"
+const HTML_CONTENT_TYPE = "text/html; charset=utf-8"
+const OG_IMAGE_CONTENT_TYPE = "image/png"
+const COMPRESS_OG_IMAGE_IN_KV = true
 
 // Favicon PNGs (32x32) - dark (white icon for dark bg) and light (black icon for light bg)
 const FAVICON_DARK_BASE64 = "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAACXBIWXMAAAsTAAALEwEAmpwYAAAA8ElEQVR4nO2WPwrCMBhHSxVBvIR4CsHFQXsGt6KjJyiouOosOLgI7s4OjtrjODv450lLSjPFtjZRbB/8hi9pksdHCrGskgQAV95zAQaWDkjOHRjpEOgAPUX6gC8knsA4d4l3AA3gKHVj+slmfoq236LDgDpwkOZmWQWysBBra8BeGl+aEpAlKsCOmDVgmxAImEsSW2JWpgRkCRvYhCPwMCkQMBF7dcMKyFNgKKLiplOgKaLk7wRcoCVSFYlqtxACMsW8A2l/Q60Cifg7AUfxvWNCwFM8yTwTAqn5FYG2KK9fEcgEpQCcc2jCKVv/rYLxAsud37oBTmHeAAAAAElFTkSuQmCC"
@@ -184,20 +196,66 @@ class CritiqueKv {
     this.kv = kv
   }
 
+  private async getTextValue(key: string): Promise<string | null> {
+    const { value, metadata } = await this.kv.getWithMetadata<KvValueMetadata>(key, "arrayBuffer")
+    if (!value) return null
+    return decodeTextFromKv(value, metadata)
+  }
+
+  private async setCompressedTextValue(key: string, value: string, ttlSeconds?: number): Promise<void> {
+    const compressed = await gzipText(value)
+    await this.kv.put(
+      key,
+      compressed,
+      buildKvPutOptions(ttlSeconds, {
+        contentType: HTML_CONTENT_TYPE,
+        contentEncoding: "gzip",
+        schemaVersion: KV_SCHEMA_VERSION,
+      }),
+    )
+  }
+
+  private async getBinaryValue(key: string): Promise<ArrayBuffer | null> {
+    const { value, metadata } = await this.kv.getWithMetadata<KvValueMetadata>(key, "arrayBuffer")
+    if (!value) return null
+    return decodeBinaryFromKv(value, metadata)
+  }
+
+  private async setBinaryValue(
+    key: string,
+    bytes: ArrayBuffer,
+    contentType: string,
+    ttlSeconds?: number,
+    compress = false,
+  ): Promise<void> {
+    const metadata: KvValueMetadata = {
+      contentType,
+      schemaVersion: KV_SCHEMA_VERSION,
+    }
+
+    let valueToStore = bytes
+    if (compress) {
+      valueToStore = await gzipArrayBuffer(bytes)
+      metadata.contentEncoding = "gzip"
+    }
+
+    await this.kv.put(key, valueToStore, buildKvPutOptions(ttlSeconds, metadata))
+  }
+
   async getHtml(id: string): Promise<string | null> {
-    return this.kv.get(id)
+    return this.getTextValue(id)
   }
 
   async setHtml(id: string, html: string, ttlSeconds?: number): Promise<void> {
-    await this.kv.put(id, html, ttlSeconds ? { expirationTtl: ttlSeconds } : undefined)
+    await this.setCompressedTextValue(id, html, ttlSeconds)
   }
 
   async getMobileHtml(id: string): Promise<string | null> {
-    return this.kv.get(`${id}-mobile`)
+    return this.getTextValue(`${id}-mobile`)
   }
 
   async setMobileHtml(id: string, html: string, ttlSeconds?: number): Promise<void> {
-    await this.kv.put(`${id}-mobile`, html, ttlSeconds ? { expirationTtl: ttlSeconds } : undefined)
+    await this.setCompressedTextValue(`${id}-mobile`, html, ttlSeconds)
   }
 
   async getPatch(id: string): Promise<string | null> {
@@ -209,11 +267,17 @@ class CritiqueKv {
   }
 
   async getOgImage(id: string): Promise<ArrayBuffer | null> {
-    return this.kv.get(`og-${id}`, "arrayBuffer")
+    return this.getBinaryValue(`og-${id}`)
   }
 
   async setOgImage(id: string, bytes: ArrayBuffer, ttlSeconds?: number): Promise<void> {
-    await this.kv.put(`og-${id}`, bytes, ttlSeconds ? { expirationTtl: ttlSeconds } : undefined)
+    await this.setBinaryValue(
+      `og-${id}`,
+      bytes,
+      OG_IMAGE_CONTENT_TYPE,
+      ttlSeconds,
+      COMPRESS_OG_IMAGE_IN_KV,
+    )
   }
 
   async getLicense(key: string): Promise<LicenseRecord | null> {
@@ -915,7 +979,7 @@ async function handleHead(c: any) {
     return c.body(null, 404)
   }
 
-  c.header("Content-Length", String(html.length))
+  c.header("Content-Length", String(new TextEncoder().encode(html).byteLength))
   return c.body(null, 200)
 }
 
