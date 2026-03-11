@@ -1,3 +1,11 @@
+# 0.1.126
+
+- Worker KV storage (`POST /upload`, `GET /v/:id.patch`):
+  - Store unified diff patch payloads gzip-compressed in KV with metadata (`contentType: text/x-diff`, `contentEncoding: gzip`)
+  - Keep backward-compatible reads for legacy uncompressed patch entries via metadata-aware decode
+- Preview verification tests:
+  - Extend `src/worker.preview-upload.e2e.test.ts` to upload a patch and verify `/v/:id.patch` returns the original diff content
+
 # 0.1.125
 
 - Worker KV storage (`POST /upload`, `PATCH /upload/:id/og`, `GET /og/:id.png`):

@@ -32,6 +32,7 @@ describe("preview worker upload and reads", () => {
     const ownerSecret = `preview-owner-${randomHex(8)}`
     const desktopMarker = `desktop-${randomHex(6)}`
     const mobileMarker = `mobile-${randomHex(6)}`
+    const patchMarker = `patch-${randomHex(6)}`
     const inputOgBytes = Buffer.from(SAMPLE_PNG_BASE64, "base64")
 
     let uploadedId: string | null = null
@@ -47,6 +48,7 @@ describe("preview worker upload and reads", () => {
           html: `<html><head><title>${desktopMarker}</title></head><body>${desktopMarker}</body></html>`,
           htmlMobile: `<html><head><title>${mobileMarker}</title></head><body>${mobileMarker}</body></html>`,
           ogImage: SAMPLE_PNG_BASE64,
+          patch: `diff --git a/a.txt b/a.txt\n--- a/a.txt\n+++ b/a.txt\n@@ -1 +1 @@\n-${patchMarker}\n+${patchMarker}-updated\n`,
         }),
       })
 
@@ -84,6 +86,15 @@ describe("preview worker upload and reads", () => {
       expect(ogResponse.headers.get("Content-Type")).toBe("image/png")
       const servedOgBytes = Buffer.from(await ogResponse.arrayBuffer())
       expect(servedOgBytes).toEqual(inputOgBytes)
+
+      const patchResponse = await fetch(`${BASE_URL}/v/${id}.patch`, {
+        headers: { "Accept-Encoding": "identity" },
+      })
+      expect(patchResponse.status).toBe(200)
+      expect(patchResponse.headers.get("Content-Type")).toContain("text/plain")
+      const patchText = await patchResponse.text()
+      expect(patchText).toContain(patchMarker)
+      expect(patchText).toContain(`${patchMarker}-updated`)
 
       const deleteResponse = await fetch(`${BASE_URL}/v/${id}`, {
         method: "DELETE",

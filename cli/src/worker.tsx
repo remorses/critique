@@ -51,6 +51,7 @@ const LICENSE_HEADER = "X-Critique-License"
 const OWNER_SECRET_HEADER = "X-Critique-Owner-Secret"
 const STRIPE_YEARLY_PRICE_ID = "price_1Su9CZBekrVyz93iMIEnjPOk"
 const HTML_CONTENT_TYPE = "text/html; charset=utf-8"
+const PATCH_CONTENT_TYPE = "text/x-diff; charset=utf-8"
 const OG_IMAGE_CONTENT_TYPE = "image/png"
 const COMPRESS_OG_IMAGE_IN_KV = true
 
@@ -202,13 +203,18 @@ class CritiqueKv {
     return decodeTextFromKv(value, metadata)
   }
 
-  private async setCompressedTextValue(key: string, value: string, ttlSeconds?: number): Promise<void> {
+  private async setCompressedTextValue(
+    key: string,
+    value: string,
+    contentType: string,
+    ttlSeconds?: number,
+  ): Promise<void> {
     const compressed = await gzipText(value)
     await this.kv.put(
       key,
       compressed,
       buildKvPutOptions(ttlSeconds, {
-        contentType: HTML_CONTENT_TYPE,
+        contentType,
         contentEncoding: "gzip",
         schemaVersion: KV_SCHEMA_VERSION,
       }),
@@ -247,7 +253,7 @@ class CritiqueKv {
   }
 
   async setHtml(id: string, html: string, ttlSeconds?: number): Promise<void> {
-    await this.setCompressedTextValue(id, html, ttlSeconds)
+    await this.setCompressedTextValue(id, html, HTML_CONTENT_TYPE, ttlSeconds)
   }
 
   async getMobileHtml(id: string): Promise<string | null> {
@@ -255,15 +261,15 @@ class CritiqueKv {
   }
 
   async setMobileHtml(id: string, html: string, ttlSeconds?: number): Promise<void> {
-    await this.setCompressedTextValue(`${id}-mobile`, html, ttlSeconds)
+    await this.setCompressedTextValue(`${id}-mobile`, html, HTML_CONTENT_TYPE, ttlSeconds)
   }
 
   async getPatch(id: string): Promise<string | null> {
-    return this.kv.get(`${id}-patch`)
+    return this.getTextValue(`${id}-patch`)
   }
 
   async setPatch(id: string, patch: string, ttlSeconds?: number): Promise<void> {
-    await this.kv.put(`${id}-patch`, patch, ttlSeconds ? { expirationTtl: ttlSeconds } : undefined)
+    await this.setCompressedTextValue(`${id}-patch`, patch, PATCH_CONTENT_TYPE, ttlSeconds)
   }
 
   async getOgImage(id: string): Promise<ArrayBuffer | null> {
