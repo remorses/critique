@@ -1,44 +1,15 @@
 # 0.1.127
 
-- Web preview (`critique --web`):
-  - Render the same `DirectoryTreeView` component used in the TUI at the top of shared HTML pages
-  - Turn tree file rows into hash links (`href="#..."`) that jump to their matching file sections for quick navigation
-  - Keep anchor `id` attributes only on file section headers; tree index rows are links only (no IDs)
-  - Use a simple tree-row regex (`^\s*[│ ]*[├└]──\s+(.+?)\s+\([^)]*\)\s*$`) to detect file items in rendered tree lines
-  - Replace `React.createElement` usage in web capture rendering paths with JSX for consistency with the rest of the codebase
-- Tests:
-  - Add unit coverage for tree-row detection (`extractTreeFilePath`) and HTML link-injection behavior for tree rows
+1. **Directory tree index in web previews** — shared `critique --web` pages now render the same file tree shown in the TUI at the top of the page, with each file row linking directly to its diff section:
 
-# 0.1.126
+   ```bash
+   critique --web "My changes"
+   # → opens a page with a clickable tree index at the top
+   ```
 
-- Worker KV storage (`POST /upload`, `GET /v/:id.patch`):
-  - Store unified diff patch payloads gzip-compressed in KV with metadata (`contentType: text/x-diff`, `contentEncoding: gzip`)
-  - Keep backward-compatible reads for legacy uncompressed patch entries via metadata-aware decode
-- Preview verification tests:
-  - Extend `src/worker.preview-upload.e2e.test.ts` to upload a patch and verify `/v/:id.patch` returns the original diff content
+   Clicking a file in the tree jumps straight to that file's diff — useful for large PRs with many files.
 
-# 0.1.125
-
-- Worker KV storage (`POST /upload`, `PATCH /upload/:id/og`, `GET /og/:id.png`):
-  - Enable OG PNG gzip-at-rest in KV by default (`COMPRESS_OG_IMAGE_IN_KV = true`)
-  - Keep metadata-aware decode on reads so served OG images remain byte-correct PNG responses
-- Preview verification tests:
-  - Add `src/worker.preview-upload.e2e.test.ts` to validate preview upload + read endpoints end-to-end (`/upload`, `/raw/:id`, `/v/:id`, `/og/:id.png`, `DELETE /v/:id`)
-  - Add `test:preview-upload` script for running the preview smoke test directly
-
-# 0.1.124
-
-- KV storage + web preview upload (`critique --web`, `critique review --web`):
-  - Store desktop/mobile HTML gzipped in KV with metadata (`contentType`, `contentEncoding`, `schemaVersion`) to reduce at-rest storage size
-  - Keep read compatibility with legacy uncompressed KV entries
-- Worker serving (`GET /v/:id`, `GET /raw/:id`, `HEAD /v/:id`):
-  - Decode metadata-marked gzip HTML before response rendering and widget injection
-  - Compute `Content-Length` from UTF-8 byte length for accurate HEAD responses
-- Worker OG image path (`GET /og/:id.png`):
-  - Add metadata-aware binary decode path so OG entries can be compressed in a future rollout without breaking reads
-  - Keep OG-at-rest compression disabled by default for now (`COMPRESS_OG_IMAGE_IN_KV = false`)
-- Tests:
-  - Add `src/kv-codec.test.ts` covering gzip text/binary round-trips, legacy uncompressed decoding, and KV put-option metadata generation
+2. **Fixed `.patch` URL routing** — `GET /v/:id.patch` now works reliably. Previously the Hono route param could conflict and fail to route `.patch` requests correctly.
 
 # 0.1.123
 
