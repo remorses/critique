@@ -1,3 +1,14 @@
+# 0.1.127
+
+- Web preview (`critique --web`):
+  - Render the same `DirectoryTreeView` component used in the TUI at the top of shared HTML pages
+  - Turn tree file rows into hash links (`href="#..."`) that jump to their matching file sections for quick navigation
+  - Keep anchor `id` attributes only on file section headers; tree index rows are links only (no IDs)
+  - Use a simple tree-row regex (`^\s*[│ ]*[├└]──\s+(.+?)\s+\([^)]*\)\s*$`) to detect file items in rendered tree lines
+  - Replace `React.createElement` usage in web capture rendering paths with JSX for consistency with the rest of the codebase
+- Tests:
+  - Add unit coverage for tree-row detection (`extractTreeFilePath`) and HTML link-injection behavior for tree rows
+
 # 0.1.126
 
 - Worker KV storage (`POST /upload`, `GET /v/:id.patch`):

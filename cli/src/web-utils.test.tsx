@@ -1,10 +1,9 @@
 import { describe, test, expect, afterEach } from "bun:test"
 import { createTestRenderer } from "@opentuah/core/testing"
 import { createRoot } from "@opentuah/react"
-import React from "react"
 import { RGBA } from "@opentuah/core"
 import type { CapturedFrame, CapturedLine, CapturedSpan } from "@opentuah/core"
-import { slugifyFileName, buildAnchorMap, extractLineNumber } from "./web-utils.js"
+import { slugifyFileName, buildAnchorMap, extractLineNumber, extractTreeFilePath } from "./web-utils.js"
 import { frameToHtml, frameToHtmlDocument } from "./ansi-html.js"
 
 describe("getSpanLines rendering", () => {
@@ -21,14 +20,16 @@ describe("getSpanLines rendering", () => {
     const { renderOnce } = setup
 
     function App() {
-      return React.createElement("box", { style: { flexDirection: "column" } },
-        React.createElement("text", { content: "├── src/errors" }),
-        React.createElement("text", { content: "│   └── index.ts" }),
-        React.createElement("text", { content: "└── api" }),
+      return (
+        <box style={{ flexDirection: "column" }}>
+          <text content="├── src/errors" />
+          <text content="│   └── index.ts" />
+          <text content="└── api" />
+        </box>
       )
     }
 
-    createRoot(renderer).render(React.createElement(App))
+    createRoot(renderer).render(<App />)
 
     for (let i = 0; i < 5; i++) {
       await renderOnce()
@@ -51,10 +52,10 @@ describe("getSpanLines rendering", () => {
     const { renderOnce } = setup
 
     function App() {
-      return React.createElement("text", { content: "src/errors/index.ts" })
+      return <text content="src/errors/index.ts" />
     }
 
-    createRoot(renderer).render(React.createElement(App))
+    createRoot(renderer).render(<App />)
 
     for (let i = 0; i < 5; i++) {
       await renderOnce()
@@ -285,6 +286,19 @@ describe("extractLineNumber", () => {
   })
 })
 
+describe("extractTreeFilePath", () => {
+  test("matches tree file rows with change stats", () => {
+    expect(extractTreeFilePath("│   ├── index.ts (+5,-2)")).toBe("index.ts")
+    expect(extractTreeFilePath("└── README.md (-15)")).toBe("README.md")
+    expect(extractTreeFilePath("│   └── utils.ts (+30)")).toBe("utils.ts")
+  })
+
+  test("does not match directory rows", () => {
+    expect(extractTreeFilePath("└── src")).toBe(null)
+    expect(extractTreeFilePath("│   ├── components")).toBe(null)
+  })
+})
+
 describe("data-anchor in rendered HTML", () => {
   test("injects data-anchor with file and line number", () => {
     // Simulate a frame with a file header line and diff lines
@@ -368,6 +382,54 @@ describe("data-anchor in rendered HTML", () => {
 
     // Quotes should be escaped in the attribute
     expect(html).toContain('data-anchor="src/&quot;quoted&quot;.ts:5"')
+  })
+})
+
+describe("tree links in rendered HTML", () => {
+  test("adds href links to tree file rows without ids", () => {
+    const frame: CapturedFrame = {
+      cols: 80,
+      rows: 3,
+      cursor: [0, 0],
+      lines: [
+        { spans: [mockSpan("└── src")] },
+        { spans: [mockSpan("    └── "), mockSpan("foo.ts"), mockSpan(" (+2,-1)")] },
+        { spans: [mockSpan("src/foo.ts")] },
+      ],
+    }
+
+    let treeLinkPtr = 0
+    const treeAnchorOrder = ["src-foo-ts"]
+
+    const { html } = frameToHtml(frame, {
+      renderLine: (defaultHtml, line, lineIndex) => {
+        let out = defaultHtml
+
+        if (lineIndex < 2 && treeLinkPtr < treeAnchorOrder.length) {
+          const treePath = extractTreeFilePath(line.spans.map((span) => span.text).join(""))
+          if (treePath) {
+            const targetAnchor = treeAnchorOrder[treeLinkPtr]
+            treeLinkPtr++
+            out = out.replace(
+              `>${treePath}</span>`,
+              `><a href="#${targetAnchor}" class="tree-file-link">${treePath}</a></span>`,
+            )
+          }
+        }
+
+        if (lineIndex === 2) {
+          out = out.replace('<div class="line">', '<div id="src-foo-ts" class="line file-section">')
+        }
+
+        return out
+      },
+    })
+
+    const htmlLines = html.split("\n")
+    expect(htmlLines[1]).toContain('href="#src-foo-ts"')
+    expect(htmlLines[1]).toContain('class="tree-file-link"')
+    expect(htmlLines[1]).not.toContain('id="src-foo-ts"')
+    expect(htmlLines[2]).toContain('id="src-foo-ts"')
   })
 })
 

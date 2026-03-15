@@ -8,6 +8,7 @@ import fs from "fs"
 import { tmpdir } from "os"
 import { join } from "path"
 import { getResolvedTheme, rgbaToHex } from "./themes.js"
+import { buildDirectoryTree } from "./directory-tree.js"
 import type { BoxRenderable, CapturedFrame, CapturedLine, RootRenderable, CliRenderer } from "@opentuah/core"
 import { DiffRenderable } from "@opentuah/core"
 import type { IndexedHunk, ReviewYaml } from "./review/types.js"
@@ -176,11 +177,13 @@ async function waitForHighlightAndRenderStabilization(
 interface FileSectionPosition {
   lineIndex: number
   fileName: string
+  fileIndex: number
 }
 
 interface RenderDiffFrameResult {
   frame: CapturedFrame
   sectionPositions: FileSectionPosition[]
+  treeFileOrder: number[]
 }
 
 /**
@@ -195,18 +198,18 @@ async function renderDiffToFrameWithSectionPositions(
   const { createTestRenderer } = await import("@opentuah/core/testing")
   const { createRoot } = await import("@opentuah/react")
   const { getTreeSitterClient } = await import("@opentuah/core")
-  const React = await import("react")
   const { parsePatch, formatPatch } = await import("diff")
   
   // Pre-initialize TreeSitter client to ensure syntax highlighting works
   const tsClient = getTreeSitterClient()
   await tsClient.initialize()
   
-  const { DiffView } = await import("./components/index.js")
+  const { DiffView, DirectoryTreeView } = await import("./components/index.js")
   const {
     getFileName,
     getOldFileName,
     countChanges,
+    getFileStatus,
     getViewMode,
     processFiles,
     detectFiletype,
@@ -223,6 +226,19 @@ async function renderDiffToFrameWithSectionPositions(
   const files = parseGitDiffFiles(stripSubmoduleHeaders(diffContent), parsePatch)
   const filesWithRawDiff = processFiles(files, formatPatch)
   const fileNames = filesWithRawDiff.map((file) => getFileName(file))
+  const treeFiles = filesWithRawDiff.map((file, idx) => {
+    const { additions, deletions } = countChanges(file.hunks)
+    return {
+      path: getFileName(file),
+      status: getFileStatus(file),
+      additions,
+      deletions,
+      fileIndex: idx,
+    }
+  })
+  const treeFileOrder = buildDirectoryTree(treeFiles)
+    .filter((node) => node.isFile && node.fileIndex !== undefined)
+    .map((node) => node.fileIndex!)
 
   if (filesWithRawDiff.length === 0) {
     throw new Error("No files to display")
@@ -244,72 +260,75 @@ async function renderDiffToFrameWithSectionPositions(
   // Create the diff view component
   // NOTE: No height: "100%" - let content determine its natural height
   function WebApp() {
-    return React.createElement(
-      "box",
-      {
-        style: {
+    return (
+      <box
+        style={{
           flexDirection: "column",
           backgroundColor: webBg,
-        },
-      },
-      showNotice
-        ? renderNoticeBlock({
-            mutedColor: webMuted,
-            showExpiry: showExpiryNotice,
-          })
-        : null,
-      filesWithRawDiff.map((file, idx) => {
-        const fileName = getFileName(file)
-        const oldFileName = getOldFileName(file)
-        const filetype = detectFiletype(fileName)
-        const { additions, deletions } = countChanges(file.hunks)
-        // Use forced viewMode if set, otherwise auto-detect (higher threshold 150 for web vs TUI 100)
-        const viewMode = options.viewMode || getViewMode(additions, deletions, options.cols, 150)
+        }}
+      >
+        {showNotice
+          ? renderNoticeBlock({
+              mutedColor: webMuted,
+              showExpiry: showExpiryNotice,
+            })
+          : null}
 
-        // Build file header elements - show "old → new" for renames
-        const fileHeaderChildren = oldFileName
-          ? [
-              React.createElement("text", { fg: webMuted, key: "old" }, oldFileName.trim()),
-              React.createElement("text", { fg: webMuted, key: "arrow" }, " → "),
-              React.createElement("text", { fg: webText, key: "new" }, fileName.trim()),
-            ]
-          : [React.createElement("text", { fg: webText, key: "name" }, fileName.trim())]
+        <box style={{ marginBottom: 2 }}>
+          <DirectoryTreeView files={treeFiles} themeName={themeName} />
+        </box>
 
-        return React.createElement(
-          "box",
-          {
-            key: idx,
-            ref: (r: BoxRenderable | null) => {
-              if (r) fileSectionRefs.set(idx, r)
-              else fileSectionRefs.delete(idx)
-            },
-            style: { flexDirection: "column", marginBottom: 2 },
-          },
-          React.createElement(
-            "box",
-            {
-              style: {
-                paddingBottom: 1,
-                paddingLeft: 1,
-                paddingRight: 1,
-                flexShrink: 0,
-                flexDirection: "row",
-                alignItems: "center",
-              },
-            },
-            ...fileHeaderChildren,
-            React.createElement("text", { fg: "#2d8a47" }, ` +${additions}`),
-            React.createElement("text", { fg: "#c53b53" }, `-${deletions}`)
-          ),
-          React.createElement(DiffView, {
-            diff: file.rawDiff || "",
-            view: viewMode,
-            filetype,
-            themeName,
-            ...(options.wrapMode && { wrapMode: options.wrapMode }),
-          })
-        )
-      })
+        {filesWithRawDiff.map((file, idx) => {
+          const fileName = getFileName(file)
+          const oldFileName = getOldFileName(file)
+          const filetype = detectFiletype(fileName)
+          const { additions, deletions } = countChanges(file.hunks)
+          // Use forced viewMode if set, otherwise auto-detect (higher threshold 150 for web vs TUI 100)
+          const viewMode = options.viewMode || getViewMode(additions, deletions, options.cols, 150)
+
+          return (
+            <box
+              key={idx}
+              ref={(r: BoxRenderable | null) => {
+                if (r) fileSectionRefs.set(idx, r)
+                else fileSectionRefs.delete(idx)
+              }}
+              style={{ flexDirection: "column", marginBottom: 2 }}
+            >
+              <box
+                style={{
+                  paddingBottom: 1,
+                  paddingLeft: 1,
+                  paddingRight: 1,
+                  flexShrink: 0,
+                  flexDirection: "row",
+                  alignItems: "center",
+                }}
+              >
+                {oldFileName ? (
+                  <>
+                    <text fg={webMuted}>{oldFileName.trim()}</text>
+                    <text fg={webMuted}> → </text>
+                    <text fg={webText}>{fileName.trim()}</text>
+                  </>
+                ) : (
+                  <text fg={webText}>{fileName.trim()}</text>
+                )}
+                <text fg="#2d8a47"> +{additions}</text>
+                <text fg="#c53b53">-{deletions}</text>
+              </box>
+
+              <DiffView
+                diff={file.rawDiff || ""}
+                view={viewMode}
+                filetype={filetype}
+                themeName={themeName}
+                wrapMode={options.wrapMode}
+              />
+            </box>
+          )
+        })}
+      </box>
     )
   }
 
@@ -327,7 +346,7 @@ async function renderDiffToFrameWithSectionPositions(
   })
 
   // Mount and do initial render
-  createRoot(renderer).render(React.createElement(WebApp))
+  createRoot(renderer).render(<WebApp />)
   await renderOnce()
   
   // Wait for React to mount components (may take a few render cycles)
@@ -365,6 +384,7 @@ async function renderDiffToFrameWithSectionPositions(
     sectionPositions.push({
       lineIndex: Math.max(0, Math.round(layout.top)),
       fileName: fileNames[idx]!,
+      fileIndex: idx,
     })
   }
 
@@ -382,6 +402,7 @@ async function renderDiffToFrameWithSectionPositions(
   return {
     frame,
     sectionPositions,
+    treeFileOrder,
   }
 }
 
@@ -452,6 +473,26 @@ export function extractLineNumber(line: CapturedLine): string | null {
 }
 
 /**
+ * Match a rendered tree file row and extract the file path label.
+ * Examples:
+ *   "│   ├── index.ts (+5,-2)"
+ *   "└── README.md (-15)"
+ */
+export function extractTreeFilePath(lineText: string): string | null {
+  const match = lineText.match(/^\s*[│ ]*[├└]──\s+(.+?)\s+\([^)]*\)\s*$/)
+  if (!match || !match[1]) return null
+  return match[1].trim()
+}
+
+function escapeHtmlAttribute(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+}
+
+/**
  * Build line-indexed anchors from file section layout positions.
  * This avoids regex detection on rendered text, which can produce
  * false positives when code lines mimic file-header patterns.
@@ -482,6 +523,8 @@ const SECTION_ANCHOR_CSS = `
   .file-section { scroll-margin-top: 16px; }
   .file-link { color: inherit; text-decoration: none; cursor: copy; }
   .file-link:hover { text-decoration: underline; }
+  .tree-file-link { color: inherit; text-decoration: none; }
+  .tree-file-link:hover { text-decoration: underline; }
 `
 
 // JS: scroll to hash fragment on page load + click-to-copy filename on .file-link click.
@@ -516,11 +559,19 @@ export async function captureToHtml(
 
   // Render diff to captured frame (with notice for web uploads)
   // and collect exact section line positions from layout metadata.
-  const { frame, sectionPositions } = await renderDiffToFrameWithSectionPositions(
+  const { frame, sectionPositions, treeFileOrder } = await renderDiffToFrameWithSectionPositions(
     diffContent,
     { ...options, showNotice: true },
   )
   const anchors = buildAnchorMap(sectionPositions)
+  const anchorIdByFileIndex = new Map<number, string>()
+  for (const section of sectionPositions) {
+    const anchor = anchors.get(section.lineIndex)
+    if (anchor) {
+      anchorIdByFileIndex.set(section.fileIndex, anchor.id)
+    }
+  }
+  const treeAnchorOrder = treeFileOrder.map((fileIndex) => anchorIdByFileIndex.get(fileIndex) ?? null)
 
   // Get theme colors for HTML output
   const theme = getResolvedTheme(options.themeName)
@@ -541,6 +592,7 @@ export async function captureToHtml(
   const sortedSections = [...sectionPositions].sort((a, b) => a.lineIndex - b.lineIndex)
   let sectionPtr = 0
   let currentFile: string | null = null
+  let treeLinkPtr = 0
 
   const renderLineCallback = (defaultHtml: string, line: CapturedLine, lineIndex: number) => {
     // Advance current file when we pass a section boundary
@@ -551,6 +603,23 @@ export async function captureToHtml(
 
     let html = defaultHtml
 
+    if (currentFile === null && treeLinkPtr < treeAnchorOrder.length) {
+      const lineText = line.spans.map((span) => span.text).join("")
+      const treePath = extractTreeFilePath(lineText)
+      if (treePath) {
+        const targetAnchor = treeAnchorOrder[treeLinkPtr]
+        treeLinkPtr++
+
+        if (targetAnchor) {
+          const escapedPath = escapeHtmlAttribute(treePath)
+          html = html.replace(
+            `>${escapedPath}</span>`,
+            `><a href="#${targetAnchor}" class="tree-file-link">${escapedPath}</a></span>`,
+          )
+        }
+      }
+    }
+
     // File-section header: add id + clickable link
     const anchor = anchors.get(lineIndex)
     if (anchor) {
@@ -558,11 +627,7 @@ export async function captureToHtml(
         '<div class="line">',
         `<div id="${anchor.id}" class="line file-section">`,
       )
-      const escapedLabel = anchor.label
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
+      const escapedLabel = escapeHtmlAttribute(anchor.label)
       html = html.replace(
         `>${escapedLabel}</span>`,
         `><a href="#${anchor.id}" class="file-link">${escapedLabel}</a></span>`,
@@ -576,11 +641,7 @@ export async function captureToHtml(
       const lineNum = extractLineNumber(line)
       if (lineNum) {
         const anchorValue = `${currentFile}:${lineNum}`
-        const safeAnchor = anchorValue
-          .replace(/&/g, "&amp;")
-          .replace(/"/g, "&quot;")
-          .replace(/</g, "&lt;")
-          .replace(/>/g, "&gt;")
+        const safeAnchor = escapeHtmlAttribute(anchorValue)
         html = html.replace(
           '<div class="line">',
           `<div class="line" data-anchor="${safeAnchor}">`,
@@ -680,7 +741,6 @@ export async function renderReviewToFrame(
   const { createTestRenderer } = await import("@opentuah/core/testing")
   const { createRoot } = await import("@opentuah/react")
   const { getTreeSitterClient } = await import("@opentuah/core")
-  const React = await import("react")
   
   // Pre-initialize TreeSitter client to ensure syntax highlighting works
   const tsClient = getTreeSitterClient()
@@ -712,34 +772,34 @@ export async function renderReviewToFrame(
   // Pass renderer to enable custom renderNode (wrapMode: "none" for diagrams)
   // NOTE: No height: "100%" - let content determine its natural height
   function ReviewWebApp() {
-    return React.createElement(
-      "box",
-      {
-        style: {
+    return (
+      <box
+        style={{
           flexDirection: "column",
           backgroundColor: webBg,
-        },
-      },
-      showNotice
-        ? renderNoticeBlock({
-            mutedColor: webMuted,
-            showExpiry: showExpiryNotice,
-          })
-        : null,
-      React.createElement(ReviewAppView, {
-        hunks: options.hunks,
-        reviewData: options.reviewData,
-        isGenerating: false,
-        themeName,
-        width: options.cols,
-        showFooter: false,
-        renderer: renderer,
-      })
+        }}
+      >
+        {showNotice
+          ? renderNoticeBlock({
+              mutedColor: webMuted,
+              showExpiry: showExpiryNotice,
+            })
+          : null}
+        <ReviewAppView
+          hunks={options.hunks}
+          reviewData={options.reviewData}
+          isGenerating={false}
+          themeName={themeName}
+          width={options.cols}
+          showFooter={false}
+          renderer={renderer}
+        />
+      </box>
     )
   }
 
   // Mount and do initial render
-  createRoot(renderer).render(React.createElement(ReviewWebApp))
+  createRoot(renderer).render(<ReviewWebApp />)
   await renderOnce()
   
   // Wait for React to mount components (may take a few render cycles)
