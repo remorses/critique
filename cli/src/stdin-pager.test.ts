@@ -194,6 +194,10 @@ describe("--stdin pager mode (lazygit issue #25)", () => {
 
     expect(trimmed).toMatchInlineSnapshot(`
       "
+                                            └── b/src
+                                                └── hello.ts (+1,-1)
+
+
        a/src/hello.ts → b/src/hello.ts +1-1
 
        1   const greeting = 'hello'
@@ -235,6 +239,10 @@ describe("--stdin pager mode (lazygit issue #25)", () => {
 
     expect(trimmed).toMatchInlineSnapshot(`
       "
+                                              └── b
+                                                  └── readme.md ()
+
+
        a/readme.md → b/readme.md +0-0
 
        1 # My Project
@@ -253,6 +261,11 @@ describe("--stdin pager mode (lazygit issue #25)", () => {
 
     expect(trimmed).toMatchInlineSnapshot(`
       "
+                                             └── b/src
+                                                 ├── logger.ts (+5)
+                                                 └── index.ts (+2)
+
+
        b/src/logger.ts +5-0
 
        1 + export class Logger {
@@ -292,6 +305,10 @@ describe("--stdin pager mode (lazygit issue #25)", () => {
 
     expect(trimmed).toMatchInlineSnapshot(`
       "
+                                           └── a/src
+                                               └── deprecated.ts (-4)
+
+
        a/src/deprecated.ts +0-4
 
        1 - // This module is no longer needed
@@ -313,6 +330,10 @@ describe("--stdin pager mode (lazygit issue #25)", () => {
 
     expect(trimmed).toMatchInlineSnapshot(`
       "
+                                              └── b/src
+                                                  └── utils.ts (+7)
+
+
        b/src/utils.ts +7-0
 
        1 + export function clamp(value: number, min: number, max: number): number {
@@ -338,6 +359,10 @@ describe("--stdin pager mode (lazygit issue #25)", () => {
 
     expect(trimmed).toMatchInlineSnapshot(`
       "
+                                           └── b
+                                               └── config.json (+6,-4)
+
+
        a/config.json → b/config.json +6-4
 
         1   {
@@ -371,6 +396,10 @@ describe("--stdin pager mode (lazygit issue #25)", () => {
 
     expect(trimmed).toMatchInlineSnapshot(`
       "
+                                           └── src
+                                               └── new-name.ts (+1,-1)
+
+
        src/old-name.ts → src/new-name.ts +1-1
 
        1 - export const name = 'old'
@@ -396,6 +425,9 @@ describe("--stdin pager mode (lazygit issue #25)", () => {
 
     expect(trimmed).toMatchInlineSnapshot(`
       "
+                                                 └── unknown ()
+
+
        unknown +0-0"
     `)
 
@@ -416,6 +448,10 @@ describe("--stdin pager mode (lazygit issue #25)", () => {
 
     expect(trimmed).toMatchInlineSnapshot(`
       "
+                                            └── b/src
+                                                └── hello.ts (+1,-1)
+
+
        a/src/hello.ts → b/src/hello.ts +1-1
 
        1   const greeting = 'hello'
@@ -435,6 +471,10 @@ describe("--stdin pager mode (lazygit issue #25)", () => {
 
     expect(trimmed).toMatchInlineSnapshot(`
       "
+              └── b/src
+                  └── hello.ts (+1,-1)
+
+
        a/src/hello.ts → b/src/hello.ts +1-1
 
        1   const greeting = 'hello'
