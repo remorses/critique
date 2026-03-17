@@ -60,6 +60,31 @@ describe("buildDirectoryTree", () => {
     expect(result[1]!.displayPath).toBe("Button.tsx")
     expect(result[1]!.isFile).toBe(true)
   })
+
+  it("should sort nodes alphabetically regardless of input order", () => {
+    const files: TreeFileInfo[] = [
+      { path: "website/src/index.ts", status: "modified", additions: 1, deletions: 0 },
+      { path: "db/schema.prisma", status: "modified", additions: 1, deletions: 0 },
+      { path: "discord/src/utils.ts", status: "modified", additions: 1, deletions: 0 },
+      { path: "discord/src/cli.ts", status: "modified", additions: 1, deletions: 0 },
+      { path: "gateway-proxy/src/main.rs", status: "modified", additions: 1, deletions: 0 },
+    ]
+
+    const result = buildDirectoryTree(files)
+
+    const rendered = result.map((node) => `${node.prefix}${node.connector}${node.displayPath}`)
+    expect(rendered).toEqual([
+      "├── db",
+      "│   └── schema.prisma",
+      "├── discord/src",
+      "│   ├── cli.ts",
+      "│   └── utils.ts",
+      "├── gateway-proxy/src",
+      "│   └── main.rs",
+      "└── website/src",
+      "    └── index.ts",
+    ])
+  })
 })
 
 describe("TreeRenderer visual tests", () => {
@@ -199,10 +224,10 @@ describe("TreeRenderer visual tests", () => {
     expect(frame).toMatchInlineSnapshot(`
       "├── package.json (+2,-1)                                    
       ├── src                                                     
-      │   ├── index.ts (+10,-5)                                   
       │   ├── components                                          
       │   │   ├── Button.tsx (+50,-0)                             
       │   │   └── Input.tsx (+15,-8)                              
+      │   ├── index.ts (+10,-5)                                   
       │   └── utils                                               
       │       └── helpers.ts (+0,-30)                             
       └── tests                                                   
@@ -233,8 +258,8 @@ describe("TreeRenderer visual tests", () => {
     const frame = testSetup.captureCharFrame()
     expect(frame).toMatchInlineSnapshot(`
       "└── packages/core/src/lib/utils                             
-          ├── helpers.ts (+5,-3)                                  
-          └── format.ts (+20,-0)                                  
+          ├── format.ts (+20,-0)                                  
+          └── helpers.ts (+5,-3)                                  
                                                                   
                                                                   
                                                                   
@@ -261,14 +286,14 @@ describe("TreeRenderer visual tests", () => {
     await testSetup.renderOnce()
     const frame = testSetup.captureCharFrame()
     expect(frame).toMatchInlineSnapshot(`
-      "├── src                                                     
-      │   ├── api                                                 
-      │   │   ├── routes.ts (+10,-5)                              
-      │   │   └── handlers.ts (+30,-0)                            
-      │   └── db                                                  
-      │       └── models.ts (+8,-2)                               
-      └── lib                                                     
-          └── utils.ts (+15,-0)                                   
+      "├── lib                                                     
+      │   └── utils.ts (+15,-0)                                   
+      └── src                                                     
+          ├── api                                                 
+          │   ├── handlers.ts (+30,-0)                            
+          │   └── routes.ts (+10,-5)                              
+          └── db                                                  
+              └── models.ts (+8,-2)                               
                                                                   
                                                                   
                                                                   
@@ -303,10 +328,10 @@ describe("DirectoryTreeView component", () => {
     await testSetup.renderOnce()
     const frame = testSetup.captureCharFrame()
     expect(frame).toMatchInlineSnapshot(`
-      "                  ├── src                                   
-                        │   ├── index.ts (+5,-2)                  
-                        │   └── utils.ts (+30)                    
-                        └── README.md (-15)                       
+      "                  ├── README.md (-15)                       
+                        └── src                                   
+                            ├── index.ts (+5,-2)                  
+                            └── utils.ts (+30)                    
                                                                   
                                                                   
                                                                   

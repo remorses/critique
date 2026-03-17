@@ -50,9 +50,9 @@ describe("processFiles ordering", () => {
     )
 
     expect(processed.map((file) => getFileName(file))).toEqual([
+      "README.md",
       "src/components/button.tsx",
       "src/index.ts",
-      "README.md",
     ])
   })
 
@@ -88,10 +88,10 @@ describe("processFiles ordering", () => {
     )
 
     expect(processed.map((file) => getFileName(file))).toEqual([
+      "docs/guide.md",
+      "docs/new-name.md",
       "src/alpha.ts",
       "src/remove.ts",
-      "docs/new-name.md",
-      "docs/guide.md",
     ])
   })
 })

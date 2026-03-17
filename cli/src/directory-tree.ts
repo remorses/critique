@@ -62,6 +62,7 @@ export function buildDirectoryTree(files: TreeFileInfo[]): TreeNode[] {
   }
 
   const tree = buildInternalTree(files)
+  sortInternalTree(tree)
   return flattenTree(tree)
 }
 
@@ -113,6 +114,19 @@ function buildInternalTree(files: TreeFileInfo[]): InternalTreeNode[] {
 function getName(node: InternalTreeNode): string {
   const parts = node.path.split("/")
   return parts[parts.length - 1] || node.path
+}
+
+/**
+ * Sort tree nodes by name at every level so file ordering is deterministic
+ * and independent from incoming git diff section order.
+ */
+function sortInternalTree(nodes: InternalTreeNode[]): void {
+  nodes.sort((a, b) => getName(a).toLowerCase().localeCompare(getName(b).toLowerCase()))
+  for (const node of nodes) {
+    if (node.children.length > 0) {
+      sortInternalTree(node.children)
+    }
+  }
 }
 
 /**

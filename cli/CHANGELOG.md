@@ -1,3 +1,16 @@
+# 0.1.129
+
+- File ordering:
+  - `critique` and `critique --web`:
+    - Directory tree nodes are now sorted alphabetically at every level before flattening.
+    - Diff sections now follow this deterministic tree order, instead of inheriting incoming git diff section order.
+    - Fixes repos where appended submodule diffs were grouped at the end (for example `gateway-proxy` in `kimakivoice`) and appeared out of tree order.
+- Tests:
+  - `bun test src/directory-tree.test.tsx`:
+    - Refresh snapshots for alphabetically sorted tree output.
+  - `bun test src/diff-utils.test.ts`:
+    - Update ordering assertions to match deterministic alphabetical tree traversal.
+
 # 0.1.128
 
 - File ordering:
