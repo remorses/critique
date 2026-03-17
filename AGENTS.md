@@ -34,6 +34,8 @@ The `web` command is safe to run - it generates HTML and exits:
 bun run src/cli.tsx web
 ```
 
+NEVER use `tsc --noEmit` in this repo. Always run emitting builds so `cli/dist` stays updated.
+
 NEVER use require. just import at the top of the file with esm
 
 use bun add to install packages instead of npm
