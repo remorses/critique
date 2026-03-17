@@ -3,6 +3,7 @@
 // and provides helpers for unified/split view mode selection.
 
 import { execSync } from "child_process"
+import { buildDirectoryTree } from "./directory-tree.js"
 
 /**
  * Strip submodule status lines from git diff output.
@@ -515,11 +516,41 @@ export function processFiles<T extends ParsedFile>(
     return totalLines <= 6000;
   });
 
-  const sortedFiles = filteredFiles.sort((a, b) => {
-    const aSize = a.hunks.reduce((sum, hunk) => sum + hunk.lines.length, 0);
-    const bSize = b.hunks.reduce((sum, hunk) => sum + hunk.lines.length, 0);
-    return aSize - bSize;
-  });
+  const treeFiles = filteredFiles.map((file, index) => {
+    const { additions, deletions } = countChanges(file.hunks)
+    return {
+      path: getFileName(file),
+      status: getFileStatus(file),
+      additions,
+      deletions,
+      fileIndex: index,
+    }
+  })
+
+  const treeFileOrder = buildDirectoryTree(treeFiles)
+    .filter((node) => node.isFile && node.fileIndex !== undefined)
+    .map((node) => node.fileIndex!)
+
+  const seenIndexes = new Set<number>()
+  const sortedFiles: T[] = []
+
+  for (const index of treeFileOrder) {
+    if (seenIndexes.has(index)) continue
+    const file = filteredFiles[index]
+    if (!file) continue
+    seenIndexes.add(index)
+    sortedFiles.push(file)
+  }
+
+  // Defensive fallback: keep any unmatched files in original order.
+  // This should be rare, but avoids dropping files if tree metadata and
+  // parsed file list ever diverge.
+  for (let index = 0; index < filteredFiles.length; index++) {
+    if (seenIndexes.has(index)) continue
+    const file = filteredFiles[index]
+    if (!file) continue
+    sortedFiles.push(file)
+  }
 
   // Add rawDiff for each file
   return sortedFiles.map((file) => ({

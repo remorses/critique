@@ -1,3 +1,13 @@
+# 0.1.128
+
+- File ordering:
+  - `critique` and `critique --web`:
+    - Diff files now follow the same directory-tree traversal order used by the tree view instead of sorting by patch size.
+    - Keeps file sections aligned with the tree index order, including renamed, added, and deleted files.
+- Tests:
+  - `bun test src/diff-utils.test.ts`:
+    - Add regression coverage for tree-based ordering and mixed rename/add/delete ordering.
+
 # 0.1.127
 
 1. **Directory tree index in web previews** — shared `critique --web` pages now render the same file tree shown in the TUI at the top of the page, with each file row linking directly to its diff section:

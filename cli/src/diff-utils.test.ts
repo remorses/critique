@@ -8,6 +8,7 @@ import { parsePatch, formatPatch } from "diff"
 import {
   preprocessDiff,
   parseGitDiffFiles,
+  processFiles,
   getFileStatus,
   getFileName,
   getOldFileName,
@@ -18,6 +19,82 @@ import {
   matchesFileFilters,
   detectFiletype,
 } from "./diff-utils.js"
+
+// ============================================================================
+// processFiles ordering
+// ============================================================================
+
+describe("processFiles ordering", () => {
+  it("should order output files to match directory tree traversal", () => {
+    const files = [
+      {
+        oldFileName: "src/components/button.tsx",
+        newFileName: "src/components/button.tsx",
+        hunks: [{ lines: Array.from({ length: 90 }, () => "+line") }],
+      },
+      {
+        oldFileName: "src/index.ts",
+        newFileName: "src/index.ts",
+        hunks: [{ lines: ["+line"] }],
+      },
+      {
+        oldFileName: "README.md",
+        newFileName: "README.md",
+        hunks: [{ lines: ["+line", "+line", "+line"] }],
+      },
+    ]
+
+    const processed = processFiles(
+      files,
+      (file) => `diff --git ${file.oldFileName} ${file.newFileName}`,
+    )
+
+    expect(processed.map((file) => getFileName(file))).toEqual([
+      "src/components/button.tsx",
+      "src/index.ts",
+      "README.md",
+    ])
+  })
+
+  it("should keep tree order with renamed, added, and deleted files", () => {
+    const files = [
+      {
+        oldFileName: "src/alpha.ts",
+        newFileName: "src/alpha.ts",
+        hunks: [{ lines: Array.from({ length: 30 }, () => "+line") }],
+      },
+      {
+        oldFileName: "docs/old-name.md",
+        newFileName: "docs/new-name.md",
+        renameFrom: "docs/old-name.md",
+        renameTo: "docs/new-name.md",
+        hunks: [{ lines: ["+line"] }],
+      },
+      {
+        oldFileName: "/dev/null",
+        newFileName: "docs/guide.md",
+        hunks: [{ lines: ["+line", "+line"] }],
+      },
+      {
+        oldFileName: "src/remove.ts",
+        newFileName: "/dev/null",
+        hunks: [{ lines: ["-line"] }],
+      },
+    ]
+
+    const processed = processFiles(
+      files,
+      (file) => `diff --git ${file.oldFileName} ${file.newFileName}`,
+    )
+
+    expect(processed.map((file) => getFileName(file))).toEqual([
+      "src/alpha.ts",
+      "src/remove.ts",
+      "docs/new-name.md",
+      "docs/guide.md",
+    ])
+  })
+})
 
 // ============================================================================
 // preprocessDiff
