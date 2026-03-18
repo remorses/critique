@@ -210,6 +210,9 @@ export interface ParsedFile {
   similarity?: number;
 }
 
+/** Default number of context lines around each diff hunk */
+export const DEFAULT_CONTEXT_LINES = 7;
+
 export interface GitCommandOptions {
   staged?: boolean;
   commit?: string;
@@ -282,7 +285,7 @@ export function filterParsedFilesByPatterns<T extends ParsedFile>(
  * Build git command string based on options
  */
 export function buildGitCommand(options: GitCommandOptions): string {
-  const contextArg = options.context ? `-U${options.context}` : "";
+  const contextArg = `-U${options.context ?? DEFAULT_CONTEXT_LINES}`;
   // Show full submodule diffs instead of just commit hashes
   const submoduleArg = "--submodule=diff";
   // Detect renames instead of showing full delete+add
@@ -381,7 +384,7 @@ export function buildSubmoduleDiffCommand(
   submodulePaths: string[],
   options: Pick<GitCommandOptions, "context">,
 ): string {
-  const contextArg = options.context ? `-U${options.context}` : ""
+  const contextArg = `-U${options.context ?? DEFAULT_CONTEXT_LINES}`
   const renameArg = "-M"
   const submoduleArg = "--submodule=diff"
   const pathArgs = submodulePaths.map((p) => `'${p}'`).join(" ")

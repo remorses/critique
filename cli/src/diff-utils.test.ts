@@ -18,6 +18,7 @@ import {
   getFilterPatterns,
   matchesFileFilters,
   detectFiletype,
+  DEFAULT_CONTEXT_LINES,
 } from "./diff-utils.js"
 
 // ============================================================================
@@ -766,6 +767,34 @@ describe("filter helpers", () => {
   })
 })
 
+describe("buildGitCommand default context lines", () => {
+  it("should use DEFAULT_CONTEXT_LINES when no context is provided", () => {
+    const cmd = buildGitCommand({})
+    expect(cmd).toContain(`-U${DEFAULT_CONTEXT_LINES}`)
+  })
+
+  it("should use custom context when provided", () => {
+    const cmd = buildGitCommand({ context: 15 })
+    expect(cmd).toContain("-U15")
+    expect(cmd).not.toContain(`-U${DEFAULT_CONTEXT_LINES}`)
+  })
+
+  it("should apply default context to staged diff", () => {
+    const cmd = buildGitCommand({ staged: true })
+    expect(cmd).toContain(`-U${DEFAULT_CONTEXT_LINES}`)
+  })
+
+  it("should apply default context to commit show", () => {
+    const cmd = buildGitCommand({ commit: "abc123" })
+    expect(cmd).toContain(`-U${DEFAULT_CONTEXT_LINES}`)
+  })
+
+  it("should apply default context to base...head diff", () => {
+    const cmd = buildGitCommand({ base: "main", head: "feature" })
+    expect(cmd).toContain(`-U${DEFAULT_CONTEXT_LINES}`)
+  })
+})
+
 describe("buildSubmoduleDiffCommand", () => {
   it("should only scope to submodule paths and context", () => {
     const cmd = buildSubmoduleDiffCommand(["opentui", "errore"], { context: 7 })
@@ -773,6 +802,11 @@ describe("buildSubmoduleDiffCommand", () => {
     expect(cmd).toContain("--submodule=diff")
     expect(cmd).toContain("-U7")
     expect(cmd).toContain("-- 'opentui' 'errore'")
+  })
+
+  it("should use DEFAULT_CONTEXT_LINES when no context is provided", () => {
+    const cmd = buildSubmoduleDiffCommand(["opentui"], {})
+    expect(cmd).toContain(`-U${DEFAULT_CONTEXT_LINES}`)
   })
 })
 
