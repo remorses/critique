@@ -211,7 +211,7 @@ export interface ParsedFile {
 }
 
 /** Default number of context lines around each diff hunk */
-export const DEFAULT_CONTEXT_LINES = 7;
+export const DEFAULT_CONTEXT_LINES = 6;
 
 export interface GitCommandOptions {
   staged?: boolean;

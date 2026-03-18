@@ -2036,7 +2036,7 @@ cli
   .option("--staged", "Show staged changes")
   .option("--commit <ref>", "Show changes from a specific commit")
   .option("--watch", "Watch for file changes and refresh diff")
-  .option("--context <lines>", "Number of context lines (default: 7)")
+  .option("--context <lines>", "Number of context lines (default: 6)")
   .option("--filter <pattern>", wrapJsonSchema({
     type: "array",
     items: { type: "string" },
@@ -2354,7 +2354,7 @@ cli
   .option("--model <id>", "Model to use for review (e.g., anthropic/claude-sonnet-4-20250514 for opencode, claude-sonnet-4-20250514 for claude)")
   .option("--staged", "Review staged changes")
   .option("--commit <ref>", "Review changes from a specific commit")
-  .option("--context <lines>", "Number of context lines (default: 7)")
+  .option("--context <lines>", "Number of context lines (default: 6)")
   .option("--filter <pattern>", wrapJsonSchema({
     type: "array",
     items: { type: "string" },
@@ -2709,7 +2709,7 @@ cli
   .option("--cols <cols>", "Number of columns for desktop rendering (default: 240)")
   .option("--mobile-cols <cols>", "Number of columns for mobile rendering (default: 100)")
   .option("--open", "Open in browser after generating")
-  .option("--context <lines>", "Number of context lines (default: 7)")
+  .option("--context <lines>", "Number of context lines (default: 6)")
   .option("--theme <name>", "Theme to use for rendering")
   .option("--filter <pattern>", wrapJsonSchema({
     type: "array",
