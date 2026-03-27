@@ -1,10 +1,14 @@
 # 0.1.134
 
-- Syntax highlighting hunk isolation (`critique`, `critique --web`, `critique review`):
-  - Expand unclosed comment repair to more tree-sitter filetypes that use C-style block comments, including Rust, C/C++, C#, Java, PHP, CSS, Scala, Swift, Go, and TypeScript
-  - Add HTML/XML-style comment isolation by closing open `<!--` hunks on the last content line so later hunks render as code again
-- Tests:
-  - Cover Rust block-comment isolation and HTML comment isolation while keeping repaired hunks parseable by `diff.parsePatch`
+1. **Default context lines increased from 3 to 6** — diffs now show 6 surrounding lines by default instead of git's built-in 3, giving more code context when reviewing. Override with `--context <n>` on any command:
+
+   ```bash
+   critique --context 10        # show 10 context lines
+   critique --web --context 2   # compact web view
+   critique review --context 8  # more context during AI review
+   ```
+
+2. **Expanded unclosed comment repair** (`critique`, `critique --web`, `critique review`) — syntax highlighting hunk isolation now covers more languages: Rust, C/C++, C#, Java, PHP, CSS, Scala, Swift, Go, TypeScript (C-style `/* */` block comments), and HTML/XML (`<!-- -->` comments). Open comment hunks are closed on the last content line so later hunks render as code instead of comment text.
 
 # 0.1.133
 
