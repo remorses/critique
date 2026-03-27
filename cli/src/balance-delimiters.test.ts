@@ -1,6 +1,7 @@
 // Tests for delimiter balancing: tokenizer pass (countDelimiter) and fix pass (balanceDelimiters).
 
 import { describe, expect, it } from "bun:test"
+import { parsePatch } from "diff"
 import { countDelimiter, balanceDelimiters } from "./balance-delimiters.js"
 
 // ============================================================================
@@ -138,7 +139,7 @@ describe("balanceDelimiters", () => {
       expect(balanceDelimiters(patch, "typescript")).toBe(patch)
     })
 
-    it("prepends balancing backtick when count is odd", () => {
+    it("escapes a leading closing backtick when count is odd", () => {
       const patch = makePatch([
         " end of template`",
         " const x = 1",
@@ -148,13 +149,13 @@ describe("balanceDelimiters", () => {
       const result = balanceDelimiters(patch, "typescript")
       const lines = result.split("\n")
       expect(lines[2]).toBe("@@ -10,4 +10,4 @@ function foo() {")
-      expect(lines[3]).toBe(" `end of template`")
+      expect(lines[3]).toBe(" end of template\\`")
       expect(lines[4]).toBe(" const x = 1")
     })
 
     it("returns patch unchanged for non-supported filetypes", () => {
       const patch = makePatch([" end of template`", " const x = 1"])
-      expect(balanceDelimiters(patch, "rust")).toBe(patch)
+      expect(balanceDelimiters(patch, "ruby")).toBe(patch)
       expect(balanceDelimiters(patch, undefined)).toBe(patch)
     })
 
@@ -175,7 +176,7 @@ describe("balanceDelimiters", () => {
       const lines = result.split("\n")
       expect(lines[3]).toBe(" const x = `balanced`")
       const secondHunkIdx = lines.findIndex((l, i) => i > 2 && l.startsWith("@@"))
-      expect(lines[secondHunkIdx + 1]).toBe(" `closing`")
+      expect(lines[secondHunkIdx + 1]).toBe(" closing\\`")
     })
 
     it("keeps patch unchanged for URL template literal (regression)", () => {
@@ -225,6 +226,66 @@ describe("balanceDelimiters", () => {
       expect(balanceDelimiters(patch, "typescript")).toBe(patch)
     })
 
+    it("keeps patch unchanged for regex literals with backticks", () => {
+      const patch = makePatch([
+        " const re = /`+/g",
+        " const x = 1",
+        "-const y = 2",
+        "+const y = 3",
+      ])
+      expect(balanceDelimiters(patch, "typescript")).toBe(patch)
+    })
+
+    it("escapes a trailing unmatched opener instead of prepending a fake opener", () => {
+      const patch = makePatch([
+        " const x = `open template",
+        " const y = 1",
+        "-const z = 2",
+        "+const z = 3",
+      ])
+      const result = balanceDelimiters(patch, "typescript")
+      const lines = result.split("\n")
+      expect(lines[3]).toBe(" const x = \\`open template")
+      expect(lines[4]).toBe(" const y = 1")
+    })
+
+    it("appends a synthetic block comment closer before the next hunk", () => {
+      const patch = [
+        "--- file.ts",
+        "+++ file.ts",
+        "@@ -1,1 +1,3 @@",
+        "+/**",
+        "+ * open comment",
+        " const x = 1",
+        "@@ -10,1 +11,1 @@",
+        "-const y = 1",
+        "+const y = 2",
+      ].join("\n")
+      const result = balanceDelimiters(patch, "typescript")
+      const lines = result.split("\n")
+      const secondHunkIdx = lines.findIndex((line, index) => index > 2 && line.startsWith("@@"))
+      expect(lines[2]).toBe("@@ -1,1 +1,3 @@")
+      expect(lines[5]).toBe(" const x = 1 */")
+      expect(secondHunkIdx).toBe(6)
+      expect(() => parsePatch(result)).not.toThrow()
+    })
+
+    it("appends a synthetic block comment closer at the end of a single hunk", () => {
+      const patch = [
+        "--- file.ts",
+        "+++ file.ts",
+        "@@ -20,1 +20,3 @@",
+        " interface DelimiterRule {",
+        "+/**",
+        "+ * Balance paired delimiters in a unified diff patch",
+      ].join("\n")
+      const result = balanceDelimiters(patch, "typescript")
+      const lines = result.split("\n")
+      expect(lines[2]).toBe("@@ -20,1 +20,3 @@")
+      expect(lines.at(-1)).toBe("+ * Balance paired delimiters in a unified diff patch */")
+      expect(() => parsePatch(result)).not.toThrow()
+    })
+
     it("preserves no-newline markers", () => {
       const patch = [
         "--- file.ts",
@@ -257,7 +318,7 @@ describe("balanceDelimiters", () => {
       expect(balanceDelimiters(patch, "python")).toBe(patch)
     })
 
-    it("prepends balancing triple double-quote when count is odd", () => {
+    it("escapes a leading closing triple double-quote when count is odd", () => {
       const patch = pyPatch([
         '     This is still inside the docstring.',
         '     """',
@@ -266,11 +327,11 @@ describe("balanceDelimiters", () => {
       ])
       const result = balanceDelimiters(patch, "python")
       const lines = result.split("\n")
-      // First content line gets """ prepended
-      expect(lines[3]).toBe(' """    This is still inside the docstring.')
+      expect(lines[3]).toBe('     This is still inside the docstring.')
+      expect(lines[4]).toBe('     \\"""')
     })
 
-    it("prepends balancing triple single-quote when count is odd", () => {
+    it("escapes a leading closing triple single-quote when count is odd", () => {
       const patch = pyPatch([
         "     still inside raw string",
         "     '''",
@@ -279,7 +340,8 @@ describe("balanceDelimiters", () => {
       ])
       const result = balanceDelimiters(patch, "python")
       const lines = result.split("\n")
-      expect(lines[3]).toBe(" '''    still inside raw string")
+      expect(lines[3]).toBe("     still inside raw string")
+      expect(lines[4]).toBe("     \\'''")
     })
 
     it("returns patch unchanged when regular quotes are present but balanced", () => {
@@ -302,8 +364,8 @@ describe("balanceDelimiters", () => {
       ])
       const result = balanceDelimiters(patch, "python")
       const lines = result.split("\n")
-      // """ is odd (1), so prepend to first content line
-      expect(lines[3]).toBe(' """    Args:')
+      expect(lines[3]).toBe("     Args:")
+      expect(lines[5]).toBe('     \\"""')
     })
 
     it("does not modify when both triple-quote types are balanced", () => {
@@ -314,6 +376,19 @@ describe("balanceDelimiters", () => {
         "+y = 2",
       ])
       expect(balanceDelimiters(patch, "python")).toBe(patch)
+    })
+
+    it("escapes a trailing unmatched opener instead of duplicating the token", () => {
+      const patch = pyPatch([
+        ' """docstring starts here',
+        " value = 1",
+        "-return old_value",
+        "+return new_value",
+      ])
+      const result = balanceDelimiters(patch, "python")
+      const lines = result.split("\n")
+      expect(lines[3]).toBe(' \\"""docstring starts here')
+      expect(lines[4]).toBe(" value = 1")
     })
   })
 
@@ -335,7 +410,7 @@ describe("balanceDelimiters", () => {
       expect(balanceDelimiters(patch, "go")).toBe(patch)
     })
 
-    it("prepends balancing backtick when count is odd", () => {
+    it("escapes a leading closing backtick when count is odd", () => {
       const patch = goPatch([
         " still inside raw string`",
         " x := 1",
@@ -344,7 +419,62 @@ describe("balanceDelimiters", () => {
       ])
       const result = balanceDelimiters(patch, "go")
       const lines = result.split("\n")
-      expect(lines[3]).toBe(" `still inside raw string`")
+      expect(lines[3]).toBe(" still inside raw string\\`")
+    })
+
+    it("appends a synthetic block comment closer when a hunk leaves one open", () => {
+      const patch = [
+        "--- file.go",
+        "+++ file.go",
+        "@@ -10,2 +10,3 @@ func foo() {",
+        " /*",
+        " still inside comment",
+        "+x := 1",
+      ].join("\n")
+      const result = balanceDelimiters(patch, "go")
+      const lines = result.split("\n")
+      expect(lines[2]).toBe("@@ -10,2 +10,3 @@ func foo() {")
+      expect(lines.at(-1)).toBe("+x := 1 */")
+      expect(() => parsePatch(result)).not.toThrow()
+    })
+  })
+
+  describe("rust", () => {
+    it("appends a block comment closer to the last content line", () => {
+      const patch = [
+        "--- file.rs",
+        "+++ file.rs",
+        "@@ -10,1 +10,3 @@ fn demo() {",
+        "+/*",
+        "+ * open comment",
+        " let x = 1",
+      ].join("\n")
+      const result = balanceDelimiters(patch, "rust")
+      const lines = result.split("\n")
+      expect(lines[5]).toBe(" let x = 1 */")
+      expect(() => parsePatch(result)).not.toThrow()
+    })
+  })
+
+  describe("html", () => {
+    it("appends an HTML comment closer to isolate the next hunk", () => {
+      const patch = [
+        "--- file.html",
+        "+++ file.html",
+        "@@ -1,1 +1,3 @@",
+        "+<!--",
+        "+  open comment",
+        " <div>content</div>",
+        "@@ -10,1 +11,1 @@",
+        "-<span>old</span>",
+        "+<span>new</span>",
+      ].join("\n")
+      const result = balanceDelimiters(patch, "html")
+      const lines = result.split("\n")
+      const secondHunkIdx = lines.findIndex((line, index) => index > 2 && line.startsWith("@@"))
+      expect(lines[5]).toBe(" <div>content</div> -->")
+      expect(secondHunkIdx).toBe(6)
+      expect(() => parsePatch(result)).not.toThrow()
     })
   })
 
@@ -366,7 +496,7 @@ describe("balanceDelimiters", () => {
       expect(balanceDelimiters(patch, "markdown")).toBe(patch)
     })
 
-    it("prepends balancing code fence when count is odd", () => {
+    it("escapes a leading closing code fence when count is odd", () => {
       const patch = mdPatch([
         " inside fenced block",
         " ```",
@@ -375,7 +505,8 @@ describe("balanceDelimiters", () => {
       ])
       const result = balanceDelimiters(patch, "markdown")
       const lines = result.split("\n")
-      expect(lines[3]).toBe(" ```inside fenced block")
+      expect(lines[3]).toBe(" inside fenced block")
+      expect(lines[4]).toBe(" \\```")
     })
 
     it("does not modify when only inline code backticks are present", () => {
@@ -385,6 +516,19 @@ describe("balanceDelimiters", () => {
         "+new",
       ])
       expect(balanceDelimiters(patch, "markdown")).toBe(patch)
+    })
+
+    it("escapes a trailing unmatched fence opener instead of duplicating it", () => {
+      const patch = mdPatch([
+        " ```ts",
+        " const x = 1",
+        "-old line",
+        "+new line",
+      ])
+      const result = balanceDelimiters(patch, "markdown")
+      const lines = result.split("\n")
+      expect(lines[3]).toBe(" \\```ts")
+      expect(lines[4]).toBe(" const x = 1")
     })
   })
 
@@ -406,7 +550,7 @@ describe("balanceDelimiters", () => {
       expect(balanceDelimiters(patch, "scala")).toBe(patch)
     })
 
-    it("prepends balancing triple quote when count is odd", () => {
+    it("escapes a leading closing triple quote when count is odd", () => {
       const patch = scalaPatch([
         "     still inside string",
         '     """.stripMargin',
@@ -415,7 +559,8 @@ describe("balanceDelimiters", () => {
       ])
       const result = balanceDelimiters(patch, "scala")
       const lines = result.split("\n")
-      expect(lines[3]).toBe(' """    still inside string')
+      expect(lines[3]).toBe('     still inside string')
+      expect(lines[4]).toBe('     \\""".stripMargin')
     })
   })
 
@@ -437,7 +582,7 @@ describe("balanceDelimiters", () => {
       expect(balanceDelimiters(patch, "swift")).toBe(patch)
     })
 
-    it("prepends balancing triple quote when count is odd", () => {
+    it("escapes a leading closing triple quote when count is odd", () => {
       const patch = swiftPatch([
         "     still inside multi-line string",
         '     """',
@@ -446,7 +591,8 @@ describe("balanceDelimiters", () => {
       ])
       const result = balanceDelimiters(patch, "swift")
       const lines = result.split("\n")
-      expect(lines[3]).toBe(' """    still inside multi-line string')
+      expect(lines[3]).toBe('     still inside multi-line string')
+      expect(lines[4]).toBe('     \\"""')
     })
   })
 
@@ -468,7 +614,7 @@ describe("balanceDelimiters", () => {
       expect(balanceDelimiters(patch, "julia")).toBe(patch)
     })
 
-    it("prepends balancing triple quote when count is odd", () => {
+    it("escapes a leading closing triple quote when count is odd", () => {
       const patch = juliaPatch([
         "     still inside string",
         '     """',
@@ -477,7 +623,8 @@ describe("balanceDelimiters", () => {
       ])
       const result = balanceDelimiters(patch, "julia")
       const lines = result.split("\n")
-      expect(lines[3]).toBe(' """    still inside string')
+      expect(lines[3]).toBe('     still inside string')
+      expect(lines[4]).toBe('     \\"""')
     })
   })
 
@@ -502,7 +649,7 @@ describe("balanceDelimiters", () => {
       expect(balanceDelimiters(patch, "python")).toBe(patch)
     })
 
-    it("prepends to added line when first content line is +", () => {
+    it("escapes an unmatched opener on an added line", () => {
       const patch = [
         "--- file.ts",
         "+++ file.ts",
@@ -513,10 +660,10 @@ describe("balanceDelimiters", () => {
       ].join("\n")
       const result = balanceDelimiters(patch, "typescript")
       const lines = result.split("\n")
-      expect(lines[3]).toBe("+`const x = `open template")
+      expect(lines[3]).toBe("+const x = \\`open template")
     })
 
-    it("handles all-removed hunk with odd backticks", () => {
+    it("escapes an unmatched opener on a removed line", () => {
       const patch = [
         "--- file.ts",
         "+++ file.ts",
@@ -526,7 +673,7 @@ describe("balanceDelimiters", () => {
       ].join("\n")
       const result = balanceDelimiters(patch, "typescript")
       const lines = result.split("\n")
-      expect(lines[3]).toBe("-`const x = `old template")
+      expect(lines[3]).toBe("-const x = \\`old template")
     })
   })
 })

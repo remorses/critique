@@ -1,3 +1,44 @@
+# 0.1.134
+
+- Syntax highlighting hunk isolation (`critique`, `critique --web`, `critique review`):
+  - Expand unclosed comment repair to more tree-sitter filetypes that use C-style block comments, including Rust, C/C++, C#, Java, PHP, CSS, Scala, Swift, Go, and TypeScript
+  - Add HTML/XML-style comment isolation by closing open `<!--` hunks on the last content line so later hunks render as code again
+- Tests:
+  - Cover Rust block-comment isolation and HTML comment isolation while keeping repaired hunks parseable by `diff.parsePatch`
+
+# 0.1.133
+
+- Syntax highlighting hunk isolation (`critique`, `critique --web`, `critique review`):
+  - Simplify unclosed block-comment repair by appending closing tokens to the last content line in the hunk instead of inserting extra synthetic lines
+  - Avoid hunk header rewriting entirely while still preventing `/**` / `/*` state from leaking into later hunks
+- Tests:
+  - Keep block-comment isolation coverage while asserting the repaired diff still parses without any header count adjustments
+
+# 0.1.132
+
+- Syntax highlighting hunk isolation (`critique`, `critique --web`, `critique review`):
+  - Fix synthetic block-comment closers so they also update unified diff hunk counts, keeping the repaired diff parseable by the renderer
+  - Preserve the per-hunk `*/` isolation fix without falling back to raw "Error parsing diff" output on focused snippets
+- Tests:
+  - Assert repaired block-comment hunks remain parseable by `diff.parsePatch` after synthetic closers are appended
+
+# 0.1.131
+
+- Syntax highlighting hunk isolation (`critique`, `critique --web`, `critique review`):
+  - Append synthetic closing tokens for unclosed block comments (`/**`, `/*`) at the end of each diff hunk so one hunk cannot leak comment state into the next or to hunk EOF
+  - Keep the existing backtick/triple-quote boundary escaping for leading/trailing unmatched symmetric delimiters without forcing synthetic closers for regex-like snippets
+- Tests:
+  - Add regression coverage for single-hunk and multi-hunk unclosed block comment cases in TypeScript and Go
+
+# 0.1.130
+
+- Syntax highlighting delimiter repair (`critique`, `critique --web`, `critique review`):
+  - Replace synthetic opener prepending with boundary-token escaping for odd backticks, triple quotes, and Markdown fences
+  - Fix hunks that end inside open templates/docstrings/fences so previews no longer duplicate delimiters like `````` or inject fake leading quotes/backticks
+  - Leave ambiguous odd-delimiter cases unchanged instead of rewriting likely-valid snippets like regex literals containing backticks
+- Tests:
+  - Add regression coverage for leading closers, trailing openers, regex literals, Markdown fence open/close cases, and added/removed-line repairs
+
 # 0.1.129
 
 1. **Deterministic alphabetical file ordering** — directory tree nodes are now sorted alphabetically at every level. Diff sections follow this tree order instead of inheriting the incoming git diff section order. Fixes repos where submodule diffs were grouped at the end and appeared out of tree order.
