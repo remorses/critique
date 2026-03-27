@@ -262,17 +262,8 @@ describe("--stdin pager mode (lazygit issue #25)", () => {
     expect(trimmed).toMatchInlineSnapshot(`
       "
                                              └── b/src
-                                                 ├── logger.ts (+5)
-                                                 └── index.ts (+2)
-
-
-       b/src/logger.ts +5-0
-
-       1 + export class Logger {
-       2 +   log(msg: string) {
-       3 +     console.log(\`[LOG] \${msg}\`)
-       4 +   }
-       5 + }
+                                                 ├── index.ts (+2)
+                                                 └── logger.ts (+5)
 
 
        a/src/index.ts → b/src/index.ts +2-0
@@ -282,7 +273,16 @@ describe("--stdin pager mode (lazygit issue #25)", () => {
        3
        4   const app = new App()
        5 + const logger = new Logger()
-       6   app.start()"
+       6   app.start()
+
+
+       b/src/logger.ts +5-0
+
+       1 + export class Logger {
+       2 +   log(msg: string) {
+       3 +     console.log(\`[LOG] \${msg}\`)
+       4 +   }
+       5 + }"
     `)
 
     // Should contain both filenames

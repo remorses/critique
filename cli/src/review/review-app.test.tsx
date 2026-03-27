@@ -220,8 +220,8 @@ describe("ReviewAppView", () => {
     expect(frame).toMatchInlineSnapshot(`
       "                                                                                                    
                                             └── src                                                       
-                                                ├── utils.ts (+5,-1)                                      
-                                                └── index.ts (+1)                                         
+                                                ├── index.ts (+1)                                         
+                                                └── utils.ts (+5,-1)                                      
                                                                                                           
                                                                                                           
          Import changes                                                                                   
@@ -352,8 +352,8 @@ describe("ReviewAppView", () => {
     expect(frame).toMatchInlineSnapshot(`
       "                                                                                                                                            
                                                                 └── src                                                                           
-                                                                    ├── utils.ts (+5,-1)                                                          
-                                                                    └── index.ts (+1)                                                             
+                                                                    ├── index.ts (+1)                                                             
+                                                                    └── utils.ts (+5,-1)                                                          
                                                                                                                                                   
                                                                                                                                                   
          Import changes                                                                                                                           
@@ -425,12 +425,12 @@ describe("ReviewAppView", () => {
     expect(frame).toMatchInlineSnapshot(`
       "                                                                                                                                            
                                                             └── src                                                                             █ 
-                                                                ├── errors                                                                      █ 
-                                                                │   └── index.ts (+6)                                                           █ 
                                                                 ├── api                                                                         █ 
                                                                 │   └── users.ts (+5,-2)                                                        █ 
-                                                                └── config                                                                      █ 
-                                                                    └── database.ts (+3,-2)                                                     █ 
+                                                                ├── config                                                                      █ 
+                                                                │   └── database.ts (+3,-2)                                                     █ 
+                                                                └── errors                                                                      █ 
+                                                                    └── index.ts (+6)                                                           █ 
                                                                                                                                                 █ 
                                                                                                                                                 █ 
          Custom Error Classes                                                                                                                   █ 
@@ -650,10 +650,10 @@ Added validation at handler start.`,
     expect(frame).toMatchInlineSnapshot(`
       "                                                                                                    
                                         └── src                                                         █ 
-                                            ├── utils.ts (+5,-1)                                        █ 
+                                            ├── api                                                     █ 
+                                            │   └── handlers.ts (+9,-2)                                 █ 
                                             ├── index.ts (+1)                                           █ 
-                                            └── api                                                     █ 
-                                                └── handlers.ts (+9,-2)                                 █ 
+                                            └── utils.ts (+5,-1)                                        █ 
                                                                                                           
                                                                                                           
          Import changes                                                                                   
@@ -717,8 +717,8 @@ This uses hunkId instead of hunkIds but shows full hunk.`,
     expect(frame).toMatchInlineSnapshot(`
       "                                                                                                    
                                             └── src                                                       
-                                                ├── utils.ts (+5,-1)                                      
-                                                └── index.ts (+1)                                         
+                                                ├── index.ts (+1)                                         
+                                                └── utils.ts (+5,-1)                                      
                                                                                                           
                                                                                                           
          Full hunk via hunkId                                                                             
@@ -1336,8 +1336,8 @@ Added logger import.`,
     expect(frame).toMatchInlineSnapshot(`
       "                                                                                
                                   └── src                                           █ 
-                                      ├── utils.ts (+5,-1)                          █ 
-                                      └── index.ts (+1)                             █ 
+                                      ├── index.ts (+1)                             █ 
+                                      └── utils.ts (+5,-1)                          █ 
                                                                                     █ 
                                                                                     █ 
          Import changes                                                             █ 
