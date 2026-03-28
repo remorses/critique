@@ -22,6 +22,13 @@ interface DelimiterRule {
   token: string
   closeToken?: string
   openTokens?: string[]
+  /**
+   * Optional function to classify a token occurrence as an opener, closer,
+   * or not-a-fence (null). Used for context-dependent delimiters like markdown
+   * code fences where the open/close distinction depends on the info string.
+   * Receives the content line (diff prefix stripped) and the column of the token.
+   */
+  classifyFence?: (content: string, column: number) => "open" | "close" | null
 }
 
 const cStyleBlockCommentRule: DelimiterRule = {
@@ -43,7 +50,7 @@ const htmlCommentRule: DelimiterRule = {
 const LANGUAGE_DELIMITERS: Record<string, DelimiterRule[]> = {
   typescript: [{ token: "`" }, cStyleBlockCommentRule],
   python: [{ token: '"""' }, { token: "'''" }],
-  markdown: [{ token: "```" }],
+  markdown: [{ token: "```", classifyFence: classifyMarkdownFence }],
   go: [{ token: "`" }, cStyleBlockCommentRule],
   rust: [cStyleBlockCommentRule],
   cpp: [cStyleBlockCommentRule],
@@ -273,6 +280,149 @@ function escapeDelimiterAt(lines: readonly string[], hunkLineIndex: number, colu
   })
 }
 
+// ---------------------------------------------------------------------------
+// Contextual fence classification and repair (markdown code fences)
+// ---------------------------------------------------------------------------
+
+/**
+ * Classify a ``` occurrence as a markdown fence opener, closer, or not a fence.
+ *
+ * Returns null if the occurrence is not a valid block-level fence (e.g. inline
+ * triple-backtick in prose, or indented more than 3 spaces).
+ * Returns "open" if followed by an info string (language tag).
+ * Returns "close" if nothing follows the backtick run (only whitespace).
+ */
+function classifyMarkdownFence(content: string, column: number): "open" | "close" | null {
+  // Must be at start of line with at most 3 spaces of indentation
+  const beforeFence = content.slice(0, column)
+  if (beforeFence.length > 3 || /\S/.test(beforeFence)) return null
+
+  // Count consecutive backticks (support 4+ backtick fences per CommonMark)
+  let fenceLen = 0
+  for (let i = column; i < content.length && content[i] === "`"; i++) fenceLen++
+  if (fenceLen < 3) return null
+
+  // What comes after the backtick run?
+  const afterFence = content.slice(column + fenceLen).trim()
+
+  // Closing fence: nothing after backticks (only whitespace)
+  if (!afterFence) return "close"
+
+  // Opening fence: has info string (language tag)
+  // Info string must not contain backticks (CommonMark spec)
+  if (!afterFence.includes("`")) return "open"
+
+  return null
+}
+
+interface ClassifiedFence {
+  occurrence: DelimiterOccurrence
+  kind: "open" | "close"
+}
+
+interface WalkResult {
+  startDepth: number
+  endDepth: number
+  conflicts: number
+}
+
+/**
+ * Simulate a sequential walk through classified fences to detect boundary
+ * artifacts. Markdown code fences don't nest, so depth toggles between 0
+ * (outside) and 1 (inside).
+ *
+ * - "open" (has info string) always pushes depth to 1.
+ * - "close" (bare fence) decrements if inside, or acts as a bare opener
+ *   if already outside (a code block without a language tag).
+ *
+ * Conflicts are counted when a must-open fires while already inside (depth
+ * was already 1) or when other impossible transitions occur.
+ */
+function walkFences(fences: readonly ClassifiedFence[], startDepth: number): WalkResult {
+  let depth = startDepth
+  let conflicts = 0
+
+  for (const fence of fences) {
+    if (fence.kind === "open") {
+      if (depth > 0) conflicts++
+      depth = 1
+    } else {
+      // "close" (bare fence): close if inside, otherwise bare opener
+      if (depth > 0) {
+        depth = 0
+      } else {
+        depth = 1
+      }
+    }
+  }
+
+  return { startDepth, endDepth: depth, conflicts }
+}
+
+/**
+ * Repair context-dependent fences (like markdown ```) using sequential
+ * open/close pairing instead of simple odd/even counting.
+ *
+ * Tries two starting states (outside vs inside a code block), picks the
+ * walk with fewer conflicts, and escapes boundary tokens:
+ * - If the hunk starts inside a block: escape the first closer
+ * - If the hunk ends inside a block: escape the last opener
+ */
+function repairContextualFences(
+  contentLines: readonly ContentLine[],
+  lines: readonly string[],
+  rule: DelimiterRule,
+): string[] {
+  if (!rule.classifyFence) return [...lines]
+
+  const occurrences = findDelimiterOccurrences(contentLines, rule.token)
+  if (occurrences.length === 0) return [...lines]
+
+  // Classify each occurrence as fence open, close, or not-a-fence
+  const fences: ClassifiedFence[] = []
+  for (const occ of occurrences) {
+    const content = contentLines[occ.contentLineIndex]?.content
+    if (!content) continue
+    const kind = rule.classifyFence(content, occ.column)
+    if (kind) {
+      fences.push({ occurrence: occ, kind })
+    }
+  }
+
+  if (fences.length === 0) return [...lines]
+
+  // Try both starting states
+  const walk0 = walkFences(fences, 0)
+  const walk1 = walkFences(fences, 1)
+
+  // Pick better walk: fewer conflicts → fewer escapes → prefer depth=0
+  let chosen: WalkResult
+  if (walk0.conflicts < walk1.conflicts) {
+    chosen = walk0
+  } else if (walk1.conflicts < walk0.conflicts) {
+    chosen = walk1
+  } else {
+    const escapes0 = (walk0.startDepth > 0 ? 1 : 0) + (walk0.endDepth > 0 ? 1 : 0)
+    const escapes1 = (walk1.startDepth > 0 ? 1 : 0) + (walk1.endDepth > 0 ? 1 : 0)
+    chosen = escapes0 <= escapes1 ? walk0 : walk1
+  }
+
+  let result = [...lines]
+
+  // Escape last first to avoid column-shift issues on same-line fences
+  if (chosen.endDepth > 0) {
+    const last = fences[fences.length - 1]!
+    result = escapeDelimiterAt(result, last.occurrence.hunkLineIndex, last.occurrence.column)
+  }
+
+  if (chosen.startDepth > 0) {
+    const first = fences[0]!
+    result = escapeDelimiterAt(result, first.occurrence.hunkLineIndex, first.occurrence.column)
+  }
+
+  return result
+}
+
 function getRuleOpenTokens(rule: DelimiterRule): string[] {
   return rule.openTokens ?? [rule.token]
 }
@@ -366,6 +516,13 @@ export function balanceDelimiters(rawDiff: string, filetype?: string): string {
 
     for (const rule of rules) {
       if (!isSymmetricRule(rule)) {
+        continue
+      }
+
+      // Contextual fence pairing (markdown code fences): uses sequential
+      // open/close tracking instead of simple odd/even parity.
+      if (rule.classifyFence) {
+        repairedLines = repairContextualFences(contentLines, repairedLines, rule)
         continue
       }
 

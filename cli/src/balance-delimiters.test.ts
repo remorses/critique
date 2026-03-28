@@ -530,6 +530,175 @@ describe("balanceDelimiters", () => {
       expect(lines[3]).toBe(" \\```ts")
       expect(lines[4]).toBe(" const x = 1")
     })
+
+    it("escapes both boundary tokens when even count but first=closer last=opener (6 tokens)", () => {
+      const patch = mdPatch([
+        " ```",
+        " ",
+        " ## Section",
+        " ",
+        " ```ts",
+        " const a = 1",
+        " ```",
+        " ",
+        " ```ts",
+        " const b = 2",
+        " ```",
+        " ",
+        "+```ts",
+      ])
+      const result = balanceDelimiters(patch, "markdown")
+      const lines = result.split("\n")
+      // first bare ``` is boundary closer → escaped
+      expect(lines[3]).toBe(" \\```")
+      // last ```ts is boundary opener → escaped
+      expect(lines[lines.length - 1]).toBe("+\\```ts")
+      // middle fences stay untouched
+      expect(lines[7]).toBe(" ```ts")
+      expect(lines[9]).toBe(" ```")
+      expect(lines[11]).toBe(" ```ts")
+      expect(lines[13]).toBe(" ```")
+    })
+
+    it("escapes both boundary tokens with 4 tokens (bare, ```ts, bare, ```ts)", () => {
+      const patch = mdPatch([
+        " inside code block",
+        " ```",
+        " ",
+        " ```ts",
+        " const x = 1",
+        " ```",
+        " ",
+        "+```ts",
+      ])
+      const result = balanceDelimiters(patch, "markdown")
+      const lines = result.split("\n")
+      expect(lines[4]).toBe(" \\```")
+      expect(lines[lines.length - 1]).toBe("+\\```ts")
+    })
+
+    it("returns patch unchanged when 4 tokens are fully balanced (```ts, bare, ```ts, bare)", () => {
+      const patch = mdPatch([
+        " ```ts",
+        " const a = 1",
+        " ```",
+        " ",
+        " ```ts",
+        " const b = 2",
+        " ```",
+        "+New paragraph",
+      ])
+      expect(balanceDelimiters(patch, "markdown")).toBe(patch)
+    })
+
+    it("escapes both boundary tokens when 2 tokens are bare-closer then opener", () => {
+      const patch = mdPatch([
+        " inside block",
+        " ```",
+        " ",
+        "+```ts",
+      ])
+      const result = balanceDelimiters(patch, "markdown")
+      const lines = result.split("\n")
+      expect(lines[4]).toBe(" \\```")
+      expect(lines[lines.length - 1]).toBe("+\\```ts")
+    })
+
+    it("returns patch unchanged for 2 balanced tokens (```ts then bare)", () => {
+      const patch = mdPatch([
+        " ```ts",
+        " const x = 1",
+        " ```",
+        "+New paragraph",
+      ])
+      expect(balanceDelimiters(patch, "markdown")).toBe(patch)
+    })
+
+    it("returns patch unchanged for two bare fences (open + close, no language)", () => {
+      const patch = mdPatch([
+        " ```",
+        " some code",
+        " ```",
+        "+New paragraph",
+      ])
+      expect(balanceDelimiters(patch, "markdown")).toBe(patch)
+    })
+
+    it("ignores inline triple backticks in prose (not at start of line)", () => {
+      const patch = mdPatch([
+        " Use the ``` delimiter for code fences",
+        "-old",
+        "+new",
+      ])
+      expect(balanceDelimiters(patch, "markdown")).toBe(patch)
+    })
+
+    it("treats fences with up to 3 spaces indent as valid", () => {
+      const patch = mdPatch([
+        "    ```ts",
+        "    const x = 1",
+        "    ```",
+        "+New paragraph",
+      ])
+      // 3 spaces + ``` = column 3, indent 3 = valid fence
+      expect(balanceDelimiters(patch, "markdown")).toBe(patch)
+    })
+
+    it("ignores fences indented more than 3 spaces (code indentation)", () => {
+      const patch = mdPatch([
+        "     ```ts",
+        "     const x = 1",
+        "-old",
+        "+new",
+      ])
+      // 4+ spaces = not a fence, treated as code content → no escaping
+      expect(balanceDelimiters(patch, "markdown")).toBe(patch)
+    })
+
+    it("handles 4-backtick fence pair correctly", () => {
+      const patch = mdPatch([
+        " ````ts",
+        " const x = 1",
+        " ````",
+        "+New paragraph",
+      ])
+      expect(balanceDelimiters(patch, "markdown")).toBe(patch)
+    })
+
+    it("recognizes closing fence with trailing spaces", () => {
+      const patch = mdPatch([
+        " ```ts",
+        " const x = 1",
+        " ```   ",
+        "+New paragraph",
+      ])
+      expect(balanceDelimiters(patch, "markdown")).toBe(patch)
+    })
+
+    it("handles two hunks independently for markdown fences", () => {
+      const patch = [
+        "--- file.md",
+        "+++ file.md",
+        "@@ -5,4 +5,4 @@",
+        " ```ts",
+        " const x = 1",
+        " ```",
+        "+New paragraph",
+        "@@ -20,4 +20,4 @@",
+        " inside block",
+        " ```",
+        "-old line",
+        "+new line",
+      ].join("\n")
+      const result = balanceDelimiters(patch, "markdown")
+      const lines = result.split("\n")
+      // First hunk: balanced, no changes
+      expect(lines[3]).toBe(" ```ts")
+      expect(lines[5]).toBe(" ```")
+      // Second hunk: bare closer at boundary → escaped
+      const secondHunkIdx = lines.findIndex((l, i) => i > 2 && l.startsWith("@@"))
+      expect(lines[secondHunkIdx + 2]).toBe(" \\```")
+    })
   })
 
   describe("scala", () => {
