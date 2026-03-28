@@ -1,3 +1,9 @@
+# 0.1.135
+
+1. **Fixed markdown code fence balancing for even-count boundary cases** (`critique`, `critique --web`, `critique review`) — diffs that start or end mid-code-block in a `.md` file now syntax-highlight correctly. Previously, the odd/even counting approach missed cases where a hunk had an even number of ` ``` ` tokens but the first was a closing fence from a block opened before the hunk and the last was an opening fence for a block continuing past it. A sequential state-machine walk now detects these boundary fences and inserts synthetic ` ``` ` tokens inline on existing lines (preserving patch header counts) to give the parser balanced delimiters.
+
+2. **Fixed friendly error when running outside a git repository** — `critique` now prints a clear message instead of crashing with an internal error when invoked outside any git repo.
+
 # 0.1.134
 
 1. **Default context lines increased from 3 to 6** — diffs now show 6 surrounding lines by default instead of git's built-in 3, giving more code context when reviewing. Override with `--context <n>` on any command:
