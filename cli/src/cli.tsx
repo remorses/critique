@@ -43,6 +43,7 @@ import { logger } from "./logger.js";
 import { saveStoredLicenseKey } from "./license.js";
 import {
   buildGitCommand,
+  ensureGitRepo,
   filterParsedFilesByPatterns,
   getFileName,
   getFileStatus,
@@ -1849,6 +1850,7 @@ cli
     description: "Filter files by glob pattern (can be used multiple times)",
   }))
   .action(async (options) => {
+    ensureGitRepo();
     const {
       parseHunksWithIds,
       hunkToStableId,
@@ -1925,6 +1927,7 @@ cli
 cli
   .command("hunks add [...ids]", "Stage specific hunks by their stable ID")
   .action(async (ids: string[]) => {
+    ensureGitRepo();
     if (!ids || ids.length === 0) {
       console.error("Usage: critique hunks add <hunk-id> [<hunk-id> ...]");
       console.error("Use 'critique hunks list' to see available hunk IDs.");
@@ -2054,6 +2057,11 @@ cli
   .option("--stdin", "Read diff from stdin (for use as a pager)")
   .option("--scrollback", "Output to terminal scrollback instead of TUI (auto-enabled when non-TTY)")
   .action(async (base, head, options) => {
+    // Ensure we're inside a git repository before doing anything
+    if (!options.stdin) {
+      ensureGitRepo();
+    }
+
     // Apply theme if specified (zustand subscription auto-persists)
     if (options.theme && themeNames.includes(options.theme)) {
       useAppStore.setState({ themeName: options.theme });
@@ -2372,6 +2380,7 @@ cli
   .option("--json", "Output JSON to stdout (implies --web)")
   .option("--resume [id]", "Resume a previous review (shows select if no ID provided)")
   .action(async (base, head, options) => {
+    ensureGitRepo();
     try {
       // Handle resume mode
       if (options.resume !== undefined) {
@@ -2442,6 +2451,7 @@ cli
 cli
   .command("difftool <local> <remote>", "Git difftool integration")
   .action(async (local: string, remote: string) => {
+    ensureGitRepo();
     if (!process.stdout.isTTY) {
       execSync(`git diff --no-ext-diff "${local}" "${remote}"`, {
         stdio: "inherit",
@@ -2490,6 +2500,7 @@ cli
 cli
   .command("pick <branch>", "Pick files from another branch to apply to HEAD")
   .action(async (branch: string) => {
+    ensureGitRepo();
     try {
       const { stdout: currentBranch } = await execAsync(
         "git branch --show-current",
@@ -2718,6 +2729,7 @@ cli
   }))
   .option("--title <title>", "HTML document title")
   .action(async (base, head, options) => {
+    ensureGitRepo();
     // Build git command and get diff
     const gitCommand = buildGitCommand({
       staged: options.staged,

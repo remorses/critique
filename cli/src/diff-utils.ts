@@ -6,6 +6,21 @@ import { execSync } from "child_process"
 import { buildDirectoryTree } from "./directory-tree.js"
 
 /**
+ * Check if the current directory is inside a git repository.
+ * If not, print a friendly error message and exit.
+ */
+export function ensureGitRepo(): void {
+  try {
+    execSync("git rev-parse --is-inside-work-tree", { stdio: "pipe" })
+  } catch {
+    console.error("fatal: not a git repository (or any parent up to mount point /)")
+    console.error("")
+    console.error("Run critique inside a git repository.")
+    process.exit(128)
+  }
+}
+
+/**
  * Strip submodule status lines from git diff output.
  * git diff --submodule=diff adds various status lines that the diff parser doesn't understand:
  * - "Submodule name hash1..hash2:" (header before submodule diff)

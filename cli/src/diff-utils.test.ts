@@ -18,6 +18,7 @@ import {
   getFilterPatterns,
   matchesFileFilters,
   detectFiletype,
+  ensureGitRepo,
   DEFAULT_CONTEXT_LINES,
 } from "./diff-utils.js"
 
@@ -886,5 +887,29 @@ describe("parseHunksWithIds with renames", () => {
     // Pure rename = 0 hunks, normal file = 1 hunk
     expect(hunks.length).toBe(1)
     expect(hunks[0]!.filename).toBe("other.ts")
+  })
+})
+
+// ============================================================================
+// ensureGitRepo
+// ============================================================================
+
+describe("ensureGitRepo", () => {
+  it("should not throw inside a git repository", () => {
+    // We're running tests inside the critique repo, so this should pass
+    expect(() => ensureGitRepo()).not.toThrow()
+  })
+
+  it("should exit with code 128 outside a git repository", () => {
+    const { spawnSync } = require("child_process")
+    const absPath = require("path").resolve(__dirname, "./diff-utils.js")
+    const result = spawnSync(
+      "bun",
+      ["-e", `import { ensureGitRepo } from "${absPath}"; ensureGitRepo()`],
+      { encoding: "utf-8", stdio: "pipe", cwd: "/tmp" },
+    )
+    expect(result.status).toBe(128)
+    expect(result.stderr).toContain("not a git repository")
+    expect(result.stderr).toContain("Run critique inside a git repository")
   })
 })
