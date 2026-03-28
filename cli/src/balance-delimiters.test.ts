@@ -496,7 +496,7 @@ describe("balanceDelimiters", () => {
       expect(balanceDelimiters(patch, "markdown")).toBe(patch)
     })
 
-    it("escapes a leading closing code fence when count is odd", () => {
+    it("prepends synthetic opener when hunk starts inside a code block", () => {
       const patch = mdPatch([
         " inside fenced block",
         " ```",
@@ -505,8 +505,9 @@ describe("balanceDelimiters", () => {
       ])
       const result = balanceDelimiters(patch, "markdown")
       const lines = result.split("\n")
-      expect(lines[3]).toBe(" inside fenced block")
-      expect(lines[4]).toBe(" \\```")
+      // Synthetic ``` opener prepended inline to first content line
+      expect(lines[3]).toBe(" ``` inside fenced block")
+      expect(lines[4]).toBe(" ```")
     })
 
     it("does not modify when only inline code backticks are present", () => {
@@ -518,7 +519,7 @@ describe("balanceDelimiters", () => {
       expect(balanceDelimiters(patch, "markdown")).toBe(patch)
     })
 
-    it("escapes a trailing unmatched fence opener instead of duplicating it", () => {
+    it("appends synthetic closer when hunk ends with unclosed opener", () => {
       const patch = mdPatch([
         " ```ts",
         " const x = 1",
@@ -527,11 +528,14 @@ describe("balanceDelimiters", () => {
       ])
       const result = balanceDelimiters(patch, "markdown")
       const lines = result.split("\n")
-      expect(lines[3]).toBe(" \\```ts")
+      // Original content untouched
+      expect(lines[3]).toBe(" ```ts")
       expect(lines[4]).toBe(" const x = 1")
+      // Synthetic ``` closer appended inline to last content line
+      expect(lines[lines.length - 1]).toBe("+new line ```")
     })
 
-    it("escapes both boundary tokens when even count but first=closer last=opener (6 tokens)", () => {
+    it("adds synthetic fences at both boundaries when even count but first=closer last=opener (6 tokens)", () => {
       const patch = mdPatch([
         " ```",
         " ",
@@ -549,10 +553,10 @@ describe("balanceDelimiters", () => {
       ])
       const result = balanceDelimiters(patch, "markdown")
       const lines = result.split("\n")
-      // first bare ``` is boundary closer → escaped
-      expect(lines[3]).toBe(" \\```")
-      // last ```ts is boundary opener → escaped
-      expect(lines[lines.length - 1]).toBe("+\\```ts")
+      // Synthetic opener prepended inline to first content line
+      expect(lines[3]).toBe(" ``` ```")
+      // Synthetic closer appended inline to last content line
+      expect(lines[lines.length - 1]).toBe("+```ts ```")
       // middle fences stay untouched
       expect(lines[7]).toBe(" ```ts")
       expect(lines[9]).toBe(" ```")
@@ -560,7 +564,7 @@ describe("balanceDelimiters", () => {
       expect(lines[13]).toBe(" ```")
     })
 
-    it("escapes both boundary tokens with 4 tokens (bare, ```ts, bare, ```ts)", () => {
+    it("adds synthetic fences at both boundaries with 4 tokens (bare, ```ts, bare, ```ts)", () => {
       const patch = mdPatch([
         " inside code block",
         " ```",
@@ -573,8 +577,10 @@ describe("balanceDelimiters", () => {
       ])
       const result = balanceDelimiters(patch, "markdown")
       const lines = result.split("\n")
-      expect(lines[4]).toBe(" \\```")
-      expect(lines[lines.length - 1]).toBe("+\\```ts")
+      // Synthetic opener prepended inline to first content line
+      expect(lines[3]).toBe(" ``` inside code block")
+      // Synthetic closer appended inline to last content line
+      expect(lines[lines.length - 1]).toBe("+```ts ```")
     })
 
     it("returns patch unchanged when 4 tokens are fully balanced (```ts, bare, ```ts, bare)", () => {
@@ -591,7 +597,7 @@ describe("balanceDelimiters", () => {
       expect(balanceDelimiters(patch, "markdown")).toBe(patch)
     })
 
-    it("escapes both boundary tokens when 2 tokens are bare-closer then opener", () => {
+    it("adds synthetic fences at both boundaries when 2 tokens are bare-closer then opener", () => {
       const patch = mdPatch([
         " inside block",
         " ```",
@@ -600,8 +606,10 @@ describe("balanceDelimiters", () => {
       ])
       const result = balanceDelimiters(patch, "markdown")
       const lines = result.split("\n")
-      expect(lines[4]).toBe(" \\```")
-      expect(lines[lines.length - 1]).toBe("+\\```ts")
+      // Synthetic opener prepended inline to first content line
+      expect(lines[3]).toBe(" ``` inside block")
+      // Synthetic closer appended inline to last content line
+      expect(lines[lines.length - 1]).toBe("+```ts ```")
     })
 
     it("returns patch unchanged for 2 balanced tokens (```ts then bare)", () => {
@@ -675,6 +683,52 @@ describe("balanceDelimiters", () => {
       expect(balanceDelimiters(patch, "markdown")).toBe(patch)
     })
 
+    it("single bare fence with content on both sides treats as opener (appends closer)", () => {
+      // Ambiguous: bare ``` with content before AND after.
+      // Tie-break prefers depth=1 (prepend opener) since content exists before fence.
+      const patch = mdPatch([
+        " Intro paragraph",
+        " ```",
+        " code line",
+        "+new line",
+      ])
+      const result = balanceDelimiters(patch, "markdown")
+      const lines = result.split("\n")
+      // Prepend opener on first content line (content before fence)
+      expect(lines[3]).toBe(" ``` Intro paragraph")
+      expect(lines[4]).toBe(" ```")
+    })
+
+    it("single bare fence with content only after treats as opener (appends closer)", () => {
+      const patch = mdPatch([
+        " ```",
+        " code line",
+        "-old",
+        "+new",
+      ])
+      const result = balanceDelimiters(patch, "markdown")
+      const lines = result.split("\n")
+      // No content before fence → depth=0 → append closer
+      expect(lines[3]).toBe(" ```")
+      expect(lines[lines.length - 1]).toBe("+new ```")
+    })
+
+    it("prefers blank line for synthetic opener to avoid fake info string", () => {
+      const patch = mdPatch([
+        " ",
+        " inside code block",
+        " ```",
+        "-old line",
+        "+new line",
+      ])
+      const result = balanceDelimiters(patch, "markdown")
+      const lines = result.split("\n")
+      // Blank line before fence is used for synthetic opener (no fake info string)
+      expect(lines[3]).toBe(" ``` ")
+      expect(lines[4]).toBe(" inside code block")
+      expect(lines[5]).toBe(" ```")
+    })
+
     it("handles two hunks independently for markdown fences", () => {
       const patch = [
         "--- file.md",
@@ -695,9 +749,114 @@ describe("balanceDelimiters", () => {
       // First hunk: balanced, no changes
       expect(lines[3]).toBe(" ```ts")
       expect(lines[5]).toBe(" ```")
-      // Second hunk: bare closer at boundary → escaped
+      // Second hunk: bare closer at boundary → synthetic opener prepended inline
       const secondHunkIdx = lines.findIndex((l, i) => i > 2 && l.startsWith("@@"))
-      expect(lines[secondHunkIdx + 2]).toBe(" \\```")
+      expect(lines[secondHunkIdx + 1]).toBe(" ``` inside block")
+      expect(lines[secondHunkIdx + 2]).toBe(" ```")
+    })
+
+    it("handles real README.md hunk with boundary fences (from critique.work patch)", () => {
+      // Real hunk from https://critique.work/v/daa808658ee537a745b80101ba3195ae.patch
+      // First hunk: starts inside a code block (bare ``` closer), ends with ```ts opener
+      const patch = [
+        "--- README.md",
+        "+++ README.md",
+        "@@ -741,12 +741,14 @@",
+        "     }),",
+        "   )",
+        " ```",
+        " ",
+        " ## Base Path",
+        " ",
+        "+For standalone API servers (without Vite), set the base path in the constructor:",
+        "+",
+        " ```ts",
+        " import { Spiceflow } from 'spiceflow'",
+        " ",
+        " const app = new Spiceflow({ basePath: '/api/v1' })",
+        " app.route({",
+        "   method: 'GET',",
+        "@@ -754,12 +756,47 @@",
+        "   handler() {",
+        "     return 'Hello'",
+        "   },",
+        " }) // Accessible at /api/v1/hello",
+        " ```",
+        " ",
+        "+### Base Path with Vite (RSC apps)",
+        "+",
+        "+When using Spiceflow as a full-stack RSC framework with Vite, configure the base path via Vite's `base` option instead of the constructor:",
+        "+",
+        "+```ts",
+        "+// vite.config.ts",
+        "+import { defineConfig } from 'vite'",
+        "+import { spiceflowPlugin } from 'spiceflow/vite'",
+        "+",
+        "+export default defineConfig({",
+        "+  base: '/my-app',",
+        "+  plugins: [spiceflowPlugin({ entry: 'src/main.tsx' })],",
+        "+})",
+        "+```",
+        "+",
+        "+The base path must be an absolute path starting with `/`. CDN URLs and relative paths are not supported.",
+        "+",
+        " ## Async Generators (Streaming)",
+        " ",
+        " Async generators will create a server sent event response.",
+        " ",
+        " ```ts",
+        " // server.ts",
+      ].join("\n")
+      const result = balanceDelimiters(patch, "markdown")
+      expect(result).toMatchInlineSnapshot(`
+        "--- README.md
+        +++ README.md
+        @@ -741,12 +741,14 @@
+         \`\`\`     }),
+           )
+         \`\`\`
+         
+         ## Base Path
+         
+        +For standalone API servers (without Vite), set the base path in the constructor:
+        +
+         \`\`\`ts
+         import { Spiceflow } from 'spiceflow'
+         
+         const app = new Spiceflow({ basePath: '/api/v1' })
+         app.route({
+           method: 'GET', \`\`\`
+        @@ -754,12 +756,47 @@
+         \`\`\`   handler() {
+             return 'Hello'
+           },
+         }) // Accessible at /api/v1/hello
+         \`\`\`
+         
+        +### Base Path with Vite (RSC apps)
+        +
+        +When using Spiceflow as a full-stack RSC framework with Vite, configure the base path via Vite's \`base\` option instead of the constructor:
+        +
+        +\`\`\`ts
+        +// vite.config.ts
+        +import { defineConfig } from 'vite'
+        +import { spiceflowPlugin } from 'spiceflow/vite'
+        +
+        +export default defineConfig({
+        +  base: '/my-app',
+        +  plugins: [spiceflowPlugin({ entry: 'src/main.tsx' })],
+        +})
+        +\`\`\`
+        +
+        +The base path must be an absolute path starting with \`/\`. CDN URLs and relative paths are not supported.
+        +
+         ## Async Generators (Streaming)
+         
+         Async generators will create a server sent event response.
+         
+         \`\`\`ts
+         // server.ts \`\`\`"
+      `)
     })
   })
 

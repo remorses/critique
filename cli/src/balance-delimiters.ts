@@ -364,9 +364,12 @@ function walkFences(fences: readonly ClassifiedFence[], startDepth: number): Wal
  * open/close pairing instead of simple odd/even counting.
  *
  * Tries two starting states (outside vs inside a code block), picks the
- * walk with fewer conflicts, and escapes boundary tokens:
- * - If the hunk starts inside a block: escape the first closer
- * - If the hunk ends inside a block: escape the last opener
+ * walk with fewer conflicts, and adds synthetic fence tokens inline:
+ * - If the hunk starts inside a block: prepend ``` to the first content
+ *   line so the boundary closer has something to close.
+ * - If the hunk ends inside a block: append ``` to the last content
+ *   line so the boundary opener is properly closed.
+ * Tokens are added inline (no new lines) to preserve patch header counts.
  */
 function repairContextualFences(
   contentLines: readonly ContentLine[],
@@ -395,29 +398,44 @@ function repairContextualFences(
   const walk0 = walkFences(fences, 0)
   const walk1 = walkFences(fences, 1)
 
-  // Pick better walk: fewer conflicts → fewer escapes → prefer depth=0
+  // Pick better walk: fewer conflicts → fewer repairs → content heuristic
   let chosen: WalkResult
   if (walk0.conflicts < walk1.conflicts) {
     chosen = walk0
   } else if (walk1.conflicts < walk0.conflicts) {
     chosen = walk1
   } else {
-    const escapes0 = (walk0.startDepth > 0 ? 1 : 0) + (walk0.endDepth > 0 ? 1 : 0)
-    const escapes1 = (walk1.startDepth > 0 ? 1 : 0) + (walk1.endDepth > 0 ? 1 : 0)
-    chosen = escapes0 <= escapes1 ? walk0 : walk1
+    const repairs0 = (walk0.startDepth > 0 ? 1 : 0) + (walk0.endDepth > 0 ? 1 : 0)
+    const repairs1 = (walk1.startDepth > 0 ? 1 : 0) + (walk1.endDepth > 0 ? 1 : 0)
+    if (repairs0 < repairs1) {
+      chosen = walk0
+    } else if (repairs1 < repairs0) {
+      chosen = walk1
+    } else {
+      // Still tied: disambiguate by content position relative to the first fence.
+      // If there's non-empty content before the first fence in the hunk, the fence
+      // is likely closing a block from before the hunk → prefer depth=1 (starts inside).
+      // This produces better tree-sitter pairing: the prepended ``` + original ```
+      // form a matched pair, while appended inline ``` doesn't close a fence.
+      const firstIdx = fences[0]?.occurrence.contentLineIndex ?? 0
+      const hasContentBefore = contentLines.slice(0, firstIdx).some((line) => line.content.trim() !== "")
+      chosen = hasContentBefore ? walk1 : walk0
+    }
   }
 
   let result = [...lines]
 
-  // Escape last first to avoid column-shift issues on same-line fences
+  // Append synthetic closer to end of last content line (inline, no new lines)
   if (chosen.endDepth > 0) {
-    const last = fences[fences.length - 1]!
-    result = escapeDelimiterAt(result, last.occurrence.hunkLineIndex, last.occurrence.column)
+    result = appendClosingTokensToLastContentLine(result, rule.token, 1)
   }
 
+  // Prepend synthetic opener to start of first content line (inline, no new lines).
+  // Pass the first fence's hunk line index so the search only looks at lines
+  // before the boundary closer — the opener must precede it to form a pair.
   if (chosen.startDepth > 0) {
-    const first = fences[0]!
-    result = escapeDelimiterAt(result, first.occurrence.hunkLineIndex, first.occurrence.column)
+    const firstFenceHunkLine = fences[0]?.occurrence.hunkLineIndex
+    result = prependOpeningTokenToFirstContentLine(result, rule.token, firstFenceHunkLine)
   }
 
   return result
@@ -469,6 +487,42 @@ function appendClosingTokensToLastContentLine(lines: readonly string[], closeTok
     }
 
     return `${line} ${closingSuffix}`
+  })
+}
+
+function prependOpeningTokenToFirstContentLine(
+  lines: readonly string[],
+  openToken: string,
+  beforeHunkLineIndex?: number,
+): string[] {
+  // Prefer a blank/whitespace content line to avoid creating a fake info string
+  // (e.g. "```   handler() {" makes tree-sitter think "handler()" is a language).
+  // Only search among lines BEFORE the first fence so the synthetic opener
+  // appears before the boundary closer (they need to pair).
+  const firstContentLineIndex = lines.findIndex(isDiffContentLine)
+  if (firstContentLineIndex === -1) {
+    return [...lines]
+  }
+
+  const searchEnd = beforeHunkLineIndex ?? lines.length
+  let targetIndex = firstContentLineIndex
+  for (let i = firstContentLineIndex; i < searchEnd; i++) {
+    const line = lines[i]!
+    if (!isDiffContentLine(line)) continue
+    if (line.slice(1).trim() === "") {
+      targetIndex = i
+      break
+    }
+  }
+
+  return lines.map((line, index) => {
+    if (index !== targetIndex || !isDiffContentLine(line)) {
+      return line
+    }
+
+    const prefix = line[0] ?? ""
+    const content = line.slice(1)
+    return `${prefix}${openToken} ${content}`
   })
 }
 
