@@ -1,3 +1,7 @@
+# 0.1.137
+
+1. **Fixed colored diff line backgrounds bleeding gaps between rows** (`critique --web`, `critique review --web`) — switching spans to `display: inline` in 0.1.136 caused background colors on added/removed lines to only paint behind the text content area (~1em), leaving the leading above and below each line transparent and showing as gaps. Added `padding-block: 0.35em` to inline spans, which extends the background paint area to cover the full 1.7em line-height without affecting layout. Ctrl+F search across tokens still works.
+
 # 0.1.136
 
 1. **Fixed browser Ctrl+F search across syntax-highlighted tokens** (`critique --web`, `critique review --web`) — searching for any substring of a line now works correctly in Chrome, Edge, and all browsers. Previously, each colored token was wrapped in a `display: inline-block` span, which caused Chrome's find-in-page to treat each span as an isolated text island — meaning a search for `"const x"` would fail if `"const"` and `" x"` had different syntax-highlight colors. Switching spans to `display: inline` restores continuous text flow across token boundaries.

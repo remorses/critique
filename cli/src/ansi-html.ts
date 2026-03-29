@@ -309,6 +309,7 @@ export function frameToHtmlDocument(frame: CapturedFrame, options: ToHtmlOptions
       white-space: pre;
       display: inline;
       line-height: 1.7;
+      padding-block: 0.35em;
     }
     /* Disable content-visibility on iOS Safari where it can cause rendering issues */
     @supports (-webkit-touch-callout: none) {
