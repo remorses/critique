@@ -1,3 +1,7 @@
+# 0.1.136
+
+1. **Fixed browser Ctrl+F search across syntax-highlighted tokens** (`critique --web`, `critique review --web`) — searching for any substring of a line now works correctly in Chrome, Edge, and all browsers. Previously, each colored token was wrapped in a `display: inline-block` span, which caused Chrome's find-in-page to treat each span as an isolated text island — meaning a search for `"const x"` would fail if `"const"` and `" x"` had different syntax-highlight colors. Switching spans to `display: inline` restores continuous text flow across token boundaries.
+
 # 0.1.135
 
 1. **Fixed markdown code fence balancing for even-count boundary cases** (`critique`, `critique --web`, `critique review`) — diffs that start or end mid-code-block in a `.md` file now syntax-highlight correctly. Previously, the odd/even counting approach missed cases where a hunk had an even number of ` ``` ` tokens but the first was a closing fence from a block opened before the hunk and the last was an opening fence for a block continuing past it. A sequential state-machine walk now detects these boundary fences and inserts synthetic ` ``` ` tokens inline on existing lines (preserving patch header counts) to give the parser balanced delimiters.

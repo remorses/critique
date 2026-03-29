@@ -307,9 +307,8 @@ export function frameToHtmlDocument(frame: CapturedFrame, options: ToHtmlOptions
     }
     .line span {
       white-space: pre;
-      display: inline-block;
+      display: inline;
       line-height: 1.7;
-      vertical-align: top;
     }
     /* Disable content-visibility on iOS Safari where it can cause rendering issues */
     @supports (-webkit-touch-callout: none) {
