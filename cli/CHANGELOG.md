@@ -1,3 +1,9 @@
+# 0.1.138
+
+1. **Fixed block comment leak across later diff hunks** (`critique`, `critique --web`, `critique review`) — TypeScript and other `/* */`-style comment diffs now stay syntax-highlighted when a hunk contains an earlier `*/` and later reopens a comment with `/**` or `/*`. Critique now walks asymmetric comment tokens in order instead of only comparing open/close counts, so hunks that both close an earlier comment and open a new one get a synthetic trailing `*/` appended before the next hunk is rendered.
+
+2. **Added a real-world regression test for `thread-session-runtime.ts`** — the exact patch shape from `discord/src/session-handler/thread-session-runtime.ts` is now covered with an inline snapshot so future delimiter-balancing changes keep this comment-boundary case working.
+
 # 0.1.137
 
 1. **Fixed colored diff line backgrounds bleeding gaps between rows** (`critique --web`, `critique review --web`) — switching spans to `display: inline` in 0.1.136 caused background colors on added/removed lines to only paint behind the text content area (~1em), leaving the leading above and below each line transparent and showing as gaps. Added `padding-block: 0.35em` to inline spans, which extends the background paint area to cover the full 1.7em line-height without affecting layout. Ctrl+F search across tokens still works.

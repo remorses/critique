@@ -326,6 +326,11 @@ interface WalkResult {
   conflicts: number
 }
 
+interface ClassifiedAsymmetricOccurrence {
+  occurrence: DelimiterOccurrence
+  kind: "open" | "close"
+}
+
 /**
  * Simulate a sequential walk through classified fences to detect boundary
  * artifacts. Markdown code fences don't nest, so depth toggles between 0
@@ -354,6 +359,30 @@ function walkFences(fences: readonly ClassifiedFence[], startDepth: number): Wal
         depth = 1
       }
     }
+  }
+
+  return { startDepth, endDepth: depth, conflicts }
+}
+
+function walkAsymmetricOccurrences(
+  occurrences: readonly ClassifiedAsymmetricOccurrence[],
+  startDepth: number,
+): WalkResult {
+  let depth = startDepth
+  let conflicts = 0
+
+  for (const occurrence of occurrences) {
+    if (occurrence.kind === "open") {
+      depth++
+      continue
+    }
+
+    if (depth > 0) {
+      depth--
+      continue
+    }
+
+    conflicts++
   }
 
   return { startDepth, endDepth: depth, conflicts }
@@ -464,9 +493,46 @@ function getUnclosedTokenCount(lines: readonly string[], rule: DelimiterRule): n
     return 0
   }
 
-  const openCount = findAnyDelimiterOccurrences(contentLines, openTokens).length
-  const closeCount = findDelimiterOccurrences(contentLines, closeToken).length
-  return Math.max(0, openCount - closeCount)
+  const orderedTokens = [...openTokens, closeToken]
+  const occurrences = findAnyDelimiterOccurrences(contentLines, orderedTokens)
+  if (occurrences.length === 0) {
+    return 0
+  }
+
+  const classified: ClassifiedAsymmetricOccurrence[] = []
+  for (const occurrence of occurrences) {
+    const content = contentLines[occurrence.contentLineIndex]?.content
+    if (content === undefined) {
+      continue
+    }
+
+    if (content.startsWith(closeToken, occurrence.column)) {
+      classified.push({ occurrence, kind: "close" })
+      continue
+    }
+
+    const matchedOpen = openTokens.some((token) => content.startsWith(token, occurrence.column))
+    if (matchedOpen) {
+      classified.push({ occurrence, kind: "open" })
+    }
+  }
+
+  if (classified.length === 0) {
+    return 0
+  }
+
+  const walk0 = walkAsymmetricOccurrences(classified, 0)
+  const walk1 = walkAsymmetricOccurrences(classified, 1)
+
+  if (walk0.conflicts < walk1.conflicts) {
+    return walk0.endDepth
+  }
+
+  if (walk1.conflicts < walk0.conflicts) {
+    return walk1.endDepth
+  }
+
+  return Math.min(walk0.endDepth, walk1.endDepth)
 }
 
 function appendClosingTokensToLastContentLine(lines: readonly string[], closeToken: string, count: number): string[] {

@@ -286,6 +286,85 @@ describe("balanceDelimiters", () => {
       expect(() => parsePatch(result)).not.toThrow()
     })
 
+    it("captures the real thread-session-runtime comment leak when a hunk has an earlier closer and later opener", () => {
+      const patch = [
+        "--- discord/src/session-handler/thread-session-runtime.ts",
+        "+++ discord/src/session-handler/thread-session-runtime.ts",
+        "@@ -442,12 +443,13 @@",
+        '    * "tool:pattern:action"). Parsed into PermissionRuleset entries by',
+        '    * parsePermissionRules() and appended after buildSessionPermissions()',
+        '    * so they win via opencode\'s findLast() evaluation. Only used on',
+        '    * session creation (first dispatch).',
+        '    */',
+        '   permissions?: string[]',
+        '+  injectionGuardPatterns?: string[]',
+        "   sessionStartSource?: { scheduleKind: 'at' | 'cron'; scheduledTaskId?: number }",
+        '   /**',
+        '    * Lazy preprocessing callback. When set, the runtime serializes it via a',
+        '    * lightweight promise chain (preprocessChain) to resolve prompt/images/mode',
+        "@@ -2686,12 +2688,13 @@",
+        ' ',
+        '      // ── Ensure session ──────────────────────────────────────',
+        '      const sessionResult = await this.ensureSession({',
+        '        prompt: input.prompt,',
+        '        agent: input.agent,',
+        '        permissions: input.permissions,',
+        '+        injectionGuardPatterns: input.injectionGuardPatterns,',
+        '        sessionStartScheduleKind: input.sessionStartSource?.scheduleKind,',
+        '        sessionStartScheduledTaskId: input.sessionStartSource?.scheduledTaskId,',
+        '      })',
+      ].join("\n")
+
+      const result = balanceDelimiters(patch, "typescript")
+
+      expect(result).toMatchInlineSnapshot(`
+        "--- discord/src/session-handler/thread-session-runtime.ts
+        +++ discord/src/session-handler/thread-session-runtime.ts
+        @@ -442,12 +443,13 @@
+            * \"tool:pattern:action\"). Parsed into PermissionRuleset entries by
+            * parsePermissionRules() and appended after buildSessionPermissions()
+            * so they win via opencode's findLast() evaluation. Only used on
+            * session creation (first dispatch).
+            */
+           permissions?: string[]
+        +  injectionGuardPatterns?: string[]
+           sessionStartSource?: { scheduleKind: 'at' | 'cron'; scheduledTaskId?: number }
+           /**
+            * Lazy preprocessing callback. When set, the runtime serializes it via a
+            * lightweight promise chain (preprocessChain) to resolve prompt/images/mode */
+        @@ -2686,12 +2688,13 @@
+         
+              // ── Ensure session ──────────────────────────────────────
+              const sessionResult = await this.ensureSession({
+                prompt: input.prompt,
+                agent: input.agent,
+                permissions: input.permissions,
+        +        injectionGuardPatterns: input.injectionGuardPatterns,
+                sessionStartScheduleKind: input.sessionStartSource?.scheduleKind,
+                sessionStartScheduledTaskId: input.sessionStartSource?.scheduledTaskId,
+              })"
+      `)
+    })
+
+    it("appends a synthetic closer when a hunk closes an earlier comment and reopens another one", () => {
+      const patch = [
+        "--- file.ts",
+        "+++ file.ts",
+        "@@ -1,3 +1,5 @@",
+        "  still inside old comment",
+        "  */",
+        "  const x = 1",
+        "+ /**",
+        "+ * reopened comment",
+      ].join("\n")
+
+      const result = balanceDelimiters(patch, "typescript")
+      const lines = result.split("\n")
+
+      expect(lines[7]).toBe("+ * reopened comment */")
+      expect(() => parsePatch(result)).not.toThrow()
+    })
+
     it("preserves no-newline markers", () => {
       const patch = [
         "--- file.ts",
