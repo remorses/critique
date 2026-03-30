@@ -11,10 +11,11 @@
 //   3. Repair asymmetric delimiters by appending the closing token to the
 //      last content line in the hunk so later hunks do not inherit state.
 //
-// Why this is safer than prepending a synthetic opener: prepending fixes hunks
-// that begin inside a string, but it corrupts hunks that end inside an open
-// string/fence/docstring. Escaping the actual unmatched token keeps the repair
-// local and avoids duplicating delimiters like ``` -> ``````.
+// For strings/docstrings, repairing the actual unmatched token is safer than
+// prepending a synthetic opener because it keeps the mutation local and avoids
+// duplicating delimiters like ``` -> ``````. Markdown fences are the exception:
+// their contextual open/close classification lets us safely add inline fence
+// context without rewriting hunk headers.
 
 type BoundaryKind = "open" | "close" | "unknown"
 
@@ -327,7 +328,6 @@ interface WalkResult {
 }
 
 interface ClassifiedAsymmetricOccurrence {
-  occurrence: DelimiterOccurrence
   kind: "open" | "close"
 }
 
@@ -507,13 +507,13 @@ function getUnclosedTokenCount(lines: readonly string[], rule: DelimiterRule): n
     }
 
     if (content.startsWith(closeToken, occurrence.column)) {
-      classified.push({ occurrence, kind: "close" })
+      classified.push({ kind: "close" })
       continue
     }
 
     const matchedOpen = openTokens.some((token) => content.startsWith(token, occurrence.column))
     if (matchedOpen) {
-      classified.push({ occurrence, kind: "open" })
+      classified.push({ kind: "open" })
     }
   }
 
