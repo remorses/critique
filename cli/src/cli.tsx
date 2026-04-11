@@ -1844,7 +1844,7 @@ export function App({ parsedFiles }: AppProps): React.ReactElement {
 cli
   .command("hunks list", "List all hunks with stable IDs for selective staging")
   .option("--staged", "List staged hunks instead of unstaged")
-  .option("--filter <pattern>", wrapJsonSchema({
+  .option("--filter <pattern>", wrapJsonSchema<string[]>({
     type: "array",
     items: { type: "string" },
     description: "Filter files by glob pattern (can be used multiple times)",
@@ -2040,7 +2040,7 @@ cli
   .option("--commit <ref>", "Show changes from a specific commit")
   .option("--watch", "Watch for file changes and refresh diff")
   .option("--context <lines>", "Number of context lines (default: 6)")
-  .option("--filter <pattern>", wrapJsonSchema({
+  .option("--filter <pattern>", wrapJsonSchema<string[]>({
     type: "array",
     items: { type: "string" },
     description: "Filter files by glob pattern (can be used multiple times)",
@@ -2363,12 +2363,12 @@ cli
   .option("--staged", "Review staged changes")
   .option("--commit <ref>", "Review changes from a specific commit")
   .option("--context <lines>", "Number of context lines (default: 6)")
-  .option("--filter <pattern>", wrapJsonSchema({
+  .option("--filter <pattern>", wrapJsonSchema<string[]>({
     type: "array",
     items: { type: "string" },
     description: "Filter files by glob pattern (can be used multiple times)",
   }))
-  .option("--session <id>", wrapJsonSchema({
+  .option("--session <id>", wrapJsonSchema<string[]>({
     type: "array",
     items: { type: "string" },
     description: "Session ID(s) to include as context (can be repeated)",
@@ -2722,7 +2722,7 @@ cli
   .option("--open", "Open in browser after generating")
   .option("--context <lines>", "Number of context lines (default: 6)")
   .option("--theme <name>", "Theme to use for rendering")
-  .option("--filter <pattern>", wrapJsonSchema({
+  .option("--filter <pattern>", wrapJsonSchema<string[]>({
     type: "array",
     items: { type: "string" },
     description: "Filter files by glob pattern (can be used multiple times)",
