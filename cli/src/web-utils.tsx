@@ -1025,15 +1025,16 @@ export async function uploadOgImage(id: string, ogImage: Buffer): Promise<void> 
  * Open a URL in the default browser
  */
 export async function openInBrowser(url: string): Promise<void> {
-  const openCmd =
-    process.platform === "darwin"
-      ? "open"
-      : process.platform === "win32"
-        ? "start"
-        : "xdg-open"
-
   try {
-    await execAsync(`${openCmd} "${url}"`)
+    if (process.platform === "darwin") {
+      await execAsync(`open "${url}"`)
+    } else if (process.platform === "win32") {
+      // On Windows, `start` treats the first quoted arg as a window title,
+      // so pass an empty title before the URL
+      await execAsync(`cmd /c start "" "${url}"`)
+    } else {
+      await execAsync(`xdg-open "${url}"`)
+    }
   } catch {
     // Silent fail - user can copy URL manually
   }
