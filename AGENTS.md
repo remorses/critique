@@ -86,15 +86,9 @@ use gitchamber to read the .md files using curl
 
 you can read more examples of opentui react code using gitchamber by listing and reading files from the correct endpoint: https://gitchamber.com/repos/sst/opentui/main/files?glob=packages/react/examples/**
 
-## changelog
+## changesets
 
-after any meaningful change update CHANGELOG.md with the version number and the list of changes made. in concise bullet points
-
-in bullet points use nested list and specify for which command exactly are the changes. or group them to make it clear what they cover.
-
-before updating the changelog bump the package.json version field first. NEVER do major bumps. NEVER publish yourself
-
-NEVER update existing changelog bullet points for previous version unless you added those bullet points yourself recently and the change is of the same version as it is now.
+After completing a fix or feature, add a `.changeset/*.md` file at the repo root instead of editing CHANGELOG.md. Never edit CHANGELOG.md directly; it is generated at publish time. Never bump `package.json` version manually. Load the `changesets` skill for format and rules.
 
 
 ## zustand
