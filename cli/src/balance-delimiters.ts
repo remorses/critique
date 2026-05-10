@@ -10,8 +10,9 @@
 //   2. Repair symmetric delimiters by inserting a synthetic opening/closing
 //      token on an existing content line so the real boundary token can still
 //      pair and reset parser state.
-//   3. Repair asymmetric delimiters by appending the closing token to the
-//      last content line in the hunk so later hunks do not inherit state.
+//   3. Repair open/close delimiters the same way: prepend a missing opener
+//      when the hunk starts inside a block, append a missing closer when the
+//      hunk ends inside a block.
 //
 // For strings/docstrings, the real boundary token still matters. Escaping a
 // closing token that actually ends an outer template/docstring leaves the
@@ -258,7 +259,15 @@ function classifyOccurrence(
     return "unknown"
   }
 
+  if (!before && after && /[)\]};:.,]/.test(after)) {
+    return "close"
+  }
+
   if (!before && after) {
+    return "open"
+  }
+
+  if (before && !after && /[(\[{=,:?]/.test(before)) {
     return "open"
   }
 
@@ -323,7 +332,7 @@ interface WalkResult {
   conflicts: number
 }
 
-interface ClassifiedAsymmetricOccurrence {
+interface ClassifiedPairedOccurrence {
   kind: "open" | "close"
 }
 
@@ -360,8 +369,8 @@ function walkFences(fences: readonly ClassifiedFence[], startDepth: number): Wal
   return { startDepth, endDepth: depth, conflicts }
 }
 
-function walkAsymmetricOccurrences(
-  occurrences: readonly ClassifiedAsymmetricOccurrence[],
+function walkPairedOccurrences(
+  occurrences: readonly ClassifiedPairedOccurrence[],
   startDepth: number,
 ): WalkResult {
   let depth = startDepth
@@ -382,6 +391,22 @@ function walkAsymmetricOccurrences(
   }
 
   return { startDepth, endDepth: depth, conflicts }
+}
+
+function repairCount(walk: WalkResult): number {
+  return walk.startDepth + walk.endDepth
+}
+
+function chooseBoundaryWalk(walk0: WalkResult, walk1: WalkResult): WalkResult {
+  if (walk0.conflicts < walk1.conflicts) return walk0
+  if (walk1.conflicts < walk0.conflicts) return walk1
+
+  const repairs0 = repairCount(walk0)
+  const repairs1 = repairCount(walk1)
+  if (repairs0 < repairs1) return walk0
+  if (repairs1 < repairs0) return walk1
+
+  return walk0
 }
 
 /**
@@ -419,32 +444,21 @@ function repairContextualFences(
 
   if (fences.length === 0) return [...lines]
 
-  // Try both starting states
   const walk0 = walkFences(fences, 0)
   const walk1 = walkFences(fences, 1)
 
   // Pick better walk: fewer conflicts → fewer repairs → content heuristic
-  let chosen: WalkResult
-  if (walk0.conflicts < walk1.conflicts) {
-    chosen = walk0
-  } else if (walk1.conflicts < walk0.conflicts) {
-    chosen = walk1
-  } else {
-    const repairs0 = (walk0.startDepth > 0 ? 1 : 0) + (walk0.endDepth > 0 ? 1 : 0)
-    const repairs1 = (walk1.startDepth > 0 ? 1 : 0) + (walk1.endDepth > 0 ? 1 : 0)
-    if (repairs0 < repairs1) {
-      chosen = walk0
-    } else if (repairs1 < repairs0) {
-      chosen = walk1
-    } else {
-      // Still tied: disambiguate by content position relative to the first fence.
-      // If there's non-empty content before the first fence in the hunk, the fence
-      // is likely closing a block from before the hunk → prefer depth=1 (starts inside).
-      // This produces better tree-sitter pairing: the prepended ``` + original ```
-      // form a matched pair, while appended inline ``` doesn't close a fence.
-      const firstIdx = fences[0]?.occurrence.contentLineIndex ?? 0
-      const hasContentBefore = contentLines.slice(0, firstIdx).some((line) => line.content.trim() !== "")
-      chosen = hasContentBefore ? walk1 : walk0
+  let chosen = chooseBoundaryWalk(walk0, walk1)
+  if (walk0.conflicts === walk1.conflicts && repairCount(walk0) === repairCount(walk1)) {
+    // Still tied: disambiguate by content position relative to the first fence.
+    // If there's non-empty content before the first fence in the hunk, the fence
+    // is likely closing a block from before the hunk → prefer depth=1 (starts inside).
+    // This produces better tree-sitter pairing: the prepended ``` + original ```
+    // form a matched pair, while appended inline ``` doesn't close a fence.
+    const firstIdx = fences[0]?.occurrence.contentLineIndex ?? 0
+    const hasContentBefore = contentLines.slice(0, firstIdx).some((line) => line.content.trim() !== "")
+    if (hasContentBefore) {
+      chosen = walkFences(fences, 1)
     }
   }
 
@@ -480,57 +494,6 @@ function isSymmetricRule(rule: DelimiterRule): boolean {
   return openTokens.length === 1 && openTokens[0] === closeToken
 }
 
-function getUnclosedTokenCount(lines: readonly string[], rule: DelimiterRule): number {
-  const contentLines = getContentLines(lines)
-  const openTokens = getRuleOpenTokens(rule)
-  const closeToken = getRuleCloseToken(rule)
-
-  if (isSymmetricRule(rule)) {
-    return 0
-  }
-
-  const orderedTokens = [...openTokens, closeToken]
-  const occurrences = findAnyDelimiterOccurrences(contentLines, orderedTokens)
-  if (occurrences.length === 0) {
-    return 0
-  }
-
-  const classified: ClassifiedAsymmetricOccurrence[] = []
-  for (const occurrence of occurrences) {
-    const content = contentLines[occurrence.contentLineIndex]?.content
-    if (content === undefined) {
-      continue
-    }
-
-    if (content.startsWith(closeToken, occurrence.column)) {
-      classified.push({ kind: "close" })
-      continue
-    }
-
-    const matchedOpen = openTokens.some((token) => content.startsWith(token, occurrence.column))
-    if (matchedOpen) {
-      classified.push({ kind: "open" })
-    }
-  }
-
-  if (classified.length === 0) {
-    return 0
-  }
-
-  const walk0 = walkAsymmetricOccurrences(classified, 0)
-  const walk1 = walkAsymmetricOccurrences(classified, 1)
-
-  if (walk0.conflicts < walk1.conflicts) {
-    return walk0.endDepth
-  }
-
-  if (walk1.conflicts < walk0.conflicts) {
-    return walk1.endDepth
-  }
-
-  return Math.min(walk0.endDepth, walk1.endDepth)
-}
-
 function appendClosingTokensToLastContentLine(lines: readonly string[], closeToken: string, count: number): string[] {
   if (count <= 0) {
     return [...lines]
@@ -550,6 +513,64 @@ function appendClosingTokensToLastContentLine(lines: readonly string[], closeTok
 
     return `${line} ${closingSuffix}`
   })
+}
+
+function repairSymmetricDelimiter(
+  contentLines: readonly ContentLine[],
+  lines: readonly string[],
+  rule: DelimiterRule,
+): string[] {
+  const occurrences = findDelimiterOccurrences(contentLines, rule.token)
+  if (occurrences.length === 0) return [...lines]
+  if (occurrences.length % 2 === 0) return [...lines]
+
+  const first = occurrences[0]
+  const last = occurrences[occurrences.length - 1]
+  if (!first || !last) return [...lines]
+
+  if (classifyOccurrence(contentLines, first, rule.token) === "close") {
+    return prependOpeningTokenToFirstContentLine(lines, rule.token, first.hunkLineIndex)
+  }
+
+  if (classifyOccurrence(contentLines, last, rule.token) === "open") {
+    return appendClosingTokensToLastContentLine(lines, rule.token, 1)
+  }
+
+  return [...lines]
+}
+
+function repairOpenCloseDelimiter(
+  contentLines: readonly ContentLine[],
+  lines: readonly string[],
+  rule: DelimiterRule,
+): string[] {
+  const openTokens = getRuleOpenTokens(rule)
+  const closeToken = getRuleCloseToken(rule)
+  const occurrences = findAnyDelimiterOccurrences(contentLines, [...openTokens, closeToken])
+  if (occurrences.length === 0) return [...lines]
+
+  const classified: ClassifiedPairedOccurrence[] = []
+  for (const occurrence of occurrences) {
+    const content = contentLines[occurrence.contentLineIndex]?.content
+    if (content === undefined) continue
+
+    classified.push({
+      kind: content.startsWith(closeToken, occurrence.column) ? "close" : "open",
+    })
+  }
+
+  const chosen = chooseBoundaryWalk(
+    walkPairedOccurrences(classified, 0),
+    walkPairedOccurrences(classified, 1),
+  )
+  let result = [...lines]
+  if (chosen.endDepth > 0) {
+    result = appendClosingTokensToLastContentLine(result, closeToken, chosen.endDepth)
+  }
+  if (chosen.startDepth > 0) {
+    result = prependOpeningTokenToFirstContentLine(result, openTokens[0] ?? rule.token, occurrences[0]?.hunkLineIndex)
+  }
+  return result
 }
 
 function prependOpeningTokenToFirstContentLine(
@@ -599,9 +620,9 @@ function prependOpeningTokenToFirstContentLine(
  * classify the unmatched boundary token as a likely opener or closer and add
  * the missing paired token on an existing content line.
  *
- * Pass 3 (hunk isolation): if a hunk leaves an asymmetric delimiter open,
- * append its closing token to the last content line so the next hunk starts
- * from a clean parser state.
+ * Pass 3 (hunk isolation): for explicit open/close delimiters like block
+ * comments, add the missing boundary token at either side so each hunk starts
+ * and ends from a clean parser state.
  */
 export function balanceDelimiters(rawDiff: string, filetype?: string): string {
   if (!filetype) return rawDiff
@@ -627,13 +648,14 @@ export function balanceDelimiters(rawDiff: string, filetype?: string): string {
   const result = [...fileHeader]
 
   for (const hunk of hunks) {
-    const contentLines = getContentLines(hunk.lines)
     let repairedLines = hunk.lines
 
     for (const rule of rules) {
       if (!isSymmetricRule(rule)) {
         continue
       }
+
+      const contentLines = getContentLines(repairedLines)
 
       // Contextual fence pairing (markdown code fences): uses sequential
       // open/close tracking instead of simple odd/even parity.
@@ -642,36 +664,15 @@ export function balanceDelimiters(rawDiff: string, filetype?: string): string {
         continue
       }
 
-      const occurrences = findDelimiterOccurrences(contentLines, rule.token)
-      if (occurrences.length % 2 === 0) {
-        continue
-      }
-
-      const first = occurrences[0]
-      const last = occurrences[occurrences.length - 1]
-      if (!first || !last) {
-        continue
-      }
-
-      const firstBoundary = classifyOccurrence(contentLines, first, rule.token)
-      const lastBoundary = classifyOccurrence(contentLines, last, rule.token)
-
-      if (firstBoundary === "close") {
-        repairedLines = prependOpeningTokenToFirstContentLine(repairedLines, rule.token, first.hunkLineIndex)
-        break
-      }
-
-      if (lastBoundary === "open") {
-        repairedLines = appendClosingTokensToLastContentLine(repairedLines, rule.token, 1)
-        break
-      }
+      repairedLines = repairSymmetricDelimiter(contentLines, repairedLines, rule)
     }
 
     for (const rule of rules) {
-      const unclosedCount = getUnclosedTokenCount(repairedLines, rule)
-      if (unclosedCount > 0) {
-        repairedLines = appendClosingTokensToLastContentLine(repairedLines, getRuleCloseToken(rule), unclosedCount)
+      if (isSymmetricRule(rule)) {
+        continue
       }
+
+      repairedLines = repairOpenCloseDelimiter(getContentLines(repairedLines), repairedLines, rule)
     }
 
     result.push(hunk.header)

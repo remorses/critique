@@ -289,6 +289,35 @@ describe("balanceDelimiters", () => {
       expect(lines[lines.length - 1]).toBe("+const z = 3 `")
     })
 
+    it("prepends a synthetic opener for inline snapshot hunks that start inside a template literal", () => {
+      const patch = [
+        "--- spiceflow/src/instrumentation.test.ts",
+        "+++ spiceflow/src/instrumentation.test.ts",
+        "@@ -1,6 +1,14 @@",
+        '        "handler - /users/:id",',
+        '        "handler - /users/:id > db.query",',
+        "      ]",
+        "    `)",
+        "  })",
+        "+",
+        "+  test('tracing works across mounted subapps', async () => {",
+        "+    expect(spanNames).toMatchInlineSnapshot(`",
+        "+      [",
+        '+        "GET /users/:id",',
+        "+      ]",
+        "+    `)",
+        "+  })",
+        " })",
+      ].join("\n")
+
+      const result = balanceDelimiters(patch, "typescript")
+      const lines = result.split("\n")
+
+      expect(lines[3]).toBe(' `        "handler - /users/:id",')
+      expect(lines.at(-1)).toBe(" })")
+      expect(() => parsePatch(result)).not.toThrow()
+    })
+
     it("appends a synthetic block comment closer before the next hunk", () => {
       const patch = [
         "--- file.ts",
@@ -361,7 +390,7 @@ describe("balanceDelimiters", () => {
         "--- discord/src/session-handler/thread-session-runtime.ts
         +++ discord/src/session-handler/thread-session-runtime.ts
         @@ -442,12 +443,13 @@
-            * \"tool:pattern:action\"). Parsed into PermissionRuleset entries by
+         /*    * "tool:pattern:action"). Parsed into PermissionRuleset entries by
             * parsePermissionRules() and appended after buildSessionPermissions()
             * so they win via opencode's findLast() evaluation. Only used on
             * session creation (first dispatch).
