@@ -1,67 +1,223 @@
-# critique
-
-A beautiful terminal UI for reviewing git diffs with syntax highlighting, split view, and word-level diff.
+<div align='center'>
+    <br/>
+    <br/>
+    <h3>critique</h3>
+    <p>Bun-only diff viewer for terminals, web previews, and agents.</p>
+    <br/>
+    <br/>
+</div>
 
 ![Diff Viewer Demo](screenshot.png)
 
 ## Installation
 
-> **Note:** critique requires [Bun](https://bun.sh) - it does not work with Node.js.
+critique requires [Bun](https://bun.sh). It does not run under Node.js.
 
 ```bash
-# Run directly with bunx (no install needed)
+# Run directly without installing
 bunx critique
 
 # Or install globally
 bun install -g critique
 ```
 
-## Usage
+## Quick Start
 
-### View Git Diff
+Open the current working tree diff in the terminal:
 
 ```bash
-# View unstaged changes (includes untracked files)
+critique
+```
+
+Upload the same diff and get a shareable URL:
+
+```bash
+critique --web "Current working tree"
+```
+
+Review staged changes:
+
+```bash
+critique --staged
+critique --staged --web "Staged changes"
+```
+
+## Core Diff Commands
+
+critique follows the same mental model as `git diff`.
+
+```bash
+# View unstaged changes, including untracked files
 critique
 
 # View staged changes
 critique --staged
 
-# View changes since a ref (like git diff)
-critique HEAD~1         # shows last 1 commit (changes since HEAD~1)
-critique HEAD~3         # shows last 3 commits
-critique main           # shows changes since main (your branch's additions)
+# View changes since a ref
+critique HEAD~1
+critique main
 
-# View a specific commit only (what that commit introduced)
+# View one commit only
 critique --commit HEAD~1
 critique --commit abc1234
 
-# Compare two refs (PR-style, shows what head added since diverging from base)
-critique HEAD~3 HEAD    # shows all changes from 3 commits ago to now
+# Compare two refs, PR style
+critique main HEAD
+critique main feature-branch
 
-# Compare two branches (PR-style, shows what head added since diverging from base)
-critique main feature-branch    # what feature-branch added vs main
-critique main HEAD              # what current branch added vs main
-
-# Watch mode - auto-refresh on file changes
+# Watch the working tree and refresh on changes
 critique --watch
 
-# Filter files by glob pattern (can be used multiple times)
+# Filter files by glob pattern
 critique --filter "src/**/*.ts"
 critique --filter "src/**/*.ts" --filter "lib/**/*.js"
 ```
 
-### Navigation
+## Navigation
 
 | Key | Action |
-|-----|--------|
+| --- | --- |
 | `←` / `→` | Navigate between files |
-| `↑` / `↓` | Scroll up/down |
+| `↑` / `↓` | Scroll up and down |
 | `Ctrl+P` | Open file selector dropdown |
-| `Option` (hold) | Fast scroll (10x) |
+| `Option` held | Fast scroll at 10x speed |
 | `Esc` | Close dropdown |
 
-### Git Difftool Integration
+## Web Previews
+
+`--web` renders the diff with the same terminal renderer, uploads it to [critique.work](https://critique.work), and prints a shareable URL.
+
+```bash
+# Working tree changes
+critique --web "Fix auth retry"
+
+# Staged changes
+critique --staged --web "Release notes"
+
+# Changes since a ref
+critique main --web "Branch changes"
+
+# One commit
+critique --commit HEAD --web "Latest commit"
+
+# PR-style branch diff
+critique main HEAD --web "Current branch"
+
+# JSON output for scripts
+critique --web "Deploy changes" --json
+```
+
+Generated URLs look like `critique.work/v/<id>`.
+
+![Web Preview](screenshot-web.png)
+
+### Web Preview Options
+
+| Flag | Description | Default |
+| --- | --- | --- |
+| `--web [title]` | Generate and upload a web preview | `Critique Diff` |
+| `--staged` | Show staged changes | none |
+| `--commit <ref>` | Show changes from a specific commit | none |
+| `--cols <n>` | Desktop render width | `240` |
+| `--mobile-cols <n>` | Mobile render width | `100` |
+| `--filter <pattern>` | Filter files by glob, can be repeated | none |
+| `--theme <name>` | Use a fixed theme instead of auto light and dark mode | none |
+| `--open` | Open the URL in your browser | none |
+| `--json` | Print `{ url, id, files }` for scripts | none |
+
+### How Web Uploads Work
+
+```text
+┌─────────────────────────────────────┐
+│ git diff                            │
+└─────────────────────────────────────┘
+                   │
+                   ▼
+┌─────────────────────────────────────┐
+│ opentui test renderer               │
+└─────────────────────────────────────┘
+                   │
+                   ▼
+┌─────────────────────────────────────┐
+│ HTML variants and raw patch         │
+└─────────────────────────────────────┘
+                   │
+                   ▼
+┌─────────────────────────────────────┐
+│ critique.work upload                │
+└─────────────────────────────────────┘
+                   │
+                   ▼
+┌─────────────────────────────────────┐
+│ shareable URL, optional .patch      │
+└─────────────────────────────────────┘
+```
+
+The CLI does **not** generate a local HTML file. It uploads to `critique.work`. Local HTML export is tracked separately in [issue #42](https://github.com/remorses/critique/issues/42).
+
+Uploaded diffs expire after 7 days unless you use a license key. Identical diffs reuse the same content hash URL.
+
+## Raw Patch Access
+
+Every `--web` upload also stores the raw unified diff. Append `.patch` to any critique URL to fetch it.
+
+```bash
+CRITIQUE_URL='https://critique.work/v/<id>'
+
+# View the patch in your terminal
+curl "$CRITIQUE_URL.patch"
+
+# Apply the patch directly to your repo
+curl -s "$CRITIQUE_URL.patch" | git apply
+
+# Reverse the patch
+curl -s "$CRITIQUE_URL.patch" | git apply --reverse
+```
+
+## AI-Powered Diff Explanation
+
+`critique review` asks an agent to explain a diff in a readable order. It can use [OpenCode](https://opencode.ai) or [Claude Code](https://www.anthropic.com/claude-code).
+
+```bash
+# Review unstaged changes with OpenCode
+critique review
+
+# Use Claude Code instead
+critique review --agent claude
+
+# Review staged changes
+critique review --staged
+
+# Review changes since a ref
+critique review HEAD~1
+critique review main
+
+# Review one commit
+critique review --commit HEAD~1
+
+# Include coding session context
+critique review --agent opencode --session <session-id>
+critique review --agent claude --session <session-id>
+
+# Upload the review as a web preview
+critique review --web
+critique review --web --open
+```
+
+### Review Options
+
+| Flag | Description |
+| --- | --- |
+| `--agent <name>` | AI agent to use: `opencode` or `claude` |
+| `--staged` | Review staged changes |
+| `--commit <ref>` | Review one commit |
+| `--session <id>` | Include session context, can be repeated |
+| `--web` | Upload the review as a web preview |
+| `--pdf [filename]` | Generate a PDF. See the [e-reader guide](docs/e-reader-guide.md) |
+| `--open` | Open the generated URL or PDF |
+| `--filter <pattern>` | Filter files by glob |
+
+## Git Difftool Integration
 
 Configure critique as your git difftool:
 
@@ -70,13 +226,13 @@ git config --global diff.tool critique
 git config --global difftool.critique.cmd 'critique difftool "$LOCAL" "$REMOTE"'
 ```
 
-Then use:
+Then run:
 
 ```bash
 git difftool HEAD~1
 ```
 
-### Lazygit Integration
+## Lazygit Integration
 
 Use critique as a custom pager in [lazygit](https://github.com/jesseduffield/lazygit):
 
@@ -87,81 +243,24 @@ git:
     - pager: critique --stdin
 ```
 
-For more details, see [lazygit's Custom Pagers documentation](https://github.com/jesseduffield/lazygit/blob/master/docs/Custom_Pagers.md).
+For details, see [lazygit's Custom Pagers documentation](https://github.com/jesseduffield/lazygit/blob/master/docs/Custom_Pagers.md).
 
-### AI-Powered Diff Explanation
+## Pick Files from Another Branch
 
-Generate AI-powered explanations of code changes using [OpenCode](https://opencode.ai) or [Claude Code](https://www.anthropic.com/claude-code) as the backend agent.
-
-**What it does:**
-- Orders hunks in logical reading order (types before implementation, etc.)
-- Splits large hunks into digestible chunks with focused explanations
-- Explains each change with diagrams, tables, and markdown
-- Groups related changes across files
-
-**Best for reviewing AI-generated changes:** Pass `--session` to include the coding session context, so the AI understands *why* changes were made and can explain them better.
-
-```bash
-# Review unstaged changes (uses OpenCode by default)
-critique review
-
-# Use Claude Code instead
-critique review --agent claude
-
-# Review staged changes
-critique review --staged
-
-# Review changes since a ref (like git diff)
-critique review HEAD~1         # review last 1 commit
-critique review main           # review changes since main
-
-# Review a specific commit only (what that commit introduced)
-critique review --commit HEAD~1
-critique review --commit abc1234
-
-# Review commit range (like a PR): critique review <base> <head>
-# Shows what <head> added since diverging from <base>
-critique review main HEAD          # what current branch added vs main
-critique review main feature-branch
-
-# Include session context (from opencode or claude sessions)
-critique review --agent opencode --session <session-id>
-critique review --agent claude --session <session-id>
-
-# Generate web preview instead of TUI
-critique review --web
-critique review --web --open
-```
-
-**Options:**
-
-| Flag | Description |
-|------|-------------|
-| `--agent <name>` | AI agent to use: `opencode` (default) or `claude` |
-| `--staged` | Review staged changes |
-| `--commit <ref>` | Review changes from a specific commit |
-| `--session <id>` | Include session(s) as context (can be repeated) |
-| `--web` | Generate web preview instead of TUI |
-| `--pdf [filename]` | Generate PDF instead of TUI. Great for reading on e-ink devices — see [e-reader guide](docs/e-reader-guide.md) |
-| `--open` | Open in browser/viewer (with --web/--pdf) |
-| `--filter <pattern>` | Filter files by glob pattern |
-
-### Pick Files from Another Branch
-
-Selectively apply changes from another branch to your current HEAD:
+`critique pick` lets you apply selected files from another branch to the current checkout.
 
 ```bash
 critique pick feature-branch
 ```
 
-Use the interactive UI to select files. Selected files are immediately applied as patches, deselected files are restored.
+Selected files are applied as patches. Deselected files are restored.
 
-### Selective Hunk Staging
+## Selective Hunk Staging
 
-Non-interactive hunk staging for scripts and AI agents. Similar to `git add -p` but scriptable.
+`critique hunks` gives scripts and agents a stable alternative to `git add -p`.
 
 ```bash
-# List all unstaged hunks with stable IDs
+# List unstaged hunks with stable IDs
 critique hunks list
 
 # List staged hunks
@@ -170,170 +269,73 @@ critique hunks list --staged
 # Filter by file pattern
 critique hunks list --filter "src/**/*.ts"
 
-# Stage specific hunks by ID
+# Stage one hunk by ID
 critique hunks add 'src/main.ts:@-10,6+10,7'
 
 # Stage multiple hunks
 critique hunks add 'src/main.ts:@-10,6+10,7' 'src/utils.ts:@-5,3+5,4'
 ```
 
-**Hunk ID format:** `file:@-oldStart,oldLines+newStart,newLines`
+Hunk IDs use this format:
 
-The ID is derived from the `@@` header in unified diff format, making it stable across runs (unlike incremental IDs).
-
-**Example workflow:**
-
-```bash
-# 1. List available hunks
-$ critique hunks list
-src/main.ts:@-10,6+10,7
-@@ -10,6 +10,7 @@
-+import { newFeature } from './feature'
----
-src/main.ts:@-50,3+51,5
-@@ -50,3 +51,5 @@
-+  newFeature()
-+  return result
----
-
-# 2. Stage just the import hunk
-$ critique hunks add 'src/main.ts:@-10,6+10,7'
-Staged: src/main.ts:@-10,6+10,7
-
-# 3. Commit it separately
-$ git commit -m "Add newFeature import"
-
-# 4. Stage and commit the usage
-$ critique hunks add 'src/main.ts:@-50,3+51,5'
-$ git commit -m "Use newFeature in main"
+```text
+file:@-oldStart,oldLines+newStart,newLines
 ```
 
-### Web Preview
-
-Generate a shareable web preview of your diff that you can send to anyone - no installation required.
-
-**Example:** [critique.work/v/b8faf4362c247bfc46f5098a028e00f0](https://critique.work/v/b8faf4362c247bfc46f5098a028e00f0)
-
-Great for background agents that can't render terminal UIs, like [kimaki.xyz](https://kimaki.xyz) which runs OpenCode in Discord.
-
-![Web Preview](screenshot-web.png)
-
-```bash
-# Upload to critique.work and get a shareable URL
-critique web
-
-# View staged changes
-critique web --staged
-
-# View changes since a ref (like git diff)
-critique web HEAD~1         # last 1 commit
-critique web main           # changes since main
-
-# View a specific commit only (what that commit introduced)
-critique web --commit HEAD~1
-
-# Compare branches (PR-style diff)
-critique web main feature-branch
-
-# Filter specific files
-critique web -- src/api.ts src/utils.ts
-
-# Custom title for the HTML page
-critique web --title "Fix authentication bug"
-```
-
-**Features:**
-
-- **Mobile optimized** - Automatically detects mobile devices and serves a unified diff view optimized for smaller screens. Add `?v=mobile` to any URL to force mobile view.
-- **Dark/Light mode** - Automatically adapts to your system's color scheme preference using CSS `prefers-color-scheme`.
-- **Syntax highlighting** - Full syntax highlighting for 20+ languages, same as the terminal UI.
-- **Split view** - Side-by-side diff on desktop, unified view on mobile.
-- **Fast loading** - HTML is streamed for quick initial render, cached for 24 hours.
-
-**Options:**
-
-| Flag | Description | Default |
-|------|-------------|---------|
-| `--staged` | Show staged changes | - |
-| `--commit <ref>` | Show changes from a specific commit | - |
-| `--cols <n>` | Terminal width for rendering | `240` |
-| `--mobile-cols <n>` | Terminal width for mobile version | `100` |
-| `--filter <pattern>` | Filter files by glob (can be used multiple times) | - |
-| `--title <text>` | Custom HTML document title | `Critique Diff` |
-| `--theme <name>` | Theme for rendering (disables auto dark/light mode) | - |
-
-**How it works:**
-
-1. Renders the diff using opentui's test renderer to capture structured frame data
-2. Converts the captured spans to styled HTML with syntax highlighting
-3. Generates both desktop (240 cols, split view) and mobile (100 cols, unified view) versions
-4. Uploads to [critique.work](https://critique.work) (Cloudflare Worker + KV storage)
-5. Returns a shareable URL that expires after 7 days
-
-**Raw Patch Access:**
-
-Every uploaded diff is also available as a raw unified diff (patch) by appending `.patch` to the URL:
-
-```bash
-# View the patch in your terminal
-curl https://critique.work/v/b8faf4362c247bfc46f5098a028e00f0.patch
-
-# Apply the patch directly to your repo
-curl -s https://critique.work/v/b8faf4362c247bfc46f5098a028e00f0.patch | git apply
-
-# Reverse the patch (undo the changes)
-curl -s https://critique.work/v/b8faf4362c247bfc46f5098a028e00f0.patch | git apply --reverse
-```
-
-This makes critique URLs useful for programmatic tools — share the HTML link for humans, use the `.patch` URL for machines.
-
-**Tips:**
-
-- The URL is based on a SHA-256 hash of the content, so identical diffs produce the same URL (deduplication)
-- Use `?v=desktop` or `?v=mobile` query params to force a specific version
-- If upload fails, critique automatically saves the HTML locally as a fallback
+The ID comes from the unified diff `@@` header, so it stays stable across runs.
 
 ## E-Ink Reading
 
-Generate PDFs from diffs and AI reviews to read on Kindle or Boox e-readers. Useful when you have background agents writing code — tools like [kimaki](https://kimaki.xyz) (runs coding agents from Discord) or [clawdbot](https://clawd.bot) (self-hosted AI assistant connected to Discord/Slack/Telegram) — and you want to review their changes away from your desk on an e-ink device.
+Generate PDFs from diffs and AI reviews to read on Kindle or Boox e-readers.
 
 ```bash
-critique --pdf                    # diff as PDF
-critique review --pdf             # AI review as PDF
-critique review main --pdf --open # review branch changes, open in viewer
+critique --pdf
+critique review --pdf
+critique review main --pdf --open
 ```
 
-The PDF preserves syntax highlighting and diff formatting. Email it to your Kindle, drop it in BooxDrop, or save to a synced Google Drive folder. See [docs/e-reader-guide.md](docs/e-reader-guide.md) for detailed setup for each device.
+The PDF preserves syntax highlighting and diff formatting. Email it to your Kindle, drop it in BooxDrop, or save it to a synced Google Drive folder. See [docs/e-reader-guide.md](docs/e-reader-guide.md) for setup details.
+
+## Agent Skill
+
+This package ships a skill file that teaches AI coding agents how to use critique for diff URLs, PDFs, images, and selective hunk staging.
+
+```bash
+npx -y skills add remorses/critique
+```
 
 ## Features
 
-- **Syntax Highlighting** - Powered by [Tree-sitter](https://tree-sitter.github.io/) via [opentui](https://github.com/sst/opentui) with support for 20+ languages
-- **Split View** - Side-by-side comparison for wide terminals (auto-switches to unified view on narrow terminals)
-- **Word-Level Diff** - Highlights specific word changes within modified lines
-- **File Navigation** - Quick file switcher with fuzzy search
-- **Click to Open** - Click line numbers to open in your editor (set `REACT_EDITOR` env var)
-- **Watch Mode** - Live updates as you edit files
-- **Web Preview** - Generate shareable HTML previews hosted on [critique.work](https://critique.work)
-- **Cherry Pick** - Interactive file picker to apply changes from other branches
+- **Syntax highlighting:** powered by [Tree-sitter](https://tree-sitter.github.io/) via [opentui](https://github.com/sst/opentui)
+- **Split view:** side-by-side comparison for wide terminals, unified view on narrow terminals
+- **Word-level diff:** highlights exact word changes inside modified lines
+- **File navigation:** quick file switcher with fuzzy search
+- **Click to open:** click line numbers to open in your editor with `REACT_EDITOR`
+- **Watch mode:** refreshes as you edit files
+- **Web previews:** hosted shareable URLs on [critique.work](https://critique.work)
+- **Raw patches:** every web preview has a `.patch` endpoint
+- **PDF output:** optimized for code review away from the terminal
 
 ## Supported Languages
 
-TypeScript, JavaScript, TSX, JSX, JSON, Markdown, HTML, CSS, Python, Rust, Go, Java, C, C++, C#, Ruby, PHP, Scala, Haskell, Julia, OCaml, Clojure, Swift, Nix, YAML, Bash
+TypeScript, JavaScript, TSX, JSX, JSON, Markdown, HTML, CSS, Python, Rust, Go, Java, C, C++, C#, Ruby, PHP, Scala, Haskell, Julia, OCaml, Clojure, Swift, Nix, YAML, and Bash.
 
 ## Configuration
 
 | Environment Variable | Description | Default |
-|---------------------|-------------|---------|
+| --- | --- | --- |
 | `REACT_EDITOR` | Editor command for click-to-open | `zed` |
-| `CRITIQUE_WORKER_URL` | Custom worker URL for web preview | `https://critique.work` |
+| `CRITIQUE_WORKER_URL` | Custom worker URL for web previews | `https://critique.work` |
 
 ## Ignored Files
 
 Lock files are automatically hidden from diffs:
+
 - `pnpm-lock.yaml`
 - `package-lock.json`
 - `yarn.lock`
 - `bun.lockb`
+- `bun.lock`
 - `Cargo.lock`
 - `poetry.lock`
 - `Gemfile.lock`
@@ -343,16 +345,12 @@ Files with more than 6000 lines of diff are also hidden for performance.
 
 ## Built With
 
-- [opentui](https://github.com/sst/opentui) - React-based terminal UI framework
-- [Tree-sitter](https://tree-sitter.github.io/) - Syntax highlighting
-- [diff](https://github.com/kpdecker/jsdiff) - Diff algorithm
-- [Hono](https://hono.dev/) - Web framework for the preview worker
+- [opentui](https://github.com/sst/opentui): React-based terminal UI framework
+- [Tree-sitter](https://tree-sitter.github.io/): syntax highlighting
+- [diff](https://github.com/kpdecker/jsdiff): diff algorithm
+- [Hono](https://hono.dev/): web framework for the preview worker
 
 ## Sponsors
-
-<a href="https://coderabbit.link/remorses" target="_blank" rel="noopener noreferrer">
-  <img src="https://github.com/coderabbitai.png" alt="CodeRabbit" height="24" />
-</a>
 
 Sponsored by [CodeRabbit](https://coderabbit.link/remorses).
 
