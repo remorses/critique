@@ -2,7 +2,7 @@
     <br/>
     <br/>
     <h3>critique</h3>
-    <p>Bun-only diff viewer for terminals, web previews, and agents.</p>
+    <p>Beautiful diff viewer for terminals, web previews, and agents.</p>
     <br/>
     <br/>
 </div>
@@ -351,6 +351,10 @@ Files with more than 6000 lines of diff are also hidden for performance.
 - [Hono](https://hono.dev/): web framework for the preview worker
 
 ## Sponsors
+
+<a href="https://coderabbit.link/remorses" target="_blank" rel="noopener noreferrer">
+  <img src="https://github.com/coderabbitai.png" alt="CodeRabbit" height="24" />
+</a>
 
 Sponsored by [CodeRabbit](https://coderabbit.link/remorses).
 
