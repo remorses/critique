@@ -307,6 +307,11 @@ export function buildGitCommand(options: GitCommandOptions): string {
   const submoduleArg = "--submodule=diff";
   // Detect renames instead of showing full delete+add
   const renameArg = "-M";
+  // Force standard unified diff output even when user has diff.external or
+  // GIT_EXTERNAL_DIFF configured (e.g. difftastic). Without this flag git
+  // delegates to the external program and emits non-unified output that our
+  // parser cannot handle. See https://github.com/remorses/critique/issues/45
+  const noExtDiffArg = "--no-ext-diff";
 
   // Combine --filter options with positional args after --
   const filters = getFilterPatterns(options);
@@ -325,14 +330,14 @@ export function buildGitCommand(options: GitCommandOptions): string {
   }
 
   if (options.staged) {
-    return `git diff --cached --no-prefix ${renameArg} ${submoduleArg} ${contextArg} ${filterArg}`.trim();
+    return `git diff --cached ${noExtDiffArg} --no-prefix ${renameArg} ${submoduleArg} ${contextArg} ${filterArg}`.trim();
   }
   if (options.commit) {
-    return `git show ${options.commit} --no-prefix ${renameArg} ${submoduleArg} ${contextArg} ${filterArg}`.trim();
+    return `git show ${options.commit} ${noExtDiffArg} --no-prefix ${renameArg} ${submoduleArg} ${contextArg} ${filterArg}`.trim();
   }
   // Two refs: compare base...head (three-dot, shows changes since branches diverged, like GitHub PRs)
   if (options.base && options.head) {
-    return `git diff ${options.base}...${options.head} --no-prefix ${renameArg} ${submoduleArg} ${contextArg} ${filterArg}`.trim();
+    return `git diff ${options.base}...${options.head} ${noExtDiffArg} --no-prefix ${renameArg} ${submoduleArg} ${contextArg} ${filterArg}`.trim();
   }
   // Detect range syntax in single base argument (e.g., "origin/main...HEAD" or "main..feature")
   if (options.base && !options.head) {
@@ -340,24 +345,24 @@ export function buildGitCommand(options: GitCommandOptions): string {
     const threeDotsMatch = options.base.match(/^(.+)\.\.\.(.+)$/);
     if (threeDotsMatch) {
       const [, rangeBase, rangeHead] = threeDotsMatch;
-      return `git diff ${rangeBase}...${rangeHead} --no-prefix ${renameArg} ${submoduleArg} ${contextArg} ${filterArg}`.trim();
+      return `git diff ${rangeBase}...${rangeHead} ${noExtDiffArg} --no-prefix ${renameArg} ${submoduleArg} ${contextArg} ${filterArg}`.trim();
     }
 
     // Two-dot syntax: A..B (commits in B not in A)
     const twoDotsMatch = options.base.match(/^(.+)\.\.(.+)$/);
     if (twoDotsMatch) {
       const [, rangeBase, rangeHead] = twoDotsMatch;
-      return `git diff ${rangeBase}..${rangeHead} --no-prefix ${renameArg} ${submoduleArg} ${contextArg} ${filterArg}`.trim();
+      return `git diff ${rangeBase}..${rangeHead} ${noExtDiffArg} --no-prefix ${renameArg} ${submoduleArg} ${contextArg} ${filterArg}`.trim();
     }
   }
   // Single ref: compare ref to working tree (like git diff)
   if (options.base) {
-    return `git diff ${options.base} --no-prefix ${renameArg} ${submoduleArg} ${contextArg} ${filterArg}`.trim();
+    return `git diff ${options.base} ${noExtDiffArg} --no-prefix ${renameArg} ${submoduleArg} ${contextArg} ${filterArg}`.trim();
   }
   // Default (no args): ignore submodules here — dirty submodule diffs are fetched
   // separately via buildSubmoduleDiffCommand() to avoid showing committed submodule
   // ref changes that have no actual uncommitted content.
-  return `git add -N . && git diff --no-prefix ${renameArg} --ignore-submodules=all ${contextArg} ${filterArg}`.trim();
+  return `git add -N . && git diff ${noExtDiffArg} --no-prefix ${renameArg} --ignore-submodules=all ${contextArg} ${filterArg}`.trim();
 }
 
 /**
@@ -405,7 +410,7 @@ export function buildSubmoduleDiffCommand(
   const renameArg = "-M"
   const submoduleArg = "--submodule=diff"
   const pathArgs = submodulePaths.map((p) => `'${p}'`).join(" ")
-  return `git diff --no-prefix ${renameArg} ${submoduleArg} ${contextArg} -- ${pathArgs}`.trim()
+  return `git diff --no-ext-diff --no-prefix ${renameArg} ${submoduleArg} ${contextArg} -- ${pathArgs}`.trim()
 }
 
 /**

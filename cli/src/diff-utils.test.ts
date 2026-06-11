@@ -799,7 +799,7 @@ describe("buildGitCommand default context lines", () => {
 describe("buildSubmoduleDiffCommand", () => {
   it("should only scope to submodule paths and context", () => {
     const cmd = buildSubmoduleDiffCommand(["opentui", "errore"], { context: 7 })
-    expect(cmd).toContain("git diff --no-prefix")
+    expect(cmd).toContain("git diff --no-ext-diff --no-prefix")
     expect(cmd).toContain("--submodule=diff")
     expect(cmd).toContain("-U7")
     expect(cmd).toContain("-- 'opentui' 'errore'")
