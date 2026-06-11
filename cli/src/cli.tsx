@@ -1434,7 +1434,13 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
   }
 }
 
-const execAsync = promisify(exec);
+// Default maxBuffer is ~1MB which is too small for large git diffs.
+// 100MB handles any reasonable diff size.
+const MAX_BUFFER = 100 * 1024 * 1024;
+const _execAsync = promisify(exec);
+function execAsync(command: string, options?: Record<string, any>) {
+  return _execAsync(command, { maxBuffer: MAX_BUFFER, ...options });
+}
 
 async function filterCombinedDiffByPatterns(
   diffContent: string,
