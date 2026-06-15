@@ -93,6 +93,7 @@ const THEME_FILES: Record<string, string> = {
   ayu: "ayu.json",
   catppuccin: "catppuccin.json",
   "catppuccin-frappe": "catppuccin-frappe.json",
+  "catppuccin-latte": "catppuccin-latte.json",
   "catppuccin-macchiato": "catppuccin-macchiato.json",
   cobalt2: "cobalt2.json",
   cursor: "cursor.json",
