@@ -1,4 +1,4 @@
-# 0.2.0
+# 0.2.1
 
 1. **Review call-flow changes alongside line diffs** with the experimental `--calldiff` option. Changed call trees appear under their source files in the file tree, including in terminal scrollback, web previews, PDFs, and images. The summary focuses on added calls and their parent functions instead of unchanged siblings or removed calls.
 
