@@ -1,8 +1,44 @@
-# 0.1.141
+# 0.2.0
 
-1. **Fixed TypeScript syntax highlighting for hunks that begin on a bare closing backtick** (`critique`, `critique --web`, `critique review`) — critique now treats a standalone backtick at the start of a hunk as the close of a template literal from earlier context and prepends a synthetic opener so the following code stays highlighted.
+1. **Review call-flow changes alongside line diffs** with the experimental `--calldiff` option. Changed call trees appear under their source files in the file tree, including in terminal scrollback, web previews, PDFs, and images. The summary focuses on added calls and their parent functions instead of unchanged siblings or removed calls.
 
-2. **Improved backtick token handling inside quoted string fragments** (`critique`, `critique --web`, `critique review`) — backticks inside single or double quoted JavaScript/TypeScript fragments, like `${'`'}`, no longer count as template literal delimiters when deciding whether a hunk needs balancing.
+   ```bash
+   critique --calldiff
+   critique main HEAD --calldiff --web "Call flow changes"
+   ```
+
+   Set `CRITIQUE_CALLDIFF=1` to enable it by default. This option does not support `--staged`, `--stdin`, or `--watch`. Its first run can install a Tree-sitter grammar through npm.
+
+2. **See the commits included in a diff before sharing it.** Range summaries show the commit count, files, changed lines, base commit, and any uncommitted work. Direct comparisons of diverged branches also identify commits reversed from the base side. The list appears in the TUI and before web uploads; `--json` includes `commits` and `reversedCommits` in its payload and sends the summary to stderr.
+
+   ```bash
+   critique main HEAD --web "Branch changes"
+   critique main HEAD --web "Branch changes" --no-commit-list
+   ```
+
+3. **Stage hunks by content-based IDs that survive unrelated edits.** `critique hunks list` now identifies a hunk by a hash of its added and removed lines, so edits elsewhere in the file do not change its ID. Duplicate hunks use `.1`, `.2`, and so on. Old line-number IDs are no longer accepted; list the hunks again before staging. Nearby edits that merge hunks still change their IDs.
+
+   ```bash
+   critique hunks list
+   critique hunks add 'src/main.ts:@a1b2c3d4e5f6'
+   ```
+
+4. **Complete commands and options with Tab** after installing shell completions. The installed shim reads the current command table, so it follows new commands without reinstalling. Use `critique completions uninstall` to remove it.
+
+   ```bash
+   critique completions install
+   critique completions uninstall
+   ```
+
+5. **Select Catppuccin Latte for light-mode diffs** with `critique --theme catppuccin-latte` or the `t` theme picker.
+
+6. **Keep experimental `review` out of the main command list.** Direct `critique review` invocations still work, but the root help no longer presents it as a supported command.
+
+7. **Get accurate syntax highlighting in partial diffs** that begin inside template literals, inline snapshots, or block comments. Boundary repair also handles a bare closing backtick and ignores backticks inside quoted JavaScript and TypeScript string fragments.
+
+8. **View large diffs and repos with external diff drivers reliably.** Diffs no longer fail at the old process output limit, and external Git diff drivers no longer cause an empty `unknown +0-0` view. Fixes #45.
+
+9. **Find the right navigation keys in the README.** The table now documents `p`, `t`, `q`, `gg`/`G`, and half-page scrolling instead of obsolete shortcuts. The web preview docs also clarify that `--web` uploads to critique.work rather than creating a local HTML file. Fixes #48.
 
 # 0.1.140
 
