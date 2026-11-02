@@ -3,6 +3,7 @@
 // Handles upload, storage (KV), Stripe checkout, responsive serving, and real-time comments.
 // Endpoints: POST /upload, GET /v/:id (view), GET /raw/:id (debug), /a/* (agentation API).
 // Payments: GET /buy, GET /success, POST /stripe/webhook.
+// Legal: GET /privacy, GET /terms (routes/legal.tsx).
 
 import { Hono } from "hono"
 import { cors } from "hono/cors"
@@ -12,6 +13,7 @@ import Stripe from "stripe"
 import { Resend } from "resend"
 import { agentationApi } from "./agentation-api.js"
 import { annotationsContextRoute } from "./routes/annotations-context.js"
+import { LEGAL_LINKS_CSS, LegalLinks, legalRoute } from "./routes/legal.js"
 import { version as pkgVersion } from "../package.json"
 import {
   buildKvPutOptions,
@@ -105,6 +107,9 @@ app.route("/a", agentationApi)
 
 // Annotations context page (HTML/JSON view of all annotations for a diff)
 app.route("", annotationsContextRoute)
+
+// Privacy policy and terms
+app.route("", legalRoute)
 
 // Redirect to GitHub repo
 app.get("/", (c) => {
@@ -679,6 +684,7 @@ function SuccessPage({
           p { color: #9aa4b2; margin: 0 0 20px; line-height: 1.5; }
           .key { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; background: #0b1117; border: 1px solid #2d3440; padding: 12px 14px; border-radius: 10px; word-break: break-all; }
           .status { margin-top: 16px; font-size: 14px; color: #6b7280; }
+          ${LEGAL_LINKS_CSS}
         `}</style>
       </head>
       <body>
@@ -688,6 +694,7 @@ function SuccessPage({
             <p>{message}</p>
             {command ? <div class="key">{command}</div> : null}
             {status ? <div class="status">Status: {status}</div> : null}
+            <LegalLinks />
           </div>
         </div>
       </body>

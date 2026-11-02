@@ -277,6 +277,13 @@ The CLI does **not** generate a local HTML file. It uploads to `critique.work`. 
 
 Uploaded diffs expire after 7 days unless you use a license key. Identical diffs reuse the same content hash URL.
 
+### Privacy and Terms
+
+critique.work is run by Tommaso De Rossi ([remorses](https://github.com/remorses)). Anyone with a link can open its diff, so do not upload secrets. Delete an upload with `critique unpublish <url>`.
+
+- [Privacy policy](https://critique.work/privacy): what is stored, for how long, and how to delete it
+- [Terms of service](https://critique.work/terms)
+
 ## Raw Patch Access
 
 Every `--web` upload also stores the raw unified diff. Append `.patch` to any critique URL to fetch it.
