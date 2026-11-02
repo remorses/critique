@@ -1,6 +1,6 @@
 /** @jsxImportSource hono/jsx */
 // Routes: GET /privacy, GET /terms.
-// Every statement here must match what worker.tsx, diff-password.tsx and diff-store.ts
+// Every statement here must match what worker.tsx, diff-password.tsx, diff-crypto.ts and diff-store.ts
 // really do. Update these pages when storage, TTLs or providers change.
 
 import { Hono } from "hono"
@@ -89,11 +89,6 @@ function PrivacyPage() {
             <td>Same as the diff</td>
           </tr>
           <tr>
-            <td>A hash of the link password (PBKDF2), only for password protected links</td>
-            <td>To check the password</td>
-            <td>Same as the diff</td>
-          </tr>
-          <tr>
             <td>
               License records: the license key, its status, your Stripe customer and subscription IDs,
               and dates
@@ -104,8 +99,8 @@ function PrivacyPage() {
         </tbody>
       </table>
       <p>
-        Diffs are stored compressed in Cloudflare R2. Owner secrets, password hashes and license
-        records are stored in Cloudflare Workers KV. Your email address is not stored by critique.work. Stripe keeps
+        Diffs are stored compressed in Cloudflare R2. Password protected diffs are stored encrypted.
+        Owner secrets and license records are stored in Cloudflare Workers KV. Your email address is not stored by critique.work. Stripe keeps
         it, and it is given to Resend once to send you the license key.
       </p>
 
@@ -121,9 +116,16 @@ function PrivacyPage() {
           diff, they get the same link.
         </li>
         <li>
-          A <strong>password</strong> blocks access through critique.work. It does not encrypt the
-          content. The operator can technically read stored diffs, password protected or not.
+          A <strong>password</strong> encrypts the diff on your machine before upload (AES-256-GCM).
+          critique.work never receives the password and cannot read the diff. Viewers decrypt it in
+          their browser. A short password can be guessed by anyone who gets the encrypted data, and a
+          lost password cannot be recovered.
         </li>
+        <li>
+          The CLI also prints a key that opens only that diff, for <code>curl</code>. When you send it,
+          critique.work uses it to decrypt that one response and does not store it.
+        </li>
+        <li>Public diffs, without a password, are not encrypted. The operator can technically read them.</li>
         <li>Public diffs get a preview image that chat apps and social sites show next to the link.</li>
       </ul>
       <p>
@@ -137,9 +139,12 @@ function PrivacyPage() {
         </thead>
         <tbody>
           <tr>
-            <td><code>cw_pw</code></td>
-            <td>The passwords you typed that worked, so you do not type them again</td>
-            <td>400 days, renewed when you open a protected diff</td>
+            <td>IndexedDB <code>critique</code></td>
+            <td>
+              Keys made from the passwords you typed that worked, so you do not type them again. The
+              browser does not let any script read the password back. Never sent to critique.work.
+            </td>
+            <td>Until you clear site data. The last 10 are kept.</td>
           </tr>
         </tbody>
       </table>
@@ -184,7 +189,7 @@ function PrivacyPage() {
       <ul>
         <li>
           Run <code>critique unpublish &lt;url&gt;</code> on the machine that uploaded the diff. It
-          deletes the HTML, patch, preview image, owner secret and password hash. Copies cached on
+          deletes the HTML, patch, preview image and owner secret. Copies cached on
           Cloudflare servers and in browsers can stay up to 1 day, or 7 days for the preview image in
           browsers.
         </li>

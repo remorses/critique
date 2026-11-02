@@ -14,6 +14,7 @@ import { DiffRenderable } from "@opentuah/core"
 import type { IndexedHunk, ReviewYaml } from "./review/types.js"
 import { loadStoredLicenseKey, loadOrCreateOwnerSecret } from "./license.js"
 import type { CallDiffByFile } from "./calldiff.js"
+import { encryptDiffBlobs, KEY_COOKIE } from "./diff-crypto.js"
 
 const execAsync = promisify(exec)
 
@@ -44,11 +45,22 @@ export interface UploadResult {
   ogImageUrl?: string
   expiresInDays?: number | null
   passwordProtected?: boolean
+  /** Encrypted uploads only: curl command with the per-diff key cookie, for agents */
+  curl?: string
 }
 
-/** --password flag wins over the CRITIQUE_PASSWORD env var. */
+// Shorter passwords can be guessed offline from the stored ciphertext
+const MIN_SAFE_PASSWORD_LENGTH = 12
+
+/** --password flag wins over the CRITIQUE_PASSWORD env var. Warns on stderr when it is short. */
 export function resolveWebPassword(flag?: string): string | undefined {
-  return flag || process.env.CRITIQUE_PASSWORD || undefined
+  const password = flag || process.env.CRITIQUE_PASSWORD || undefined
+  if (password && password.length < MIN_SAFE_PASSWORD_LENGTH) {
+    console.error(
+      `Warning: passwords shorter than ${MIN_SAFE_PASSWORD_LENGTH} characters can be guessed offline from the encrypted upload.`,
+    )
+  }
+  return password
 }
 
 function renderNoticeBlock(options: {
@@ -965,27 +977,27 @@ export async function uploadHtml({
   htmlMobile: string
   ogImage?: Buffer | null
   patch?: string
-  /** Viewers must type this password. The worker drops the OG image for protected diffs. */
+  /** Encrypts everything in this process; the worker only gets ciphertext and no OG image. */
   password?: string
 }): Promise<UploadResult> {
-  const body: Record<string, string> = { 
-    html: htmlDesktop, 
-    htmlMobile,
-  }
+  const encrypted = password
+    ? await encryptDiffBlobs({ password, blobs: { html: htmlDesktop, mobile: htmlMobile, patch } })
+    : null
 
-  if (password) {
-    body.password = password
-  }
-
-  // Include OG image as base64 if provided
-  if (ogImage) {
-    body.ogImage = ogImage.toString("base64")
-  }
-
-  // Include raw unified diff (patch) for programmatic access
-  if (patch) {
-    body.patch = patch
-  }
+  const body = encrypted
+    ? {
+        encrypted: Object.fromEntries(
+          Object.entries(encrypted.envelopes).map(([kind, bytes]) => [kind, Buffer.from(bytes).toString("base64")]),
+        ),
+      }
+    : {
+        html: htmlDesktop,
+        htmlMobile,
+        // Include OG image as base64 if provided
+        ogImage: ogImage ? ogImage.toString("base64") : undefined,
+        // Include raw unified diff (patch) for programmatic access
+        patch,
+      }
 
   const licenseKey = loadStoredLicenseKey()
   const ownerSecret = loadOrCreateOwnerSecret()
@@ -1009,7 +1021,10 @@ export async function uploadHtml({
   }
 
   const result = (await response.json()) as UploadResult
-  return result
+  if (!encrypted) return result
+  // The worker decrypts .patch (or /raw HTML when no patch was uploaded) for a request with the key cookie
+  const target = patch ? `${result.url}.patch` : `${new URL(result.url).origin}/raw/${result.id}`
+  return { ...result, curl: `curl -b '${KEY_COOKIE}=${encrypted.key}' '${target}'` }
 }
 
 /**

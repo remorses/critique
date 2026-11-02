@@ -620,7 +620,7 @@ async function runReviewMode(
         webSpinner.stop("Uploaded");
 
         clack.log.success(`Preview URL: ${result.url}`, out);
-        if (result.passwordProtected) clack.log.info("Password protected", out);
+        if (result.curl) clack.log.info(`End-to-end encrypted. Agents can read it with:\n${result.curl}`, out);
         clack.log.info(formatPreviewExpiry(result.expiresInDays), out);
         if (typeof result.expiresInDays === "number") {
           clack.log.info("Get unlimited links and support the project: https://critique.work/buy", out);
@@ -645,7 +645,7 @@ async function runReviewMode(
             added: stats.added,
             removed: stats.removed,
           }));
-          console.log(JSON.stringify({ url: result.url, id: result.id, files: fileStats }));
+          console.log(JSON.stringify({ url: result.url, id: result.id, curl: result.curl, files: fileStats }));
         }
 
         if (webOptions.open) {
@@ -1029,7 +1029,7 @@ async function runResumeMode(options: ResumeModeOptions) {
       webSpinner.stop("Uploaded");
 
       clack.log.success(`Preview URL: ${result.url}`);
-      if (result.passwordProtected) clack.log.info("Password protected");
+      if (result.curl) clack.log.info(`End-to-end encrypted. Agents can read it with:\n${result.curl}`);
       clack.log.info(formatPreviewExpiry(result.expiresInDays));
       if (typeof result.expiresInDays === "number") {
         clack.log.info("Get unlimited links and support the project: https://critique.work/buy");
@@ -1199,7 +1199,7 @@ async function runWebMode(
     const result = await uploadHtml({ htmlDesktop, htmlMobile, patch: diffContent, password });
 
     log(`\nPreview URL: ${result.url}`);
-    if (result.passwordProtected) log("Password protected");
+    if (result.curl) log(`End-to-end encrypted. Agents can read the patch with:\n  ${result.curl}`);
     log(formatPreviewExpiry(result.expiresInDays));
     if (typeof result.expiresInDays === "number") {
       log("Get unlimited links and support the project: https://critique.work/buy");
@@ -1217,6 +1217,7 @@ async function runWebMode(
         JSON.stringify({
           url: result.url,
           id: result.id,
+          curl: result.curl,
           files: fileStats,
           commits: options.commits?.added ?? [],
           // Non-empty only when a tree comparison undoes commits from the base side

@@ -2,33 +2,31 @@
 // Cloudflare Worker for hosting HTML diff previews at critique.work.
 // Handles upload, storage, Stripe checkout and responsive serving.
 // Diff blobs (HTML, patch, OG image) live in R2 behind the Cache API (diff-store.ts).
-// Small records (licenses, owner secrets, password hashes) live in KV.
-// Endpoints: POST /upload, GET /v/:id (view), GET /raw/:id (debug).
+// Small records (licenses, owner secrets) live in KV.
+// Password diffs are encrypted by the CLI (diff-crypto.ts); the worker only stores ciphertext.
+// Endpoints: POST /upload, GET /v/:id (view), GET /v/:id/blob/:kind (ciphertext), GET /raw/:id (debug).
 // Payments: GET /buy, GET /success, POST /stripe/webhook.
 // Legal: GET /privacy, GET /terms (routes/legal.tsx).
 
 import { Hono, type Context } from "hono"
 import { cors } from "hono/cors"
+import { deleteCookie, getCookie } from "hono/cookie"
 import { stream } from "hono/streaming"
 import type { KVNamespace, R2Bucket } from "@cloudflare/workers-types"
 import Stripe from "stripe"
 import { Resend } from "resend"
 import { LEGAL_LINKS_CSS, LegalLinks, legalRoute } from "./routes/legal.js"
-import { DiffStore } from "./diff-store.js"
+import { DiffStore, type DiffBlobKind } from "./diff-store.js"
+import { DIFF_ID_REGEX, generateProtectedId, isProtectedId, renderLockPage } from "./diff-password.js"
 import {
-  checkDiffAccess,
-  checkTypedPassword,
-  DIFF_ID_REGEX,
-  generateProtectedId,
-  isProtectedId,
-  isValidPassword,
-  MAX_PASSWORD_LENGTH,
-  PASSWORD_HEADER,
-  passwordKvKey,
-  rememberPassword,
-  renderLockPage,
-  setDiffPassword,
-} from "./diff-password.js"
+  decryptDiffBlob,
+  ENCRYPTED_KINDS,
+  importDiffKey,
+  isEncryptedKind,
+  isEnvelope,
+  KEY_COOKIE,
+  type EncryptedKind,
+} from "./diff-crypto.js"
 
 type Bindings = {
   CRITIQUE_KV: KVNamespace
@@ -52,9 +50,10 @@ type LicenseRecord = {
 
 const app = new Hono<AppEnv>()
 
-// KV TTL of owner secrets and password hashes. The R2 lifecycle rule on ttl/ matches it.
+// KV TTL of owner secrets. The R2 lifecycle rule on ttl/ matches it.
 const SEVEN_DAYS = 60 * 60 * 24 * 7
 const LICENSE_HEADER = "X-Critique-License"
+const LEGACY_PASSWORD_COOKIE = "cw_pw"
 const OWNER_SECRET_HEADER = "X-Critique-Owner-Secret"
 const STRIPE_YEARLY_PRICE_ID = "price_1Su9CZBekrVyz93iMIEnjPOk"
 
@@ -70,6 +69,15 @@ const logger = {
 
 // Enable CORS for all routes
 app.use("*", cors())
+
+// critique 0.4.0 kept typed passwords in plaintext in this cookie for 400 days. Expire it.
+// TODO: remove after 2027-12 when every old cw_pw cookie has expired on its own.
+app.use("*", async (c, next) => {
+  if (getCookie(c, LEGACY_PASSWORD_COOKIE) !== undefined) {
+    deleteCookie(c, LEGACY_PASSWORD_COOKIE, { path: "/", secure: true })
+  }
+  await next()
+})
 
 // Privacy policy and terms
 app.route("", legalRoute)
@@ -212,11 +220,8 @@ class CritiqueKv {
     await this.kv.put(`owner:${id}`, secret, ttlSeconds ? { expirationTtl: ttlSeconds } : undefined)
   }
 
-  async deleteDiffRecords(id: string): Promise<void> {
-    await Promise.all([
-      this.kv.delete(`owner:${id}`),
-      this.kv.delete(passwordKvKey(id)),
-    ])
+  async deleteOwnerSecret(id: string): Promise<void> {
+    await this.kv.delete(`owner:${id}`)
   }
 }
 
@@ -230,6 +235,53 @@ function getDiffStore(c: Context<AppEnv>): DiffStore {
 
 function decodeBase64(value: string): ArrayBuffer {
   return Uint8Array.from(atob(value), (char) => char.charCodeAt(0)).buffer
+}
+
+const ENCRYPTED_BLOB_KINDS = {
+  html: "encHtml",
+  mobile: "encMobile",
+  patch: "encPatch",
+} as const satisfies Record<EncryptedKind, DiffBlobKind>
+
+/** Base64 envelopes from the upload body. Null unless html is present and every value is an envelope. */
+function decodeEnvelopes(fields: Partial<Record<EncryptedKind, string>> | null): Partial<Record<EncryptedKind, ArrayBuffer>> | null {
+  if (typeof fields !== "object" || fields === null || typeof fields.html !== "string") return null
+  const envelopes: Partial<Record<EncryptedKind, ArrayBuffer>> = {}
+  for (const kind of ENCRYPTED_KINDS) {
+    const field = fields[kind]
+    if (field === undefined) continue
+    if (typeof field !== "string") return null
+    const bytes = decodeBase64(field)
+    if (!isEnvelope(new Uint8Array(bytes))) return null
+    envelopes[kind] = bytes
+  }
+  return envelopes
+}
+
+// curl access to an encrypted diff. The CLI prints the per-diff key after upload; the worker
+// decrypts with it for this response only and never stores it.
+async function readEncryptedText(c: Context<AppEnv>, { id, kind }: { id: string; kind: EncryptedKind }) {
+  c.header("Cache-Control", "private, no-store")
+  const cookieValue = getCookie(c, KEY_COOKIE)
+  if (!cookieValue) {
+    const hint = [
+      "This diff is end-to-end encrypted. Send its key in a cookie:",
+      "",
+      `  curl -b '${KEY_COOKIE}=<key>' '${c.req.url}'`,
+      "",
+      "critique prints this command with the key after uploading with --password.",
+      "",
+    ].join("\n")
+    return c.text(hint, 401)
+  }
+  const key = await importDiffKey(cookieValue)
+  if (!key) return c.text(`Invalid ${KEY_COOKIE} cookie`, 400)
+  const envelope = await getDiffStore(c).getBytes(id, ENCRYPTED_BLOB_KINDS[kind])
+  if (!envelope) return c.text("Not found", 404)
+  const text = await decryptDiffBlob({ key, kind, envelope: new Uint8Array(envelope) })
+  if (text === null) return c.text(`Wrong ${KEY_COOKIE} for this diff`, 403)
+  const contentType = kind === "patch" ? "text/plain; charset=utf-8" : "text/html; charset=utf-8"
+  return c.text(text, 200, { "Content-Type": contentType })
 }
 
 function generateLicenseKey(): string {
@@ -348,83 +400,90 @@ function extractTitle(html: string): string {
 }
 
 // Upload HTML content
-// POST /upload with JSON body { html: string, htmlMobile?: string, ogImage?: string (base64), patch?: string, password?: string }
+// POST /upload with JSON body, one of:
+//   public:    { html: string, htmlMobile?: string, ogImage?: string (base64), patch?: string }
+//   encrypted: { encrypted: { html: string, mobile?: string, patch?: string } } (base64 envelopes, diff-crypto.ts)
 // Returns { id: string, url: string, ogImageUrl?: string, passwordProtected: boolean }
 //
 // OG tags are always injected with the deterministic URL /og/{id}.png,
 // even if no ogImage is provided yet. This lets the CLI upload HTML first
 // and PATCH the OG image later without needing to re-read/modify stored HTML.
-// Password protected diffs get a random ID and no OG image, so link previews leak nothing.
+// Encrypted diffs get a random "p" ID and no OG image, so link previews leak nothing.
 app.post("/upload", async (c) => {
   try {
     const kv = new CritiqueKv(c.env.CRITIQUE_KV)
     const store = getDiffStore(c)
-    const body = await c.req.json<{ html: string; htmlMobile?: string; ogImage?: string; patch?: string; password?: string }>()
+    const body = await c.req.json<{
+      html?: string
+      htmlMobile?: string
+      ogImage?: string
+      patch?: string
+      password?: unknown
+      encrypted?: Partial<Record<EncryptedKind, string>> | null
+    }>()
 
-    if (!body.html || typeof body.html !== "string") {
-      return c.json({ error: "Missing or invalid 'html' field" }, 400)
+    // critique 0.4.0 sent the password to the server; never store a diff the server can read as "protected"
+    if (body.password !== undefined) {
+      return c.json({ error: "This critique version sends the password to the server. Update critique to upload end-to-end encrypted diffs." }, 400)
     }
-    if (body.password !== undefined && !isValidPassword(body.password)) {
-      return c.json({ error: `Password must be 1 to ${MAX_PASSWORD_LENGTH} characters` }, 400)
-    }
-    const password = body.password
-
-    // Public diffs: first 32 hex chars of the HTML hash (128 bits, enables deduplication).
-    // Protected diffs: "p" + random hex, so the ID itself marks the diff as protected.
-    const id = password
-      ? generateProtectedId()
-      : toHex(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(body.html))).slice(0, 32)
 
     const url = new URL(c.req.url)
-
     const licenseKey = c.req.header(LICENSE_HEADER)
     const ownerSecret = c.req.header(OWNER_SECRET_HEADER)
     const license = licenseKey ? await kv.getLicense(licenseKey) : null
     const permanent = license?.status === "active"
+    const expiresInDays = permanent ? null : 7
     const ttlSeconds = permanent ? undefined : SEVEN_DAYS
+
+    // Encrypted diffs: "p" + random hex, so the ID itself marks the diff as encrypted
+    if (body.encrypted !== undefined) {
+      const envelopes = decodeEnvelopes(body.encrypted)
+      if (!envelopes) {
+        return c.json({ error: "Invalid 'encrypted' field" }, 400)
+      }
+      const id = generateProtectedId()
+      if (ownerSecret) {
+        await kv.setOwnerSecret(id, ownerSecret, ttlSeconds)
+      }
+      for (const kind of ENCRYPTED_KINDS) {
+        const bytes = envelopes[kind]
+        if (bytes) await store.put({ id, kind: ENCRYPTED_BLOB_KINDS[kind], bytes, permanent })
+      }
+      return c.json({ id, url: `${url.origin}/v/${id}`, expiresInDays, passwordProtected: true })
+    }
+
+    const html = body.html
+    if (!html || typeof html !== "string") {
+      return c.json({ error: "Missing or invalid 'html' field" }, 400)
+    }
+
+    // Public diffs: first 32 hex chars of the HTML hash (128 bits, enables deduplication)
+    const id = toHex(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(html))).slice(0, 32)
 
     // Store owner secret for deletion authentication
     if (ownerSecret) {
       await kv.setOwnerSecret(id, ownerSecret, ttlSeconds)
     }
 
-    // Store the password before any content, so the diff is never readable without it
-    if (password) {
-      await setDiffPassword({ kv: c.env.CRITIQUE_KV, id, password, ttlSeconds })
-    }
-
     // Store OG image if provided inline
-    if (!password && body.ogImage && typeof body.ogImage === "string") {
+    if (body.ogImage && typeof body.ogImage === "string") {
       await store.put({ id, kind: "og", bytes: decodeBase64(body.ogImage), permanent })
     }
 
     // Always inject OG tags with the deterministic URL.
     // The image may arrive later via PATCH /upload/:id/og —
     // the URL will already be correct in the stored HTML.
-    const ogImageUrl = password ? undefined : `${url.origin}/og/${id}.png`
-    const title = extractTitle(body.html)
-    const htmlDesktop = ogImageUrl ? injectOgTags(body.html, ogImageUrl, title) : body.html
-    const htmlMobile = body.htmlMobile && ogImageUrl
-      ? injectOgTags(body.htmlMobile, ogImageUrl, title)
-      : body.htmlMobile
-
-    await store.putText({ id, kind: "html", text: htmlDesktop, permanent })
-    if (htmlMobile && typeof htmlMobile === "string") {
-      await store.putText({ id, kind: "mobile", text: htmlMobile, permanent })
+    const ogImageUrl = `${url.origin}/og/${id}.png`
+    const title = extractTitle(html)
+    await store.putText({ id, kind: "html", text: injectOgTags(html, ogImageUrl, title), permanent })
+    if (body.htmlMobile && typeof body.htmlMobile === "string") {
+      await store.putText({ id, kind: "mobile", text: injectOgTags(body.htmlMobile, ogImageUrl, title), permanent })
     }
     if (body.patch && typeof body.patch === "string") {
       await store.putText({ id, kind: "patch", text: body.patch, permanent })
     }
 
-    const viewUrl = `${url.origin}/v/${id}`
-
-    return c.json({
-      id,
-      url: viewUrl,
-      ogImageUrl,
-      expiresInDays: permanent ? null : 7,
-      passwordProtected: Boolean(password),
-    })
+    return c.json({ id, url: `${url.origin}/v/${id}`, ogImageUrl, expiresInDays, passwordProtected: false })
   } catch (error) {
     logger.log("Upload failed", error)
     return c.json({ error: "Failed to process upload" }, 500)
@@ -701,9 +760,8 @@ async function handleView(c: any) {
     if (!id || !DIFF_ID_REGEX.test(id)) {
       return c.text("Invalid ID", 400)
     }
-    const access = await checkDiffAccess(c, id)
-    if (!access.allowed) {
-      return c.text(`Password required. Send it in the ${PASSWORD_HEADER} header.`, 401)
+    if (isProtectedId(id)) {
+      return readEncryptedText(c, { id, kind: "patch" })
     }
     const patch = await store.getText(id, "patch")
     if (!patch) {
@@ -712,12 +770,16 @@ async function handleView(c: any) {
     return c.text(patch, 200, {
       "Content-Type": "text/plain; charset=utf-8",
       "Content-Disposition": `inline; filename="${id}.patch"`,
-      "Cache-Control": access.protected ? "private, no-store" : "public, max-age=86400",
+      "Cache-Control": "public, max-age=86400",
     })
   }
 
   if (!id || !DIFF_ID_REGEX.test(id)) {
     return c.text("Invalid ID", 400)
+  }
+
+  if (c.req.method === "HEAD") {
+    return handleHead(c)
   }
 
   // Check for version query param
@@ -731,13 +793,9 @@ async function handleView(c: any) {
     return c.redirect(url.toString(), 302)
   }
 
-  const access = await checkDiffAccess(c, id)
-  if (!access.allowed) {
-    return renderLockPage(c, { id })
-  }
-  // Refresh the cookie so it never expires while the diff is in use
-  if (access.protected) {
-    rememberPassword(c, access.password)
+  // Encrypted diffs: the lock page fetches /v/:id/blob/:kind and decrypts in the browser
+  if (isProtectedId(id)) {
+    return renderLockPage(c)
   }
 
   // Mobile falls back to desktop when no mobile version was uploaded
@@ -753,8 +811,7 @@ async function handleView(c: any) {
   return stream(c, async (s) => {
     c.header("Content-Type", "text/html; charset=utf-8")
     // Cache is now safe - URL determines content, no Vary needed.
-    // Protected diffs must never sit in a shared cache.
-    c.header("Cache-Control", access.protected ? "private, no-store" : "public, max-age=86400")
+    c.header("Cache-Control", "public, max-age=86400")
 
     // Stream in chunks for better performance
     const chunkSize = 16 * 1024 // 16KB chunks
@@ -771,26 +828,22 @@ async function handleView(c: any) {
 app.get("/v/:id", handleView)
 app.get("/view/:id", handleView)
 
-// Password form submit. Wrong password shows the form again; a correct one is added
-// to the cookie list and redirects back to the diff (keeping ?v=mobile).
-app.post("/v/:id/unlock", async (c) => {
+// Ciphertext of an encrypted diff, for the lock page. Safe in shared caches.
+// GET /v/:id/blob/html|mobile|patch
+app.get("/v/:id/blob/:kind", async (c) => {
   const id = c.req.param("id")
-  if (!DIFF_ID_REGEX.test(id)) {
-    return c.text("Invalid ID", 400)
+  const kind = c.req.param("kind")
+  if (!DIFF_ID_REGEX.test(id) || !isProtectedId(id) || !isEncryptedKind(kind)) {
+    return c.text("Invalid ID or kind", 400)
   }
-  const form = await c.req.parseBody()
-  const password = form["password"]
-  if (!isValidPassword(password)) {
-    return renderLockPage(c, { id, error: "Enter the password" })
+  const envelope = await getDiffStore(c).getBytes(id, ENCRYPTED_BLOB_KINDS[kind])
+  if (!envelope) {
+    return c.text("Not found", 404)
   }
-  const result = await checkTypedPassword(c, { id, password })
-  if (result === "wrong") {
-    return renderLockPage(c, { id, error: "Wrong password" })
-  }
-  if (result === "correct") {
-    rememberPassword(c, password)
-  }
-  return c.redirect(`/v/${id}${new URL(c.req.url).search}`, 303)
+  return c.body(envelope, 200, {
+    "Content-Type": "application/octet-stream",
+    "Cache-Control": "public, max-age=86400",
+  })
 })
 
 // Delete a diff by ID (requires owner secret)
@@ -810,7 +863,7 @@ app.delete("/v/:id", async (c) => {
   }
 
   // Check if diff exists
-  const html = await store.getBytes(id, "html")
+  const html = await store.getBytes(id, isProtectedId(id) ? "encHtml" : "html")
   if (!html) {
     return c.json({ error: "Not found" }, 404)
   }
@@ -827,7 +880,7 @@ app.delete("/v/:id", async (c) => {
   }
 
   await store.deleteAll(id)
-  await kv.deleteDiffRecords(id)
+  await kv.deleteOwnerSecret(id)
 
   return c.json({ success: true, message: "Deleted" })
 })
@@ -863,9 +916,8 @@ app.get("/raw/:id", async (c) => {
     return c.json({ error: "Invalid ID" }, 400)
   }
 
-  const access = await checkDiffAccess(c, id)
-  if (!access.allowed) {
-    return c.json({ error: "Password required" }, 401)
+  if (isProtectedId(id)) {
+    return readEncryptedText(c, { id, kind: "html" })
   }
 
   const html = await getDiffStore(c).getText(id, "html")
@@ -881,7 +933,7 @@ app.get("/raw/:id", async (c) => {
 })
 
 // Check if content exists
-// HEAD /v/:id or /view/:id
+// HEAD /v/:id or /view/:id. Called from handleView: Hono routes HEAD to GET handlers.
 async function handleHead(c: any) {
   const id = c.req.param("id")
 
@@ -889,12 +941,7 @@ async function handleHead(c: any) {
     return c.body(null, 400)
   }
 
-  const access = await checkDiffAccess(c, id)
-  if (!access.allowed) {
-    return c.body(null, 401)
-  }
-
-  const html = await getDiffStore(c).getBytes(id, "html")
+  const html = await getDiffStore(c).getBytes(id, isProtectedId(id) ? "encHtml" : "html")
 
   if (!html) {
     return c.body(null, 404)
@@ -903,8 +950,5 @@ async function handleHead(c: any) {
   c.header("Content-Length", String(html.byteLength))
   return c.body(null, 200)
 }
-
-app.on("HEAD", "/v/:id", handleHead)
-app.on("HEAD", "/view/:id", handleHead)
 
 export default app

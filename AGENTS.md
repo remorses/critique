@@ -85,13 +85,15 @@ After completing a fix or feature, add a `.changeset/*.md` file at the repo root
 
 ## worker dependencies
 
-worker code (worker.tsx, diff-store.ts, diff-password.tsx, routes/) is bundled by wrangler at deploy time. all their dependencies must be **devDependencies** in cli/package.json, not production dependencies. wrangler bundles everything into the worker output, so they don't need to be installed at runtime. production dependencies are only for the CLI tool itself (what users install with `bun install -g critique`).
+worker code (worker.tsx, diff-store.ts, diff-password.tsx, diff-crypto.ts, routes/) is bundled by wrangler at deploy time. all their dependencies must be **devDependencies** in cli/package.json, not production dependencies. wrangler bundles everything into the worker output, so they don't need to be installed at runtime. production dependencies are only for the CLI tool itself (what users install with `bun install -g critique`).
 
 this includes: `hono`, `stripe`, `resend`, and all `@cloudflare/*` types.
 
 ## worker storage
 
-diff blobs (desktop HTML, mobile HTML, patch, OG image) live in the R2 bucket `critique-diffs` (`critique-diffs-preview` for preview), read through `caches.default`. see the top of `cli/src/diff-store.ts` for the key layout. free uploads go under `ttl/` and an R2 lifecycle rule deletes them after 7 days; licensed uploads go under `keep/`. small records (licenses, owner secrets, password hashes) stay in KV `CRITIQUE_KV`, which preview shares with production.
+diff blobs (desktop HTML, mobile HTML, patch, OG image) live in the R2 bucket `critique-diffs` (`critique-diffs-preview` for preview), read through `caches.default`. see the top of `cli/src/diff-store.ts` for the key layout. free uploads go under `ttl/` and an R2 lifecycle rule deletes them after 7 days; licensed uploads go under `keep/`. small records (licenses, owner secrets) stay in KV `CRITIQUE_KV`, which preview shares with production.
+
+password diffs are end-to-end encrypted by the CLI (`cli/src/diff-crypto.ts`): gzip, then AES-256-GCM with a PBKDF2 key. the worker stores `*.enc` envelopes only and never sees the password. the lock page in `cli/src/diff-password.tsx` decrypts in the browser; curl sends the per-diff key in the `critique_key` cookie and the worker decrypts that one response.
 
 `cli/scripts/migrate-kv-to-r2.ts` copied the old KV diff blobs to R2. it deploys a temporary worker, so the data never goes through your machine.
 

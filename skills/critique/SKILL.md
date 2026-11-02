@@ -109,6 +109,12 @@ curl -s https://critique.work/v/<id>.patch | git apply --reverse
 
 Useful when an agent shares a critique URL and you want to programmatically apply or revert those changes.
 
+Password links (`--password`, IDs start with `p`) are end-to-end encrypted. Plain curl gets a 401 hint. Use the curl command critique printed after upload (also `curl` in `--json`), which sends the diff key in a cookie:
+
+```bash
+curl -b 'critique_key=<key>' https://critique.work/v/<id>.patch
+```
+
 ## Notes
 
 - Requires **Bun** — use `bunx critique` or global `critique`

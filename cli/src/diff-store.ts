@@ -7,6 +7,8 @@
 // Reads: caches.default (this datacenter) → R2 (both tiers in parallel) → cache.put.
 // Writes go to R2 and to the cache, so the first view after an upload is a cache hit.
 // Text blobs are stored gzipped; the OG PNG is stored as is.
+// Password diffs store *.enc envelopes from the CLI (diff-crypto.ts) as is: they are
+// already gzipped before encryption, and ciphertext does not compress.
 // Cache API delete only clears the current datacenter, so a deleted diff can stay
 // cached elsewhere for CACHE_MAX_AGE (browsers already cache views for that long).
 
@@ -26,13 +28,16 @@ export const DIFF_BLOBS = {
   mobile: { file: "mobile.html.gz", gzip: true },
   patch: { file: "diff.patch.gz", gzip: true },
   og: { file: "og.png", gzip: false },
+  encHtml: { file: "desktop.html.enc", gzip: false },
+  encMobile: { file: "mobile.html.enc", gzip: false },
+  encPatch: { file: "diff.patch.enc", gzip: false },
 } as const
 
 export type DiffBlobKind = keyof typeof DIFF_BLOBS
 export type DiffTier = "ttl" | "keep"
 
 const TIERS: DiffTier[] = ["keep", "ttl"]
-const KINDS: DiffBlobKind[] = ["html", "mobile", "patch", "og"]
+const KINDS: DiffBlobKind[] = ["html", "mobile", "patch", "og", "encHtml", "encMobile", "encPatch"]
 const CACHE_MAX_AGE = 60 * 60 * 24
 
 export function diffBlobKey({ tier, id, kind }: { tier: DiffTier; id: string; kind: DiffBlobKind }): string {

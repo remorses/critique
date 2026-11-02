@@ -1,8 +1,10 @@
 // End-to-end preview worker smoke test for upload/read/delete endpoints.
-// Validates HTML + mobile upload, OG image round-trip, and owner-secret deletion.
+// Validates HTML + mobile upload, OG image round-trip, owner-secret deletion,
+// and encrypted uploads (ciphertext blobs, curl key cookie, old CLI password rejection).
 
 import { describe, expect, test } from "bun:test"
 import crypto from "crypto"
+import { encryptDiffBlobs, KEY_COOKIE } from "./diff-crypto.js"
 
 const BASE_URL = process.env.CRITIQUE_PREVIEW_URL || "https://preview.critique.work"
 const OWNER_SECRET_HEADER = "X-Critique-Owner-Secret"
@@ -114,6 +116,71 @@ describe("preview worker upload and reads", () => {
           headers: {
             [OWNER_SECRET_HEADER]: ownerSecret,
           },
+        }).catch(() => undefined)
+      }
+    }
+  }, 120_000)
+
+  test("encrypted upload stores only ciphertext and decrypts .patch with the key cookie", async () => {
+    const ownerSecret = `preview-owner-${randomHex(8)}`
+    const htmlMarker = `secret-html-${randomHex(6)}`
+    const patchMarker = `secret-patch-${randomHex(6)}`
+    const patch = `diff --git a/a.txt b/a.txt\n--- a/a.txt\n+++ b/a.txt\n@@ -1 +1 @@\n-${patchMarker}\n+${patchMarker}-updated\n`
+    const { envelopes, key } = await encryptDiffBlobs({
+      password: "preview test password",
+      blobs: { html: `<html><body>${htmlMarker}</body></html>`, patch },
+    })
+    const encrypted = Object.fromEntries(
+      Object.entries(envelopes).map(([kind, bytes]) => [kind, Buffer.from(bytes).toString("base64")]),
+    )
+
+    let uploadedId: string | null = null
+    try {
+      const uploadResponse = await fetch(`${BASE_URL}/upload`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", [OWNER_SECRET_HEADER]: ownerSecret },
+        body: JSON.stringify({ encrypted }),
+      })
+      expect(uploadResponse.status).toBe(200)
+      const id = getString(asRecord(await uploadResponse.json(), "upload"), "id", "upload")
+      uploadedId = id
+      expect(id.startsWith("p")).toBe(true)
+
+      const viewHtml = await (await fetch(`${BASE_URL}/v/${id}?v=desktop`)).text()
+      expect(viewHtml).toContain("critiqueDecrypt")
+      expect(viewHtml).not.toContain(htmlMarker)
+
+      const blobResponse = await fetch(`${BASE_URL}/v/${id}/blob/html`)
+      expect(blobResponse.status).toBe(200)
+      expect(Buffer.from(await blobResponse.arrayBuffer())).toEqual(Buffer.from(envelopes.html!))
+
+      const lockedPatch = await fetch(`${BASE_URL}/v/${id}.patch`)
+      expect(lockedPatch.status).toBe(401)
+      expect(await lockedPatch.text()).toContain(`curl -b '${KEY_COOKIE}=<key>'`)
+
+      const patchResponse = await fetch(`${BASE_URL}/v/${id}.patch`, { headers: { Cookie: `${KEY_COOKIE}=${key}` } })
+      expect(patchResponse.status).toBe(200)
+      expect(await patchResponse.text()).toBe(patch)
+
+      const otherKey = (await encryptDiffBlobs({ password: "preview test password", blobs: { patch } })).key
+      const wrongKeyResponse = await fetch(`${BASE_URL}/v/${id}.patch`, { headers: { Cookie: `${KEY_COOKIE}=${otherKey}` } })
+      expect(wrongKeyResponse.status).toBe(403)
+
+      const oldCliResponse = await fetch(`${BASE_URL}/upload`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ html: "<html></html>", password: "hunter2" }),
+      })
+      expect(oldCliResponse.status).toBe(400)
+
+      const deleteResponse = await fetch(`${BASE_URL}/v/${id}`, { method: "DELETE", headers: { [OWNER_SECRET_HEADER]: ownerSecret } })
+      expect(deleteResponse.status).toBe(200)
+      uploadedId = null
+    } finally {
+      if (uploadedId) {
+        await fetch(`${BASE_URL}/v/${uploadedId}`, {
+          method: "DELETE",
+          headers: { [OWNER_SECRET_HEADER]: ownerSecret },
         }).catch(() => undefined)
       }
     }

@@ -11,7 +11,7 @@
     "directory": "./public"
   },
 
-  // Small records: licenses, owner secrets, password hashes
+  // Small records: licenses, owner secrets
   "kv_namespaces": [
     {
       "binding": "CRITIQUE_KV",

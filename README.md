@@ -224,26 +224,31 @@ Generated URLs look like `critique.work/v/<id>`.
 | `--theme <name>` | Use a fixed theme instead of auto light and dark mode | none |
 | `--no-commit-list` | Do not list the commits contained in the range | off |
 | `--open` | Open the URL in your browser | none |
-| `--json` | Print `{ url, id, files, commits }` for scripts | none |
-| `--password <pw>` | Require a password to open the link (or set `CRITIQUE_PASSWORD`) | none |
+| `--json` | Print `{ url, id, curl, files, commits }` for scripts | none |
+| `--password <pw>` | Encrypt the link end to end with a password (or set `CRITIQUE_PASSWORD`) | none |
 
 ### Password Protected Links
 
-Add a **password** to keep a link private. Viewers type it once.
+Add a **password** to encrypt the link end to end. The CLI encrypts the diff before upload, so critique.work only stores ciphertext and never sees the password. Viewers type it once and the browser decrypts.
 
 ```bash
-critique --web --password 'hunter2'
+critique --web --password 'a long passphrase only you share'
 
 # or for every upload
-export CRITIQUE_PASSWORD='hunter2'
+export CRITIQUE_PASSWORD='a long passphrase only you share'
 critique --web
 ```
 
-The browser keeps every password that worked, so one password unlocks all diffs you share with it. Protected links have no social preview image, and the `.patch` and `/raw` endpoints need the password too. Scripts send it in a header:
+The browser remembers every password that worked, so one password unlocks all diffs you share with it. Protected links have no social preview image.
+
+Agents read the patch with **curl**. The CLI prints the command after upload. It sends a key that opens only this diff, never the password:
 
 ```bash
-curl -H 'X-Critique-Password: hunter2' "$CRITIQUE_URL.patch"
+curl -b 'critique_key=<key>' 'https://critique.work/v/<id>.patch'
 ```
+
+> [!WARNING]
+> Anyone who gets the encrypted upload can try to guess the password offline. Use 12 characters or more. A lost password cannot be recovered.
 
 ### How Web Uploads Work
 
