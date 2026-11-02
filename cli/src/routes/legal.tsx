@@ -1,7 +1,7 @@
 /** @jsxImportSource hono/jsx */
 // Routes: GET /privacy, GET /terms.
-// Every statement here must match what worker.tsx, diff-password.tsx, agentation-api.ts
-// and comments-server really do. Update these pages when storage, TTLs or providers change.
+// Every statement here must match what worker.tsx, diff-password.tsx and diff-store.ts
+// really do. Update these pages when storage, TTLs or providers change.
 
 import { Hono } from "hono"
 import type { Child } from "hono/jsx"
@@ -10,7 +10,7 @@ const OPERATOR = "Tommaso De Rossi"
 const OPERATOR_GITHUB = "https://github.com/remorses"
 const REPO_URL = "https://github.com/remorses/critique"
 const CONTACT_EMAIL = "tommy@unframer.co"
-const LAST_UPDATED = "November 1, 2026"
+const LAST_UPDATED = "November 2, 2026"
 
 export function LegalLinks() {
   return (
@@ -95,14 +95,6 @@ function PrivacyPage() {
           </tr>
           <tr>
             <td>
-              Comments: the text, replies, the text you selected or near it, the position on the page,
-              the page URL, status, and your anonymous user ID
-            </td>
-            <td>To show comments to everyone who opens the link</td>
-            <td>No automatic expiry. Unpublishing a diff does not delete its comments.</td>
-          </tr>
-          <tr>
-            <td>
               License records: the license key, its status, your Stripe customer and subscription IDs,
               and dates
             </td>
@@ -112,16 +104,16 @@ function PrivacyPage() {
         </tbody>
       </table>
       <p>
-        Diffs are stored compressed in Cloudflare Workers KV. Comments are stored in a Cloudflare
-        Durable Object, one per diff. Your email address is not stored by critique.work. Stripe keeps
+        Diffs are stored compressed in Cloudflare R2. Owner secrets, password hashes and license
+        records are stored in Cloudflare Workers KV. Your email address is not stored by critique.work. Stripe keeps
         it, and it is given to Resend once to send you the license key.
       </p>
 
       <h2>Who can see your diff</h2>
       <ul>
         <li>
-          <strong>Anyone with the link</strong> can open the diff, its <code>.patch</code>, its
-          preview image and its comments. Links are long random-looking IDs and there is no public
+          <strong>Anyone with the link</strong> can open the diff, its <code>.patch</code> and its
+          preview image. Links are long random-looking IDs and there is no public
           list of them. But if someone posts a link publicly, search engines and others can find it.
         </li>
         <li>
@@ -130,11 +122,7 @@ function PrivacyPage() {
         </li>
         <li>
           A <strong>password</strong> blocks access through critique.work. It does not encrypt the
-          content. The operator can technically read stored diffs and comments, password protected
-          or not.
-        </li>
-        <li>
-          Anyone who can open a diff can add, edit or delete its comments.
+          content. The operator can technically read stored diffs, password protected or not.
         </li>
         <li>Public diffs get a preview image that chat apps and social sites show next to the link.</li>
       </ul>
@@ -149,19 +137,9 @@ function PrivacyPage() {
         </thead>
         <tbody>
           <tr>
-            <td><code>cw_user_id</code></td>
-            <td>A random ID, set on your first visit. It marks which comments you wrote.</td>
-            <td>10 years</td>
-          </tr>
-          <tr>
             <td><code>cw_pw</code></td>
             <td>The passwords you typed that worked, so you do not type them again</td>
             <td>400 days, renewed when you open a protected diff</td>
-          </tr>
-          <tr>
-            <td><code>feedback-toolbar-theme</code> (local storage)</td>
-            <td>Light or dark theme of the comments toolbar</td>
-            <td>Until you clear it</td>
           </tr>
         </tbody>
       </table>
@@ -181,7 +159,7 @@ function PrivacyPage() {
       <ul>
         <li>
           <a href="https://www.cloudflare.com/privacypolicy/">Cloudflare</a>: hosting and storage of
-          diffs, comments and license records.
+          diffs and license records.
         </li>
         <li>
           <a href="https://stripe.com/privacy">Stripe</a>: payments. Stripe collects your payment
@@ -206,12 +184,12 @@ function PrivacyPage() {
       <ul>
         <li>
           Run <code>critique unpublish &lt;url&gt;</code> on the machine that uploaded the diff. It
-          deletes the HTML, patch, preview image, owner secret and password hash. It can take up to
-          about a minute to disappear everywhere. Copies cached by browsers can stay up to 1 day, or
-          7 days for the preview image.
+          deletes the HTML, patch, preview image, owner secret and password hash. Copies cached on
+          Cloudflare servers and in browsers can stay up to 1 day, or 7 days for the preview image in
+          browsers.
         </li>
         <li>
-          To delete comments, a license record, or a diff you can no longer unpublish, email{" "}
+          To delete a license record, or a diff you can no longer unpublish, email{" "}
           <Contact /> with the link.
         </li>
         <li>

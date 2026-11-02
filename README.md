@@ -239,7 +239,7 @@ export CRITIQUE_PASSWORD='hunter2'
 critique --web
 ```
 
-The browser keeps every password that worked, so one password unlocks all diffs you share with it. Protected links have no social preview image, and the comments, `.patch` and `/annotations` endpoints need the password too. Scripts send it in a header:
+The browser keeps every password that worked, so one password unlocks all diffs you share with it. Protected links have no social preview image, and the `.patch` and `/raw` endpoints need the password too. Scripts send it in a header:
 
 ```bash
 curl -H 'X-Critique-Password: hunter2' "$CRITIQUE_URL.patch"

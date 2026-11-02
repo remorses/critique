@@ -85,13 +85,19 @@ After completing a fix or feature, add a `.changeset/*.md` file at the repo root
 
 ## worker dependencies
 
-worker code (worker.tsx, agentation-api.ts, comments-server) is bundled by wrangler at deploy time. all their dependencies must be **devDependencies** in cli/package.json, not production dependencies. wrangler bundles everything into the worker output, so they don't need to be installed at runtime. production dependencies are only for the CLI tool itself (what users install with `bun install -g critique`).
+worker code (worker.tsx, diff-store.ts, diff-password.tsx, routes/) is bundled by wrangler at deploy time. all their dependencies must be **devDependencies** in cli/package.json, not production dependencies. wrangler bundles everything into the worker output, so they don't need to be installed at runtime. production dependencies are only for the CLI tool itself (what users install with `bun install -g critique`).
 
-this includes: `@critique.work/server`, `agents`, `hono`, `stripe`, `resend`, `@critique.work/agentation`, `preact`, and all `@cloudflare/*` types.
+this includes: `hono`, `stripe`, `resend`, and all `@cloudflare/*` types.
+
+## worker storage
+
+diff blobs (desktop HTML, mobile HTML, patch, OG image) live in the R2 bucket `critique-diffs` (`critique-diffs-preview` for preview), read through `caches.default`. see the top of `cli/src/diff-store.ts` for the key layout. free uploads go under `ttl/` and an R2 lifecycle rule deletes them after 7 days; licensed uploads go under `keep/`. small records (licenses, owner secrets, password hashes) stay in KV `CRITIQUE_KV`, which preview shares with production.
+
+`cli/scripts/migrate-kv-to-r2.ts` copied the old KV diff blobs to R2. it deploys a temporary worker, so the data never goes through your machine.
 
 ## preview worker
 
-when working on the worker, agentation widget, or HTML page styles, use the preview worker to test changes before deploying to production.
+when working on the worker or HTML page styles, use the preview worker to test changes before deploying to production.
 
 deploy the preview worker from the `cli/` directory:
 
@@ -105,7 +111,7 @@ to upload diffs to the preview worker instead of production, set `CRITIQUE_WORKE
 CRITIQUE_WORKER_URL=https://preview.critique.work bun run cli/src/cli.tsx web --filter "cli/src/ansi-html.ts"
 ```
 
-this uploads to `preview.critique.work` so you can test HTML/CSS/widget changes without affecting production. use this whenever changing `ansi-html.ts`, `web-utils.tsx`, `worker.tsx`, or `comments-client/`.
+this uploads to `preview.critique.work` so you can test HTML/CSS changes without affecting production. use this whenever changing `ansi-html.ts`, `web-utils.tsx`, `worker.tsx`, or `diff-store.ts`.
 
 production deploy (critique.work):
 

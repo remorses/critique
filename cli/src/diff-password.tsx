@@ -6,7 +6,7 @@
 // later requests, so one password unlocks every diff shared with it.
 // Scripts can send the password in the X-Critique-Password header instead.
 
-import type { Context, MiddlewareHandler } from "hono"
+import type { Context } from "hono"
 import { getCookie, setCookie } from "hono/cookie"
 import type { KVNamespace } from "@cloudflare/workers-types"
 
@@ -156,19 +156,6 @@ export function rememberPassword(c: Context, password: string): void {
     secure: true,
     sameSite: "Lax",
   })
-}
-
-// Middleware for API routes: 401 unless the request can unlock the diff from getId.
-export function diffAccessGuard<E extends KvEnv>(getId: (c: Context<E>) => string | undefined): MiddlewareHandler<E> {
-  return async (c, next) => {
-    const id = getId(c)
-    if (!id || !isProtectedId(id)) return next()
-    const access = await checkDiffAccess(c, id)
-    if (!access.allowed) return c.json({ error: "Password required" }, 401)
-    await next()
-    // Handlers return raw proxied Responses, which drop headers set with c.header
-    c.res.headers.set("Cache-Control", "private, no-store")
-  }
 }
 
 export function renderLockPage(c: Context, options: { id: string; error?: string }) {

@@ -592,10 +592,7 @@ export async function captureToHtml(
   const { themeNames, defaultThemeName } = await import("./themes.js")
   const customTheme = options.themeName !== defaultThemeName && themeNames.includes(options.themeName)
 
-  // Build renderLine callback that:
-  // 1. Wraps file header lines with anchor IDs and clickable links
-  // 2. Adds data-anchor="file:line" on diff lines so the agentation widget
-  //    can capture which exact diff line an annotation refers to
+  // Build renderLine callback that wraps file header lines with anchor IDs and clickable links
   //
   // sectionPositions is sorted by lineIndex (ascending). We track currentFile
   // by advancing a pointer as we iterate lines.

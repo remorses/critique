@@ -6,12 +6,12 @@
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": true,
 
-  // Static assets (fonts, comments widget, etc.)
+  // Static assets (fonts)
   "assets": {
     "directory": "./public"
   },
 
-  // KV Namespace binding for storing HTML content
+  // Small records: licenses, owner secrets, password hashes
   "kv_namespaces": [
     {
       "binding": "CRITIQUE_KV",
@@ -19,21 +19,23 @@
     }
   ],
 
-  // CommentRoom Durable Object for real-time threaded comments
-  "durable_objects": {
-    "bindings": [
-      {
-        "name": "CommentRoom",
-        "class_name": "CommentRoom"
-      }
-    ]
-  },
+  // Diff HTML, patches and OG images. Lifecycle rule deletes ttl/ after 7 days.
+  "r2_buckets": [
+    {
+      "binding": "CRITIQUE_DIFFS",
+      "bucket_name": "critique-diffs"
+    }
+  ],
 
-  // Durable Object migrations (SQLite storage for annotations)
+  // The comments feature (CommentRoom) was removed; v2 deletes its Durable Object storage
   "migrations": [
     {
       "tag": "v1",
       "new_sqlite_classes": ["CommentRoom"]
+    },
+    {
+      "tag": "v2",
+      "deleted_classes": ["CommentRoom"]
     }
   ],
 
@@ -56,14 +58,12 @@
           "id": "844b10c9fea049c8b20fa4a8c5cae44e"
         }
       ],
-      "durable_objects": {
-        "bindings": [
-          {
-            "name": "CommentRoom",
-            "class_name": "CommentRoom"
-          }
-        ]
-      }
+      "r2_buckets": [
+        {
+          "binding": "CRITIQUE_DIFFS",
+          "bucket_name": "critique-diffs-preview"
+        }
+      ]
     }
   }
 }

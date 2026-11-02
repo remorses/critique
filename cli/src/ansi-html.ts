@@ -246,7 +246,7 @@ export function frameToHtmlDocument(frame: CapturedFrame, options: ToHtmlOptions
     </style>
     <title>${escapeHtml(title)}</title>
     <style>
-    /* Tailwind-style global defaults (safe for agentation widget) */
+    /* Tailwind-style global defaults */
     *, ::before, ::after {
       box-sizing: border-box;
       border-width: 0;
@@ -275,8 +275,7 @@ export function frameToHtmlDocument(frame: CapturedFrame, options: ToHtmlOptions
       max-width: 100%;
     }
     /*
-     * Diff content styles scoped to #content so they don't interfere
-     * with the agentation widget which lives outside #content.
+     * Diff content styles scoped to #content.
      */
     #content {
       width: fit-content;

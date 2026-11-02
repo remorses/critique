@@ -1,29 +1,20 @@
 /** @jsxImportSource hono/jsx */
 // Cloudflare Worker for hosting HTML diff previews at critique.work.
-// Handles upload, storage (KV), Stripe checkout, responsive serving, and real-time comments.
-// Endpoints: POST /upload, GET /v/:id (view), GET /raw/:id (debug), /a/* (agentation API).
+// Handles upload, storage, Stripe checkout and responsive serving.
+// Diff blobs (HTML, patch, OG image) live in R2 behind the Cache API (diff-store.ts).
+// Small records (licenses, owner secrets, password hashes) live in KV.
+// Endpoints: POST /upload, GET /v/:id (view), GET /raw/:id (debug).
 // Payments: GET /buy, GET /success, POST /stripe/webhook.
 // Legal: GET /privacy, GET /terms (routes/legal.tsx).
 
-import { Hono } from "hono"
+import { Hono, type Context } from "hono"
 import { cors } from "hono/cors"
 import { stream } from "hono/streaming"
-import type { KVNamespace } from "@cloudflare/workers-types"
+import type { KVNamespace, R2Bucket } from "@cloudflare/workers-types"
 import Stripe from "stripe"
 import { Resend } from "resend"
-import { agentationApi } from "./agentation-api.js"
-import { annotationsContextRoute } from "./routes/annotations-context.js"
 import { LEGAL_LINKS_CSS, LegalLinks, legalRoute } from "./routes/legal.js"
-import { version as pkgVersion } from "../package.json"
-import {
-  buildKvPutOptions,
-  decodeBinaryFromKv,
-  decodeTextFromKv,
-  gzipArrayBuffer,
-  gzipText,
-  KV_SCHEMA_VERSION,
-  type KvValueMetadata,
-} from "./kv-codec.js"
+import { DiffStore } from "./diff-store.js"
 import {
   checkDiffAccess,
   checkTypedPassword,
@@ -39,18 +30,17 @@ import {
   setDiffPassword,
 } from "./diff-password.js"
 
-// Re-export CommentRoom so wrangler can discover the Durable Object class
-export { CommentRoom } from "@critique.work/server"
-
 type Bindings = {
   CRITIQUE_KV: KVNamespace
+  CRITIQUE_DIFFS: R2Bucket
   STRIPE_SECRET_KEY: string
   STRIPE_WEBHOOK_SECRET: string
   PUBLIC_URL?: string
   RESEND_API_KEY?: string
   RESEND_FROM?: string
-  CommentRoom: { idFromName(name: string): { toString(): string }; get(id: any): { fetch(request: Request): Promise<Response> } }
 }
+
+type AppEnv = { Bindings: Bindings }
 
 type LicenseRecord = {
   status: "active" | "inactive" | "canceled"
@@ -60,16 +50,13 @@ type LicenseRecord = {
   updatedAt?: number
 }
 
-const app = new Hono<{ Bindings: Bindings; Variables: { userId: string } }>()
+const app = new Hono<AppEnv>()
 
+// KV TTL of owner secrets and password hashes. The R2 lifecycle rule on ttl/ matches it.
 const SEVEN_DAYS = 60 * 60 * 24 * 7
 const LICENSE_HEADER = "X-Critique-License"
 const OWNER_SECRET_HEADER = "X-Critique-Owner-Secret"
 const STRIPE_YEARLY_PRICE_ID = "price_1Su9CZBekrVyz93iMIEnjPOk"
-const HTML_CONTENT_TYPE = "text/html; charset=utf-8"
-const PATCH_CONTENT_TYPE = "text/x-diff; charset=utf-8"
-const OG_IMAGE_CONTENT_TYPE = "image/png"
-const COMPRESS_OG_IMAGE_IN_KV = true
 
 // Favicon PNGs (32x32) - dark (white icon for dark bg) and light (black icon for light bg)
 const FAVICON_DARK_BASE64 = "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAACXBIWXMAAAsTAAALEwEAmpwYAAAA8ElEQVR4nO2WPwrCMBhHSxVBvIR4CsHFQXsGt6KjJyiouOosOLgI7s4OjtrjODv450lLSjPFtjZRbB/8hi9pksdHCrGskgQAV95zAQaWDkjOHRjpEOgAPUX6gC8knsA4d4l3AA3gKHVj+slmfoq236LDgDpwkOZmWQWysBBra8BeGl+aEpAlKsCOmDVgmxAImEsSW2JWpgRkCRvYhCPwMCkQMBF7dcMKyFNgKKLiplOgKaLk7wRcoCVSFYlqtxACMsW8A2l/Q60Cifg7AUfxvWNCwFM8yTwTAqn5FYG2KK9fEcgEpQCcc2jCKVv/rYLxAsud37oBTmHeAAAAAElFTkSuQmCC"
@@ -83,30 +70,6 @@ const logger = {
 
 // Enable CORS for all routes
 app.use("*", cors())
-
-// Cookie-based identity for comments: assign a persistent user ID on first visit
-app.use("*", async (c, next) => {
-  const cookieHeader = c.req.header("Cookie") || ""
-  const cookies = parseCookies(cookieHeader)
-  let userId = cookies["cw_user_id"]
-
-  if (!userId) {
-    userId = crypto.randomUUID()
-    c.header(
-      "Set-Cookie",
-      `cw_user_id=${userId}; Path=/; Max-Age=${60 * 60 * 24 * 365 * 10}; SameSite=Lax`,
-    )
-  }
-
-  c.set("userId", userId)
-  await next()
-})
-
-// Agentation HTTP API (annotations, sessions, SSE)
-app.route("/a", agentationApi)
-
-// Annotations context page (HTML/JSON view of all annotations for a diff)
-app.route("", annotationsContextRoute)
 
 // Privacy policy and terms
 app.route("", legalRoute)
@@ -216,95 +179,6 @@ class CritiqueKv {
     this.kv = kv
   }
 
-  private async getTextValue(key: string): Promise<string | null> {
-    const { value, metadata } = await this.kv.getWithMetadata<KvValueMetadata>(key, "arrayBuffer")
-    if (!value) return null
-    return decodeTextFromKv(value, metadata)
-  }
-
-  private async setCompressedTextValue(
-    key: string,
-    value: string,
-    contentType: string,
-    ttlSeconds?: number,
-  ): Promise<void> {
-    const compressed = await gzipText(value)
-    await this.kv.put(
-      key,
-      compressed,
-      buildKvPutOptions(ttlSeconds, {
-        contentType,
-        contentEncoding: "gzip",
-        schemaVersion: KV_SCHEMA_VERSION,
-      }),
-    )
-  }
-
-  private async getBinaryValue(key: string): Promise<ArrayBuffer | null> {
-    const { value, metadata } = await this.kv.getWithMetadata<KvValueMetadata>(key, "arrayBuffer")
-    if (!value) return null
-    return decodeBinaryFromKv(value, metadata)
-  }
-
-  private async setBinaryValue(
-    key: string,
-    bytes: ArrayBuffer,
-    contentType: string,
-    ttlSeconds?: number,
-    compress = false,
-  ): Promise<void> {
-    const metadata: KvValueMetadata = {
-      contentType,
-      schemaVersion: KV_SCHEMA_VERSION,
-    }
-
-    let valueToStore = bytes
-    if (compress) {
-      valueToStore = await gzipArrayBuffer(bytes)
-      metadata.contentEncoding = "gzip"
-    }
-
-    await this.kv.put(key, valueToStore, buildKvPutOptions(ttlSeconds, metadata))
-  }
-
-  async getHtml(id: string): Promise<string | null> {
-    return this.getTextValue(id)
-  }
-
-  async setHtml(id: string, html: string, ttlSeconds?: number): Promise<void> {
-    await this.setCompressedTextValue(id, html, HTML_CONTENT_TYPE, ttlSeconds)
-  }
-
-  async getMobileHtml(id: string): Promise<string | null> {
-    return this.getTextValue(`${id}-mobile`)
-  }
-
-  async setMobileHtml(id: string, html: string, ttlSeconds?: number): Promise<void> {
-    await this.setCompressedTextValue(`${id}-mobile`, html, HTML_CONTENT_TYPE, ttlSeconds)
-  }
-
-  async getPatch(id: string): Promise<string | null> {
-    return this.getTextValue(`${id}-patch`)
-  }
-
-  async setPatch(id: string, patch: string, ttlSeconds?: number): Promise<void> {
-    await this.setCompressedTextValue(`${id}-patch`, patch, PATCH_CONTENT_TYPE, ttlSeconds)
-  }
-
-  async getOgImage(id: string): Promise<ArrayBuffer | null> {
-    return this.getBinaryValue(`og-${id}`)
-  }
-
-  async setOgImage(id: string, bytes: ArrayBuffer, ttlSeconds?: number): Promise<void> {
-    await this.setBinaryValue(
-      `og-${id}`,
-      bytes,
-      OG_IMAGE_CONTENT_TYPE,
-      ttlSeconds,
-      COMPRESS_OG_IMAGE_IN_KV,
-    )
-  }
-
   async getLicense(key: string): Promise<LicenseRecord | null> {
     const raw = await this.kv.get(`license:${key}`)
     return safeJsonParse<LicenseRecord>(raw)
@@ -338,16 +212,24 @@ class CritiqueKv {
     await this.kv.put(`owner:${id}`, secret, ttlSeconds ? { expirationTtl: ttlSeconds } : undefined)
   }
 
-  async deleteAll(id: string): Promise<void> {
+  async deleteDiffRecords(id: string): Promise<void> {
     await Promise.all([
-      this.kv.delete(id),
-      this.kv.delete(`${id}-mobile`),
-      this.kv.delete(`${id}-patch`),
-      this.kv.delete(`og-${id}`),
       this.kv.delete(`owner:${id}`),
       this.kv.delete(passwordKvKey(id)),
     ])
   }
+}
+
+function getDiffStore(c: Context<AppEnv>): DiffStore {
+  return new DiffStore({
+    bucket: c.env.CRITIQUE_DIFFS,
+    origin: new URL(c.req.url).origin,
+    waitUntil: (promise) => c.executionCtx.waitUntil(promise),
+  })
+}
+
+function decodeBase64(value: string): ArrayBuffer {
+  return Uint8Array.from(atob(value), (char) => char.charCodeAt(0)).buffer
 }
 
 function generateLicenseKey(): string {
@@ -476,6 +358,7 @@ function extractTitle(html: string): string {
 app.post("/upload", async (c) => {
   try {
     const kv = new CritiqueKv(c.env.CRITIQUE_KV)
+    const store = getDiffStore(c)
     const body = await c.req.json<{ html: string; htmlMobile?: string; ogImage?: string; patch?: string; password?: string }>()
 
     if (!body.html || typeof body.html !== "string") {
@@ -497,8 +380,8 @@ app.post("/upload", async (c) => {
     const licenseKey = c.req.header(LICENSE_HEADER)
     const ownerSecret = c.req.header(OWNER_SECRET_HEADER)
     const license = licenseKey ? await kv.getLicense(licenseKey) : null
-    const hasActiveLicense = license?.status === "active"
-    const ttlSeconds = hasActiveLicense ? undefined : SEVEN_DAYS
+    const permanent = license?.status === "active"
+    const ttlSeconds = permanent ? undefined : SEVEN_DAYS
 
     // Store owner secret for deletion authentication
     if (ownerSecret) {
@@ -512,12 +395,7 @@ app.post("/upload", async (c) => {
 
     // Store OG image if provided inline
     if (!password && body.ogImage && typeof body.ogImage === "string") {
-      const binaryString = atob(body.ogImage)
-      const bytes = new Uint8Array(binaryString.length)
-      for (let i = 0; i < binaryString.length; i++) {
-        bytes[i] = binaryString.charCodeAt(i)
-      }
-      await kv.setOgImage(id, bytes.buffer, ttlSeconds)
+      await store.put({ id, kind: "og", bytes: decodeBase64(body.ogImage), permanent })
     }
 
     // Always inject OG tags with the deterministic URL.
@@ -530,17 +408,12 @@ app.post("/upload", async (c) => {
       ? injectOgTags(body.htmlMobile, ogImageUrl, title)
       : body.htmlMobile
 
-    // Store desktop version in KV
-    await kv.setHtml(id, htmlDesktop, ttlSeconds)
-
-    // Store mobile version if provided
+    await store.putText({ id, kind: "html", text: htmlDesktop, permanent })
     if (htmlMobile && typeof htmlMobile === "string") {
-      await kv.setMobileHtml(id, htmlMobile, ttlSeconds)
+      await store.putText({ id, kind: "mobile", text: htmlMobile, permanent })
     }
-
-    // Store raw patch (unified diff) if provided
     if (body.patch && typeof body.patch === "string") {
-      await kv.setPatch(id, body.patch, ttlSeconds)
+      await store.putText({ id, kind: "patch", text: body.patch, permanent })
     }
 
     const viewUrl = `${url.origin}/v/${id}`
@@ -549,10 +422,11 @@ app.post("/upload", async (c) => {
       id,
       url: viewUrl,
       ogImageUrl,
-      expiresInDays: hasActiveLicense ? null : 7,
+      expiresInDays: permanent ? null : 7,
       passwordProtected: Boolean(password),
     })
   } catch (error) {
+    logger.log("Upload failed", error)
     return c.json({ error: "Failed to process upload" }, 500)
   }
 })
@@ -586,23 +460,18 @@ app.patch("/upload/:id/og", async (c) => {
       return c.json({ error: "Missing or invalid 'ogImage' field" }, 400)
     }
 
-    // Check license for TTL
+    // License decides the storage tier, same as the original upload
     const licenseKey = c.req.header(LICENSE_HEADER)
     const license = licenseKey ? await kv.getLicense(licenseKey) : null
-    const hasActiveLicense = license?.status === "active"
-    const ttlSeconds = hasActiveLicense ? undefined : SEVEN_DAYS
+    const permanent = license?.status === "active"
 
-    // Decode and store OG image binary only — HTML already has the correct meta tags
-    const binaryString = atob(body.ogImage)
-    const bytes = new Uint8Array(binaryString.length)
-    for (let i = 0; i < binaryString.length; i++) {
-      bytes[i] = binaryString.charCodeAt(i)
-    }
-    await kv.setOgImage(id, bytes.buffer, ttlSeconds)
+    // Store OG image binary only — HTML already has the correct meta tags
+    await getDiffStore(c).put({ id, kind: "og", bytes: decodeBase64(body.ogImage), permanent })
 
     const url = new URL(c.req.url)
     return c.json({ ogImageUrl: `${url.origin}/og/${id}.png` })
   } catch (error) {
+    logger.log("OG image upload failed", error)
     return c.json({ error: "Failed to update OG image" }, 500)
   }
 })
@@ -823,7 +692,7 @@ app.post("/stripe/webhook", async (c) => {
 async function handleView(c: any) {
   let id: string = c.req.param("id") || ""
 
-  const kv = new CritiqueKv(c.env.CRITIQUE_KV)
+  const store = getDiffStore(c)
 
   // Serve raw patch (unified diff) when URL ends with .patch
   // e.g. /v/abc123.patch → strips suffix, returns text/plain
@@ -836,7 +705,7 @@ async function handleView(c: any) {
     if (!access.allowed) {
       return c.text(`Password required. Send it in the ${PASSWORD_HEADER} header.`, 401)
     }
-    const patch = await kv.getPatch(id)
+    const patch = await store.getText(id, "patch")
     if (!patch) {
       return c.text("Not found", 404)
     }
@@ -871,41 +740,13 @@ async function handleView(c: any) {
     rememberPassword(c, access.password)
   }
 
-  // Serve the appropriate version based on query param
-  const isMobile = version === "mobile"
-  let html: string | null = null
-
-  if (isMobile) {
-    // Try mobile version first, fall back to desktop
-    html = await kv.getMobileHtml(id)
-    if (!html) {
-      html = await kv.getHtml(id)
-    }
-  } else {
-    html = await kv.getHtml(id)
-  }
+  // Mobile falls back to desktop when no mobile version was uploaded
+  const html = version === "mobile"
+    ? (await store.getText(id, "mobile")) ?? (await store.getText(id, "html"))
+    : await store.getText(id, "html")
 
   if (!html) {
     return c.text("Not found", 404)
-  }
-
-  // Only inject agentation widget for small diffs (< 1MB HTML).
-  // Large diffs have 185K+ DOM nodes and agentation's CSS causes Safari
-  // to choke on style recalculation. Small diffs load fine with it.
-  if (html.length < 1_000_000) {
-    const userId = c.get("userId") || "anonymous"
-    const origin = new URL(c.req.url).origin
-    // Escape < to \u003c to prevent XSS via </script> sequences in JSON values
-    const configJson = JSON.stringify({
-      endpoint: origin + "/a",
-      sessionId: id,
-      userId,
-      showFreezeButton: false,
-    }).replace(/</g, "\\u003c")
-    const commentsSnippet = `
-<script>window.__CRITIQUE_CONFIG__=${configJson}</script>
-<script src="/agentation-widget.js?v=${pkgVersion}"></script>`
-    html = html.replace("</body>", `${commentsSnippet}\n</body>`)
   }
 
   // Stream the HTML content for faster initial load
@@ -957,6 +798,7 @@ app.post("/v/:id/unlock", async (c) => {
 app.delete("/v/:id", async (c) => {
   const id = c.req.param("id")
   const kv = new CritiqueKv(c.env.CRITIQUE_KV)
+  const store = getDiffStore(c)
 
   if (!id || !DIFF_ID_REGEX.test(id)) {
     return c.json({ error: "Invalid ID" }, 400)
@@ -968,7 +810,7 @@ app.delete("/v/:id", async (c) => {
   }
 
   // Check if diff exists
-  const html = await kv.getHtml(id)
+  const html = await store.getBytes(id, "html")
   if (!html) {
     return c.json({ error: "Not found" }, 404)
   }
@@ -984,8 +826,8 @@ app.delete("/v/:id", async (c) => {
     return c.json({ error: "Unauthorized - invalid owner secret" }, 403)
   }
 
-  // Delete all related KV keys
-  await kv.deleteAll(id)
+  await store.deleteAll(id)
+  await kv.deleteDiffRecords(id)
 
   return c.json({ success: true, message: "Deleted" })
 })
@@ -996,13 +838,11 @@ app.get("/og/:id.png", async (c) => {
   const idWithExt = c.req.param("id.png")
   const id = idWithExt?.replace(".png", "")
 
-  const kv = new CritiqueKv(c.env.CRITIQUE_KV)
-
   if (!id || !DIFF_ID_REGEX.test(id)) {
     return c.text("Invalid ID", 400)
   }
 
-  const imageData = await kv.getOgImage(id)
+  const imageData = await getDiffStore(c).getBytes(id, "og")
 
   if (!imageData) {
     return c.text("Not found", 404)
@@ -1019,8 +859,6 @@ app.get("/og/:id.png", async (c) => {
 app.get("/raw/:id", async (c) => {
   const id = c.req.param("id")
 
-  const kv = new CritiqueKv(c.env.CRITIQUE_KV)
-
   if (!id || !DIFF_ID_REGEX.test(id)) {
     return c.json({ error: "Invalid ID" }, 400)
   }
@@ -1030,7 +868,7 @@ app.get("/raw/:id", async (c) => {
     return c.json({ error: "Password required" }, 401)
   }
 
-  const html = await kv.getHtml(id)
+  const html = await getDiffStore(c).getText(id, "html")
 
   if (!html) {
     return c.json({ error: "Not found" }, 404)
@@ -1047,8 +885,6 @@ app.get("/raw/:id", async (c) => {
 async function handleHead(c: any) {
   const id = c.req.param("id")
 
-  const kv = new CritiqueKv(c.env.CRITIQUE_KV)
-
   if (!id || !DIFF_ID_REGEX.test(id)) {
     return c.body(null, 400)
   }
@@ -1058,30 +894,17 @@ async function handleHead(c: any) {
     return c.body(null, 401)
   }
 
-  const html = await kv.getHtml(id)
+  const html = await getDiffStore(c).getBytes(id, "html")
 
   if (!html) {
     return c.body(null, 404)
   }
 
-  c.header("Content-Length", String(new TextEncoder().encode(html).byteLength))
+  c.header("Content-Length", String(html.byteLength))
   return c.body(null, 200)
 }
 
 app.on("HEAD", "/v/:id", handleHead)
 app.on("HEAD", "/view/:id", handleHead)
-
-// --- Cookie parser ---
-
-function parseCookies(header: string): Record<string, string> {
-  const cookies: Record<string, string> = {}
-  for (const part of header.split(";")) {
-    const [key, ...rest] = part.trim().split("=")
-    if (key) {
-      cookies[key.trim()] = rest.join("=").trim()
-    }
-  }
-  return cookies
-}
 
 export default app

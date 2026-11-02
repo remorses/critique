@@ -1,9 +1,5 @@
 {
   "name": "critique-workspace",
   "private": true,
-  "workspaces": ["./*"],
-  "scripts": {
-    "build:comments-widget": "bun run cli/scripts/build-widget.ts",
-    "build:comments-server": "bun run --filter '@critique.work/server' build"
-  }
+  "workspaces": ["./*"]
 }
