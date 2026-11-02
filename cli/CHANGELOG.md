@@ -1,3 +1,25 @@
+# 0.5.0
+
+1. **Password links are end-to-end encrypted.** With `--password` (or `CRITIQUE_PASSWORD`), the CLI encrypts the HTML and the patch on your machine before upload. critique.work stores only ciphertext and never receives the password, so not even the person who runs critique.work, or Cloudflare, can read the diff. Viewers type the password once and their browser decrypts.
+
+   ```bash
+   critique --web --password 'a long passphrase only you share'
+   ```
+
+   Encryption is AES-256-GCM with a key from PBKDF2-SHA256 (600,000 rounds). The browser remembers passwords that worked as keys in IndexedDB, and no script can read the password back.
+
+   Agents read the patch with curl. critique prints the command after upload, and `--json` includes it as `curl`. The cookie holds a key that opens only this diff, never the password:
+
+   ```bash
+   curl -b 'critique_key=<key>' 'https://critique.work/v/<id>.patch'
+   ```
+
+   Breaking: the `X-Critique-Password` header is gone, critique 0.4.0 can no longer upload password links, and password links made with 0.4.0 no longer open. critique warns when a password is shorter than 12 characters, because anyone with the ciphertext can guess short passwords offline. A lost password cannot be recovered.
+
+2. **Privacy policy and terms.** [critique.work/privacy](https://critique.work/privacy) and [critique.work/terms](https://critique.work/terms) say who runs critique.work, what an upload stores, how long it is kept, what the browser stores, and how to delete it with `critique unpublish`.
+
+3. **Faster first view of new links.** Uploaded diffs are stored in Cloudflare R2 with a cache in front, so the first view after an upload is served from cache. Free uploads still expire after 7 days. The unused comments widget is removed.
+
 # 0.4.0
 
 1. **Password protected web links.** Pass `--password` or set `CRITIQUE_PASSWORD` with `--web` (also works with `critique review --web`). Viewers type the password once; the browser remembers every password that worked, so later links shared with the same password open without asking.
