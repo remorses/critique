@@ -229,7 +229,14 @@ Generated URLs look like `critique.work/v/<id>`.
 
 ### Password Protected Links
 
-Add a **password** to encrypt the link end to end. The CLI encrypts the diff before upload, so critique.work only stores ciphertext and never sees the password. Viewers type it once and the browser decrypts.
+Add a **password** to encrypt the link end to end. The CLI encrypts the HTML and the patch on your machine before upload. critique.work only stores ciphertext and never receives the password, so **nobody but the people you give the password to can read the diff**. That includes me, the person who runs critique.work, and Cloudflare, which hosts it. Viewers type the password once and their browser decrypts.
+
+```text
+your machine                     critique.work                        viewer's browser
+────────────                     ─────────────                        ────────────────
+diff ─► gzip ─► AES-256-GCM ───► stores ciphertext only ───────────► password ─► decrypt
+        key = PBKDF2(password)   no password, no key, no hash
+```
 
 ```bash
 critique --web --password 'a long passphrase only you share'
@@ -284,7 +291,7 @@ Uploaded diffs expire after 7 days unless you use a license key. Identical diffs
 
 ### Privacy and Terms
 
-critique.work is run by Tommaso De Rossi ([remorses](https://github.com/remorses)). Anyone with a link can open its diff, so do not upload secrets. Delete an upload with `critique unpublish <url>`.
+critique.work is run by Tommaso De Rossi ([remorses](https://github.com/remorses)). Anyone with a link can open a public diff, so do not upload secrets. Use `--password` when the operator of critique.work must not be able to read the diff either: password links are end-to-end encrypted. Delete an upload with `critique unpublish <url>`.
 
 - [Privacy policy](https://critique.work/privacy): what is stored, for how long, and how to delete it
 - [Terms of service](https://critique.work/terms)

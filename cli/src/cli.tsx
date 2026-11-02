@@ -2238,7 +2238,7 @@ cli
   .option("--pdf-page-size <size>", "PDF page size: a4-landscape (default), a4-portrait, a3-landscape, letter-landscape, or WxH in points")
   .option("--open", "Open in browser (with --web/--pdf)")
   .option("--json", "Output JSON to stdout (with --web)")
-  .option("--password <password>", "Require a password to view the --web link (or set CRITIQUE_PASSWORD)")
+  .option("--password <password>", "End-to-end encrypt the --web link with a password; critique.work cannot read it (or set CRITIQUE_PASSWORD)")
   .option("--image", "Generate images instead of TUI (saved to temp directory)")
   .option("--cols <cols>", "Desktop columns for web/image render (default: 240)")
   .option("--mobile-cols <cols>", "Mobile columns for web render (default: 100)")
@@ -2629,7 +2629,7 @@ cli
   .option("--open", "Open in browser/viewer (with --web/--pdf)")
   .option("--json", "Output JSON to stdout (implies --web)")
   .option("--resume [id]", "Resume a previous review (shows select if no ID provided)")
-  .option("--password <password>", "Require a password to view the --web link (or set CRITIQUE_PASSWORD)")
+  .option("--password <password>", "End-to-end encrypt the --web link with a password; critique.work cannot read it (or set CRITIQUE_PASSWORD)")
   .action(async (base, head, options) => {
     ensureGitRepo();
     try {
@@ -2980,7 +2980,7 @@ cli
     description: "Filter files by glob pattern (can be used multiple times)",
   }))
   .option("--title <title>", "HTML document title")
-  .option("--password <password>", "Require a password to view the link (or set CRITIQUE_PASSWORD)")
+  .option("--password <password>", "End-to-end encrypt the link with a password; critique.work cannot read it (or set CRITIQUE_PASSWORD)")
   .action(async (base, head, options) => {
     ensureGitRepo();
     // Build git command and get diff

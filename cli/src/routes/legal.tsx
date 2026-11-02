@@ -117,7 +117,8 @@ function PrivacyPage() {
         </li>
         <li>
           A <strong>password</strong> encrypts the diff on your machine before upload (AES-256-GCM).
-          critique.work never receives the password and cannot read the diff. Viewers decrypt it in
+          critique.work never receives the password, so neither the operator nor Cloudflare can read
+          the diff. Viewers decrypt it in
           their browser. A short password can be guessed by anyone who gets the encrypted data, and a
           lost password cannot be recovered.
         </li>
